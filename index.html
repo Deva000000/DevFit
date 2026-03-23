@@ -1,0 +1,1735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Client Progress Log</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --g:#16a34a;--g2:#22c55e;--a:#f59e0b;--r:#ef4444;--b:#3b82f6;
+    --bg:#ffffff;--bg2:#2d2d2d;--bg3:#c8c8c8;
+    --t1:#111111;--t2:#555555;--bd:#d1d5db;
+    --radius:10px;--radius-lg:14px;
+  }
+
+  html{font-size:16px}
+  body{font-family:'DM Sans',sans-serif;background:#c8c8c8;color:var(--t1);min-height:100vh;padding:1rem;
+    background-image:
+      linear-gradient(rgba(204,0,0,0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(204,0,0,0.04) 1px, transparent 1px);
+    background-size: 40px 40px, 40px 40px;
+  }
+  .page{max-width:740px;margin:0 auto}
+  .page::before{content:'';display:block;height:3px;background:linear-gradient(90deg,#cc0000,#ff4444,#cc0000);border-radius:2px;margin-bottom:12px;}
+
+  /* HEADER */
+  .header{background:#111111;border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:1rem;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;border-left:5px solid #cc0000;border-top:3px solid #cc0000;}
+  .app-title{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:#fff;line-height:1.1}
+  .app-sub{font-size:13px;color:rgba(255,255,255,0.75);margin-top:2px}
+  .week-tabs{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .wtab{font-size:12px;font-weight:500;padding:6px 14px;border-radius:20px;border:1.5px solid rgba(220,38,38,0.5);background:transparent;color:rgba(255,255,255,0.8);cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif}
+  .wtab.active{background:#dc2626;color:#ffffff;border-color:#dc2626;font-weight:700}
+  .wtab-action{font-size:11px;font-weight:600;padding:5px 11px;border-radius:20px;border:1.5px solid rgba(220,38,38,0.6);background:transparent;color:rgba(255,255,255,0.85);cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif}
+  .wtab-action:hover{background:rgba(255,255,255,0.15)}
+  .wtab-action.danger{border-color:rgba(255,150,150,0.5);color:rgba(255,180,180,0.9)}
+  .wtab-action.danger:hover{background:rgba(255,100,100,0.15)}
+
+  /* GOAL SELECTOR */
+  .goal-row{display:flex;gap:8px;flex-wrap:wrap}
+  .goal-btn{flex:1;min-width:90px;padding:10px 8px;border-radius:var(--radius);border:2px solid #d1d5db;background:#ffffff;color:#555555;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;text-align:center}
+  .goal-btn.active-loss{border-color:#ef4444;background:#fef2f2;color:#991b1b}
+  .goal-btn.active-gain{border-color:#16a34a;background:#f0fdf4;color:#15803d}
+  .goal-btn.active-maintain{border-color:#3b82f6;background:#eff6ff;color:#1e40af}
+
+  /* CARD */
+  .card{background:#2d2d2d;border:1px solid #3a3a3a;border-radius:var(--radius-lg);padding:16px;margin-bottom:12px}
+
+  /* INPUTS */
+  .client-row{display:flex;gap:10px;flex-wrap:wrap}
+  .client-row input,.text-input{flex:1;min-width:150px;font-family:'DM Sans',sans-serif;font-size:14px;padding:9px 14px;border:1px solid #d1d5db;border-radius:var(--radius);background:#ffffff;color:#111111;outline:none;transition:border-color .15s}
+  .client-row input:focus,.text-input:focus{border-color:var(--g)}
+  .client-row input::placeholder,.text-input::placeholder{color:var(--t2)}
+
+  /* SECTION LABEL */
+  .section-label{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;color:#e2e8f0;text-transform:uppercase;margin-bottom:10px}
+
+  /* DAY GRID */
+  .metric-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+  .day-card{background:#ffffff;border:1px solid var(--bd);border-radius:var(--radius);padding:8px 4px;text-align:center;transition:border-color .2s}
+  .day-card:focus-within{border-color:var(--g)}
+  .day-lbl{font-size:10px;font-weight:500;color:#888888;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}
+  .day-card input{width:100%;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;text-align:center;border:none;background:transparent;color:#111111;outline:none;padding:2px 0}
+  .day-card input::placeholder{color:var(--bd);font-size:18px;font-weight:400}
+  input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
+  input[type=number]{-moz-appearance:textfield}
+  .day-dot{width:6px;height:6px;border-radius:50%;margin:5px auto 0;background:var(--bd)}
+  .day-dot.ok{background:#22c55e}
+  .day-dot.warn{background:#f59e0b}
+  .day-dot.bad{background:#ef4444}
+
+  /* WEEKLY CHECK-IN */
+  .checkin-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .overload-opts{display:flex;flex-direction:column;gap:6px}
+  .ol-btn{padding:9px 12px;border-radius:var(--radius);border:1.5px solid #d1d5db;background:#ffffff;color:#333333;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;text-align:left}
+  .ol-btn:hover{border-color:var(--g);color:var(--t1)}
+  .ol-btn.selected{border-color:var(--g);background:#f0fdf4;color:#15803d;font-weight:600}
+  .ol-btn.selected-warn{border-color:var(--a);background:#fffbeb;color:#92400e;font-weight:600}
+  .ol-btn.selected-bad{border-color:var(--r);background:#fef2f2;color:#991b1b;font-weight:600}
+  .bf-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+  .bf-input{width:90px;font-family:'Syne',sans-serif;font-size:18px;font-weight:700;text-align:center;padding:8px;border:1.5px solid #d1d5db;border-radius:var(--radius);background:#ffffff;color:#111111;outline:none}
+  .bf-input:focus{border-color:var(--g)}
+  .bf-direction{display:flex;gap:6px;flex-wrap:wrap}
+  .bf-btn{padding:6px 12px;border-radius:20px;border:1.5px solid #d1d5db;background:#ffffff;color:#444444;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif}
+  .bf-btn.sel-drop{border-color:#16a34a;background:#dcfce7;color:#15803d}
+  .bf-btn.sel-same{border-color:#f59e0b;background:#fef9c3;color:#92400e}
+  .bf-btn.sel-rise{border-color:#ef4444;background:#fee2e2;color:#991b1b}
+  .notes-area{width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:9px 12px;border:1px solid #d1d5db;border-radius:var(--radius);background:#ffffff;color:#111111;outline:none;resize:vertical;min-height:70px}
+  .notes-area:focus{border-color:var(--g)}
+
+  /* SUMMARY */
+  .summary-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .sum-card{background:#ffffff;border:1px solid var(--bd);border-radius:var(--radius-lg);padding:12px 14px}
+  .sum-label{font-size:11px;color:#555555;font-weight:500;margin-bottom:4px}
+  .sum-val{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:#111111;margin-bottom:6px}
+  .sum-badge{display:inline-block;font-size:10px;font-weight:600;padding:3px 9px;border-radius:20px}
+  .badge-green{background:#dcfce7;color:#15803d}
+  .badge-amber{background:#fef9c3;color:#92400e}
+  .badge-red{background:#fee2e2;color:#991b1b}
+  .badge-blue{background:#dbeafe;color:#1e40af}
+  .badge-gray{background:var(--bg2);color:var(--t2);border:1px solid var(--bd)}
+
+  /* PROGRESS SCORE */
+  .score-big-wrap{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  .score-big-ring{flex-shrink:0}
+  .score-breakdown{flex:1;min-width:200px}
+  .score-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .score-bar-label{font-size:11px;color:#e2e8f0;width:90px;flex-shrink:0}
+  .score-bar-track{flex:1;height:6px;background:#444444;border-radius:3px;overflow:hidden}
+  .score-bar-fill{height:100%;border-radius:3px;transition:width .4s}
+  .score-bar-pct{font-size:11px;font-weight:600;color:#ffffff;width:32px;text-align:right}
+
+  /* FEEDBACK */
+  .feedback-box{background:#ffffff;border-left:3px solid var(--g);border-radius:var(--radius);padding:12px 16px;font-size:13px;line-height:1.7;color:#111111}
+
+  /* CHART */
+  .chart-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--t1);margin-bottom:8px}
+  .chart-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--t2);margin-bottom:10px}
+  .legend-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:middle}
+  .tip-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+  .tip-card{border-radius:10px;padding:10px 12px;border:1px solid}
+  .tip-down{background:#f0fdf4;border-color:#bbf7d0}
+  .tip-up{background:#fef2f2;border-color:#fecaca}
+  .tip-flat{background:#fffbeb;border-color:#fde68a}
+  .tip-dot{background:#eff6ff;border-color:#bfdbfe}
+  .tip-title{font-size:11px;font-weight:700;margin-bottom:3px}
+  .tip-down .tip-title{color:#15803d}
+  .tip-up .tip-title{color:#991b1b}
+  .tip-flat .tip-title{color:#92400e}
+  .tip-dot .tip-title{color:#1e40af}
+  .tip-body{font-size:12px;line-height:1.5}
+  .tip-down .tip-body{color:#166534}
+  .tip-up .tip-body{color:#7f1d1d}
+  .tip-flat .tip-body{color:#78350f}
+  .tip-dot .tip-body{color:#1e3a8a}
+
+  /* BUTTONS */
+  .action-row{display:flex;gap:8px;flex-wrap:wrap}
+  .btn{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;padding:9px 18px;border-radius:20px;cursor:pointer;transition:all .15s;border:1px solid var(--bd);background:var(--bg2);color:var(--t1)}
+  .btn:hover{background:var(--bg3)}
+  .btn.danger{border-color:#fca5a5;color:var(--r)}
+  .btn.danger:hover{background:#fee2e2}
+
+
+  /* STARTING STATS */
+  .stats-banner{background:#1a1a1a;border:1px solid #cc0000;border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:12px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .stat-item{text-align:center}
+  .stat-lbl{font-size:10px;color:#aaaaaa;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+  .stat-val{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:#ffffff}
+  .stat-highlight{color:#cc0000}
+  .stat-sub{font-size:10px;color:#888888;margin-top:2px}
+  /* PDF BUTTON */
+  .pdf-btn{background:#cc0000;color:#fff;border:none;border-radius:20px;padding:10px 20px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s}
+  .pdf-btn:hover{background:#aa0000}
+  @media(max-width:500px){.stats-banner{grid-template-columns:1fr 1fr}}
+
+
+  /* COUNTDOWN RING */
+  .countdown-wrap{display:flex;align-items:center;gap:14px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:var(--radius-lg);padding:12px 16px;margin-bottom:12px;}
+  .ring-svg{flex-shrink:0;}
+  .countdown-info{flex:1;}
+  .countdown-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#ffffff;margin-bottom:2px;}
+  .countdown-sub{font-size:11px;color:#888888;}
+
+  /* WELCOME SCREEN */
+  .welcome-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:9998;display:flex;align-items:center;justify-content:center;padding:1rem;}
+  .welcome-card{background:#111111;border:1px solid #2a2a2a;border-top:3px solid #cc0000;border-radius:16px;padding:32px 24px;max-width:380px;width:100%;text-align:center;}
+  .welcome-emoji{font-size:48px;margin-bottom:16px;}
+  .welcome-name{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:#ffffff;margin-bottom:8px;}
+  .welcome-detail{font-size:13px;color:#888888;line-height:1.7;margin-bottom:20px;}
+  .welcome-stat{display:inline-block;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:8px 14px;margin:4px;font-size:12px;color:#cccccc;}
+  .welcome-stat span{color:#cc0000;font-weight:700;}
+  .welcome-btn{display:block;width:100%;background:#cc0000;color:#fff;border:none;border-radius:10px;padding:13px;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-top:20px;transition:background .15s;}
+  .welcome-btn:hover{background:#aa0000;}
+
+  /* RENEWAL PROMPT */
+  .renewal-banner{background:#1a0000;border:1px solid #cc0000;border-radius:var(--radius-lg);padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+  .renewal-text{font-size:13px;color:#ff8888;font-weight:500;}
+  .renewal-btn{background:#cc0000;color:#fff;border:none;border-radius:20px;padding:8px 16px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block;}
+
+  /* MOBILE */
+  @media(max-width:500px){
+    body{padding:.5rem}
+    .header{padding:14px 16px}
+    .app-title{font-size:18px}
+    .metric-grid{gap:4px}
+    .day-card input{font-size:13px}
+    .sum-val{font-size:18px}
+    .summary-strip{grid-template-columns:1fr 1fr}
+    .checkin-grid{grid-template-columns:1fr}
+    .tip-cards{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <img src="data:image/jpeg;base64,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" alt="DevFit"
+        style="height:80px;width:80px;object-fit:cover;border-radius:12px;background:#fff;flex-shrink:0;">
+      <div>
+        <div class="app-title" style="font-size:18px;line-height:1.2;">DevFit Progress Log</div>
+        <div class="app-sub" style="font-size:12px;margin-top:3px;">Dominance Through Discipline</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-end;" id="week-tabs"></div>
+  </div>
+
+  <!-- COUNTDOWN RING -->
+  <div id="countdown-wrap" style="display:none;" class="countdown-wrap">
+    <svg class="ring-svg" width="56" height="56" viewBox="0 0 56 56">
+      <circle cx="28" cy="28" r="24" fill="none" stroke="#2a2a2a" stroke-width="5"/>
+      <circle id="ring-progress" cx="28" cy="28" r="24" fill="none" stroke="#cc0000" stroke-width="5"
+        stroke-linecap="round" stroke-dasharray="150.8" stroke-dashoffset="150.8"
+        transform="rotate(-90 28 28)" style="transition:stroke-dashoffset .6s;"/>
+      <text id="ring-days" x="28" y="28" text-anchor="middle" dominant-baseline="middle"
+        font-family="Syne,sans-serif" font-size="13" font-weight="800" fill="#ffffff">—</text>
+    </svg>
+    <div class="countdown-info">
+      <div class="countdown-title" id="countdown-title">Program active</div>
+      <div class="countdown-sub" id="countdown-sub">Loading...</div>
+    </div>
+  </div>
+
+  <!-- RENEWAL BANNER -->
+  <div id="renewal-banner" style="display:none;" class="renewal-banner">
+    <div class="renewal-text" id="renewal-text">⚠️ Your program ends soon!</div>
+    <a href="https://wa.me/60183679177" class="renewal-btn">💬 Renew Now</a>
+  </div>
+
+  <!-- CLIENT INFO + GOAL -->
+  <div class="card">
+    <div class="client-row" style="margin-bottom:12px;">
+      <input id="clientName" placeholder="Client name" onblur="save();render()">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div>
+        <div class="section-label" style="margin-bottom:5px;">Start weight (kg)</div>
+        <input style="width:100%;font-family:'DM Sans',sans-serif;font-size:14px;padding:8px 12px;border:1px solid #d1d5db;border-radius:var(--radius);background:#fff;color:#111;outline:none;" id="startWeight" placeholder="e.g. 80" type="number" step="0.1" inputmode="decimal" onblur="save();render()">
+      </div>
+      <div>
+        <div class="section-label" style="margin-bottom:5px;">Target weight (kg)</div>
+        <input style="width:100%;font-family:'DM Sans',sans-serif;font-size:14px;padding:8px 12px;border:1px solid #d1d5db;border-radius:var(--radius);background:#fff;color:#111;outline:none;" id="goalInput" placeholder="e.g. 70" type="number" step="0.1" inputmode="decimal" onblur="save();render()">
+      </div>
+
+      <div>
+        <div class="section-label" style="margin-bottom:5px;">Program duration</div>
+        <select style="width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 12px;border:1px solid #d1d5db;border-radius:var(--radius);background:#fff;color:#111;outline:none;cursor:pointer;" id="programDuration" onchange="save();render()">
+          <option value="4">4 weeks</option>
+          <option value="8">8 weeks</option>
+          <option value="12">12 weeks</option>
+          <option value="16">16 weeks</option>
+          <option value="20">20 weeks</option>
+          <option value="24">24 weeks</option>
+          <option value="28">28 weeks</option>
+          <option value="32">32 weeks</option>
+          <option value="36">36 weeks</option>
+          <option value="40">40 weeks</option>
+          <option value="44">44 weeks</option>
+          <option value="48">48 weeks</option>
+          <option value="52">52 weeks (1 year)</option>
+        </select>
+      </div>
+    </div>
+    <div class="section-label">Client goal</div>
+    <div class="goal-row">
+      <button class="goal-btn" id="goal-loss" onclick="setGoal('loss')">🔥 Fat Loss</button>
+      <button class="goal-btn" id="goal-gain" onclick="setGoal('gain')">💪 Weight Gain</button>
+      <button class="goal-btn" id="goal-maintain" onclick="setGoal('maintain')">⚖️ Maintain</button>
+    </div>
+  </div>
+
+  <!-- STATS BANNER -->
+  <div class="stats-banner" id="stats-banner"></div>
+
+  <!-- BODYWEIGHT -->
+  <div class="card">
+    <div class="section-label">Bodyweight (kg) — log daily</div>
+    <div class="metric-grid" id="bw-grid"></div>
+  </div>
+
+  <!-- STEPS -->
+  <div class="card">
+    <div class="section-label">Daily steps</div>
+    <div class="metric-grid" id="steps-grid"></div>
+  </div>
+
+  <!-- SLEEP -->
+  <div class="card">
+    <div class="section-label">Sleep (hours)</div>
+    <div class="metric-grid" id="sleep-grid"></div>
+  </div>
+
+  <!-- WEEKLY CHECK-IN -->
+  <div class="card">
+    <div class="section-label">Weekly check-in — Week <span id="checkin-week-num">1</span></div>
+    <div class="checkin-grid">
+      <div>
+        <div style="font-size:12px;font-weight:600;color:#ffffff;margin-bottom:8px;">Progressive overload</div>
+        <div class="overload-opts" id="overload-opts">
+          <button class="ol-btn" onclick="setOverload('improved')">💪 Weight or reps increased</button>
+          <button class="ol-btn" onclick="setOverload('form')">✅ Better form on majority of lifts</button>
+          <button class="ol-btn" onclick="setOverload('same')">➡️ Same as last week</button>
+          <button class="ol-btn" onclick="setOverload('regressed')">📉 Regressed / couldn't complete sets</button>
+        </div>
+        <div style="margin-top:12px;">
+          <div style="font-size:12px;font-weight:600;color:#ffffff;margin-bottom:6px;">Diet compliance</div>
+          <select id="diet-select" onchange="appData.weeklyCheckin[currentWeek].diet=this.value;save();render()"
+            style="width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:var(--radius);background:#ffffff;color:#333333;outline:none;cursor:pointer;">
+            <option value="">— Select —</option>
+            <option value="met">✅ Met daily requirement every day</option>
+            <option value="missed_few">⚠️ Missed target a few days</option>
+            <option value="binge">❌ Binge or mostly missed</option>
+          </select>
+        </div>
+        <div style="margin-top:10px;">
+          <div style="font-size:12px;font-weight:600;color:#ffffff;margin-bottom:6px;">Stress level</div>
+          <select id="stress-select" onchange="appData.weeklyCheckin[currentWeek].stress=this.value;save();render()"
+            style="width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:9px 12px;border:1.5px solid #d1d5db;border-radius:var(--radius);background:#ffffff;color:#333333;outline:none;cursor:pointer;">
+            <option value="">— Select —</option>
+            <option value="low">😌 Low</option>
+            <option value="moderate">😐 Moderate</option>
+            <option value="high">😤 High</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:600;color:#ffffff;margin-bottom:8px;">Body fat direction <span style="font-size:10px;color:#aaaaaa;font-weight:400;">(optional)</span></div>
+        <div class="bf-row">
+          <input class="bf-input" id="bf-input" type="number" placeholder="%" step="0.1" inputmode="decimal"
+            onblur="appData.weeklyCheckin[currentWeek].bf=this.value;save();render()">
+          <span style="font-size:12px;color:#aaaaaa;">%</span>
+        </div>
+        <div class="bf-direction">
+          <button class="bf-btn" id="bf-drop" onclick="setBF('drop')">↓ Dropped</button>
+          <button class="bf-btn" id="bf-same" onclick="setBF('same')">→ Same</button>
+          <button class="bf-btn" id="bf-rise" onclick="setBF('rise')">↑ Increased</button>
+        </div>
+        <div style="margin-top:12px;">
+          <div style="font-size:12px;font-weight:600;color:#ffffff;margin-bottom:6px;">Trainer notes</div>
+          <textarea class="notes-area" id="notes-area" placeholder="e.g. Looking leaner in shoulders, waist tighter..."
+            onblur="appData.weeklyCheckin[currentWeek].notes=this.value;save()"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUMMARY STATS -->
+  <div class="card">
+    <div class="summary-strip" id="summary-strip"></div>
+  </div>
+
+  <!-- TRUE PROGRESS SCORE -->
+  <div class="card">
+    <div class="section-label">True progress score — Week <span id="score-week-num">1</span></div>
+    <div class="score-big-wrap">
+      <div class="score-big-ring">
+        <canvas id="ring-overall" width="88" height="88"></canvas>
+        <div style="text-align:center;font-size:11px;color:var(--t2);margin-top:4px;">Overall</div>
+      </div>
+      <div class="score-breakdown" id="score-breakdown"></div>
+    </div>
+    <div style="margin-top:12px;font-size:11px;color:#e2e8f0;line-height:1.6;" id="score-legend">
+      Score is driven by: bodyweight direction vs goal (30%) · progressive overload (25%) · steps (20%) · sleep (15%) · body fat direction (10%)
+    </div>
+  </div>
+
+  <!-- FEEDBACK -->
+  <div class="card">
+    <div class="section-label">Weekly analysis</div>
+    <div class="feedback-box" id="feedback-box">Set a goal and enter data above to see analysis.</div>
+  </div>
+
+  <!-- CHART 1: BODYWEIGHT -->
+  <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:16px;margin-bottom:12px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+      <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#111111;">Bodyweight (kg)</div>
+      <select id="bw-chart-range" onchange="updateChart()" style="font-family:'DM Sans',sans-serif;font-size:12px;padding:5px 10px;border:1px solid #d1d5db;border-radius:20px;background:#f8fafc;color:#333;cursor:pointer;outline:none;" id="bw-range-select"></select>
+    </div>
+    <div id="trend-summary" style="font-size:12px;color:#666666;margin-bottom:10px;min-height:16px;"></div>
+    <div style="position:relative;height:200px;"><canvas id="trendChart"></canvas></div>
+  </div>
+
+  <!-- CHART 2: PROGRESS SCORE -->
+  <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:16px;margin-bottom:12px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+      <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#111111;">Progress Score (%)</div>
+      <select id="score-chart-range" onchange="updateChart()" style="font-family:'DM Sans',sans-serif;font-size:12px;padding:5px 10px;border:1px solid #d1d5db;border-radius:20px;background:#f8fafc;color:#333;cursor:pointer;outline:none;"></select>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:10px;">
+      <div style="background:#f8fafc;border-radius:8px;padding:7px 8px;">
+        <div style="font-size:10px;font-weight:700;color:#111;margin-bottom:2px;">Steps 20%</div>
+        <div style="font-size:9px;color:#666;">&#60;5k=25 · 5-8k=50<br>8-10k=75 · 10k+=100</div>
+      </div>
+      <div style="background:#f8fafc;border-radius:8px;padding:7px 8px;">
+        <div style="font-size:10px;font-weight:700;color:#111;margin-bottom:2px;">Sleep 20%</div>
+        <div style="font-size:9px;color:#666;">&#60;5h=20 · 5-6h=40<br>6-8h=75 · 8-9h=100</div>
+      </div>
+      <div style="background:#f8fafc;border-radius:8px;padding:7px 8px;">
+        <div style="font-size:10px;font-weight:700;color:#111;margin-bottom:2px;">Overload 20%</div>
+        <div style="font-size:9px;color:#666;">Improved=100 · Form=75<br>Same=40 · Regressed=10</div>
+      </div>
+      <div style="background:#f8fafc;border-radius:8px;padding:7px 8px;">
+        <div style="font-size:10px;font-weight:700;color:#111;margin-bottom:2px;">Diet 20%</div>
+        <div style="font-size:9px;color:#666;">Met=100 · Few miss=60<br>Binge=20</div>
+      </div>
+      <div style="background:#f8fafc;border-radius:8px;padding:7px 8px;">
+        <div style="font-size:10px;font-weight:700;color:#111;margin-bottom:2px;">Stress 10%</div>
+        <div style="font-size:9px;color:#666;">Low=100 · Moderate=60<br>High=20</div>
+      </div>
+      <div style="background:#f8fafc;border-radius:8px;padding:7px 8px;">
+        <div style="font-size:10px;font-weight:700;color:#111;margin-bottom:2px;">Body fat 10%</div>
+        <div style="font-size:9px;color:#666;">Dropped=100 · Same=50<br>Increased=0</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:14px;margin-bottom:8px;font-size:11px;color:#555;">
+      <span><span style="width:9px;height:9px;border-radius:50%;background:#16a34a;display:inline-block;margin-right:4px;vertical-align:middle;"></span>75-100% Great</span>
+      <span><span style="width:9px;height:9px;border-radius:50%;background:#f59e0b;display:inline-block;margin-right:4px;vertical-align:middle;"></span>50-74% Okay</span>
+      <span><span style="width:9px;height:9px;border-radius:50%;background:#ef4444;display:inline-block;margin-right:4px;vertical-align:middle;"></span>0-49% Low</span>
+    </div>
+    <div id="progress-summary" style="font-size:12px;color:#666666;margin-bottom:10px;min-height:16px;"></div>
+    <div style="position:relative;height:200px;"><canvas id="progressChart"></canvas></div>
+  </div>
+
+  <!-- ACTIONS -->
+  <div class="card">
+    <div class="action-row">
+      <button class="btn" onclick="logout()" style="border-color:#cc0000;color:#cc0000;">↩ Logout</button>
+      <button class="pdf-btn" id="week-pdf-btn" onclick="exportPDF()">⬇ Week Report (PDF)</button>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <select id="program-report-range" style="font-family:'DM Sans',sans-serif;font-size:13px;padding:9px 14px;border:1px solid #d1d5db;border-radius:20px;background:#ffffff;color:#333;outline:none;cursor:pointer;" id="prog-range">
+          <option value="all">All weeks</option>
+        </select>
+        <button class="pdf-btn" style="background:#cc0000;color:#fff;border-color:#cc0000;" onclick="exportProgramPDF()">⬇ Program Report (PDF)</button>
+      </div>
+      <button class="pdf-btn" style="background:#1a1a1a;border:1px solid #cc0000;" onclick="manualSync()">↑ Sync to Trainer</button>
+      <button class="btn danger" onclick="clearWeek()">Clear this week</button>
+      <button class="btn danger" onclick="clearAll()">Reset all data</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- WELCOME SCREEN -->
+<div class="welcome-overlay" id="welcome-overlay" style="display:none;">
+  <div class="welcome-card">
+    <div class="welcome-emoji">💪</div>
+    <div class="welcome-name" id="welcome-name">Welcome!</div>
+    <div class="welcome-detail" id="welcome-detail">Your program is ready. Start logging daily to track your progress.</div>
+    <div id="welcome-stats"></div>
+    <button class="welcome-btn" onclick="dismissWelcome()">Let's Go! 🔥</button>
+  </div>
+</div>
+
+<script>
+// LOGIN CHECK — verify with server every time page loads
+const SHEET_URL_AUTH = 'https://script.google.com/macros/s/AKfycbyyYXw0ySPYZ51EQyOlyIN2u04n_gpeNiag1bx4mhGPicxx5A3OjTi997J_1IFF2Wcy/exec';
+
+(function(){
+  try{
+    const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+    if(!user.email){
+      // Not logged in at all
+      window.location.href='https://deva000000.github.io/DevFit/login.html';
+      return;
+    }
+    // Show loading while we verify
+    document.addEventListener('DOMContentLoaded',function(){
+      const loadDiv = document.createElement('div');
+      loadDiv.id='auth-loading';
+      loadDiv.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:#1a1a1a;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;z-index:9999;';
+      loadDiv.innerHTML='<div style="width:40px;height:40px;border:3px solid #333;border-top-color:#cc0000;border-radius:50%;animation:spin .7s linear infinite;"></div><div style="color:#888;font-family:DM Sans,sans-serif;font-size:13px;">Verifying access...</div><style>@keyframes spin{to{transform:rotate(360deg)}}</style>';
+      document.body.appendChild(loadDiv);
+
+      // Verify with Google Sheet every time
+      fetch(SHEET_URL_AUTH+'?action=checkAccess&email='+encodeURIComponent(user.email))
+        .then(r=>r.json())
+        .then(data=>{
+          if(data.approved){
+            // Still approved — hide loader and show tracker
+            document.getElementById('auth-loading').remove();
+          } else {
+            // Revoked — clear session and redirect
+            localStorage.removeItem('devfit_user');
+            window.location.href='https://deva000000.github.io/DevFit/login.html';
+          }
+        })
+        .catch(()=>{
+          // Network error — allow access if previously approved (offline friendly)
+          const saved = localStorage.getItem('devfit_user');
+          if(saved) document.getElementById('auth-loading').remove();
+          else window.location.href='https://deva000000.github.io/DevFit/login.html';
+        });
+    });
+  }catch(e){
+    window.location.href='https://deva000000.github.io/DevFit/login.html';
+  }
+})();
+
+// Re-check approval every 30 minutes even if page stays open
+setInterval(()=>{
+  try{
+    const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+    if(!user.email) return;
+    fetch(SHEET_URL_AUTH+'?action=checkAccess&email='+encodeURIComponent(user.email))
+      .then(r=>r.json())
+      .then(data=>{
+        if(!data.approved){
+          localStorage.removeItem('devfit_user');
+          alert('Your access has been revoked. Please contact your trainer.');
+          window.location.href='https://deva000000.github.io/DevFit/login.html';
+        }
+      })
+      .catch(()=>{});
+  }catch(e){}
+}, 30 * 60 * 1000);
+
+const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+let totalWeeks = 4;
+let currentWeek = 0;
+let trendChart = null;
+let progressChart = null;
+const SHEET_URL = "https://script.google.com/macros/s/AKfycbyyYXw0ySPYZ51EQyOlyIN2u04n_gpeNiag1bx4mhGPicxx5A3OjTi997J_1IFF2Wcy/exec";
+
+function freshCheckin(){ return {overload:null, bf:'', bfDir:null, diet:null, stress:null, notes:''}; }
+
+let appData = {
+  clientName:'', goal:'', goalType:'loss',
+  startWeight:'', programDuration:'8',
+  bw:   Array.from({length:totalWeeks},()=>Array(7).fill('')),
+  steps:Array.from({length:totalWeeks},()=>Array(7).fill('')),
+  sleep:Array.from({length:totalWeeks},()=>Array(7).fill('')),
+  weeklyCheckin: Array.from({length:totalWeeks},freshCheckin)
+};
+
+function loadData(){
+  try{
+    const s=localStorage.getItem('progressLog2');
+    if(s){ appData=JSON.parse(s); totalWeeks=appData.bw.length||4; }
+    document.getElementById('clientName').value=appData.clientName||'';
+    document.getElementById('goalInput').value=appData.goal||'';
+    document.getElementById('startWeight').value=appData.startWeight||'';
+    document.getElementById('programDuration').value=appData.programDuration||'8';
+  }catch(e){}
+}
+function save(){
+  appData.clientName=document.getElementById('clientName').value;
+  appData.goal=document.getElementById('goalInput').value;
+  appData.startWeight=document.getElementById('startWeight').value;
+  appData.programDuration=document.getElementById('programDuration').value;
+  try{localStorage.setItem('progressLog2',JSON.stringify(appData));}catch(e){}
+}
+
+function setGoal(type){
+  appData.goalType=type; save(); render();
+}
+function renderGoalBtns(){
+  ['loss','gain','maintain'].forEach(t=>{
+    const b=document.getElementById('goal-'+t);
+    if(b) b.className='goal-btn'+(appData.goalType===t?' active-'+t:'');
+  });
+}
+
+function renderTabs(){
+  const c=document.getElementById('week-tabs'); c.innerHTML='';
+  for(let w=0;w<totalWeeks;w++){
+    const b=document.createElement('button');
+    b.className='wtab'+(w===currentWeek?' active':'');
+    b.textContent='Week '+(w+1);
+    b.onclick=()=>{currentWeek=w;renderTabs();render();};
+    c.appendChild(b);
+  }
+  const add=document.createElement('button');
+  add.className='wtab-action';
+  add.textContent='+ Add';
+  add.onclick=addWeek;
+  c.appendChild(add);
+  populateRangeDropdowns();
+  const wpb=document.getElementById('week-pdf-btn');
+  if(wpb) wpb.textContent='⬇ Week '+(currentWeek+1)+' Report (PDF)';
+  if(totalWeeks>1){
+    const rem=document.createElement('button');
+    rem.className='wtab-action danger';
+    rem.textContent='− Remove';
+    rem.onclick=removeWeek;
+    c.appendChild(rem);
+  }
+}
+
+function addWeek(){
+  appData.bw.push(Array(7).fill(''));
+  appData.steps.push(Array(7).fill(''));
+  appData.sleep.push(Array(7).fill(''));
+  appData.weeklyCheckin.push(freshCheckin());
+  totalWeeks++; currentWeek=totalWeeks-1;
+  save(); renderTabs(); render();
+}
+function removeWeek(){
+  if(totalWeeks<=1) return;
+  appData.bw.pop(); appData.steps.pop(); appData.sleep.pop(); appData.weeklyCheckin.pop();
+  totalWeeks--;
+  if(currentWeek>=totalWeeks) currentWeek=totalWeeks-1;
+  save(); renderTabs(); render();
+}
+
+function avg(arr){
+  const n=arr.filter(v=>v!=='').map(Number).filter(n=>!isNaN(n)&&n>0);
+  return n.length?n.reduce((a,b)=>a+b,0)/n.length:null;
+}
+function stepsScore(s){ if(s===null)return 0; if(s>=10000)return 100; if(s>=8000)return 75; if(s>=5000)return 50; return 25; }
+function sleepScore(h){ if(h===null)return 0; if(h>=8&&h<=9)return 100; if(h>=6)return 75; if(h>=5)return 40; return 20; }
+function dotSteps(v){ return v>=10000?'ok':v>=5000?'warn':'bad'; }
+function dotSleep(v){ return v>=8?'ok':v>=6?'warn':'bad'; }
+function dotBW(v){ return v>0?'ok':''; }
+
+function buildGrid(id,key,dotFn){
+  const el=document.getElementById(id); el.innerHTML='';
+  DAYS.forEach((d,i)=>{
+    const val=appData[key][currentWeek][i];
+    const dot=val!==''?dotFn(parseFloat(val)):'';
+    el.innerHTML+=`<div class="day-card"><div class="day-lbl">${d}</div>
+      <input type="number" value="${val}" placeholder="—" step="0.1" inputmode="decimal"
+        onblur="appData['${key}'][${currentWeek}][${i}]=this.value;save();render()">
+      <div class="day-dot ${dot}"></div></div>`;
+  });
+}
+
+function renderCheckin(){
+  const ci=appData.weeklyCheckin[currentWeek]||freshCheckin();
+  document.getElementById('checkin-week-num').textContent=currentWeek+1;
+  // Overload buttons
+  const olMap={improved:'ol-btn',form:'ol-btn',same:'ol-btn-warn',regressed:'ol-btn-bad'};
+  document.querySelectorAll('.ol-btn,.ol-btn-warn,.ol-btn-bad').forEach(b=>b.className='ol-btn');
+  if(ci.overload){
+    const vals=['improved','form','same','regressed'];
+    const clss=['selected','selected','selected-warn','selected-bad'];
+    const idx=vals.indexOf(ci.overload);
+    if(idx>=0) document.querySelectorAll('.ol-btn')[idx].className='ol-btn '+clss[idx];
+  }
+  // BF
+  document.getElementById('bf-input').value=ci.bf||'';
+  ['drop','same','rise'].forEach(d=>{
+    document.getElementById('bf-'+d).className='bf-btn'+(ci.bfDir===d?' sel-'+d:'');
+  });
+  document.getElementById('notes-area').value=ci.notes||'';
+  const dietSel=document.getElementById('diet-select');
+  if(dietSel) dietSel.value=ci.diet||'';
+  const stressSel=document.getElementById('stress-select');
+  if(stressSel) stressSel.value=ci.stress||'';
+}
+
+function setOverload(val){
+  if(!appData.weeklyCheckin[currentWeek]) appData.weeklyCheckin[currentWeek]=freshCheckin();
+  appData.weeklyCheckin[currentWeek].overload=val; save(); render();
+}
+function setBF(dir){
+  if(!appData.weeklyCheckin[currentWeek]) appData.weeklyCheckin[currentWeek]=freshCheckin();
+  appData.weeklyCheckin[currentWeek].bfDir=dir; save(); render();
+}
+
+function overloadScore(ol){
+  if(ol==='improved') return 100;
+  if(ol==='form') return 75;
+  if(ol==='same') return 40;
+  if(ol==='regressed') return 10;
+  return null;
+}
+function bfScore(dir){ if(dir==='drop') return 100; if(dir==='same') return 50; if(dir==='rise') return 0; return null; }
+function dietScore(d){ if(d==='met') return 100; if(d==='missed_few') return 60; if(d==='binge') return 20; return null; }
+function stressScore(s){ if(s==='low') return 100; if(s==='moderate') return 60; if(s==='high') return 20; return null; }
+
+function bwScore(bwAvg, prevBwAvg, goalType){
+  if(bwAvg===null) return null;
+  const sw=appData.startWeight?parseFloat(appData.startWeight):null;
+  const tw=appData.goal?parseFloat(appData.goal):null;
+  // Target reached — always 100%
+  if(tw!==null){
+    if(goalType==='loss'&&bwAvg<=tw) return 100;
+    if(goalType==='gain'&&bwAvg>=tw) return 100;
+    if(goalType==='maintain'&&Math.abs(bwAvg-tw)<=0.5) return 100;
+  }
+  // Week 1 with no start/target set — skip bodyweight scoring entirely
+  if(prevBwAvg===null){
+    if(sw===null||tw===null) return null;
+    const totalGap=Math.abs(tw-sw);
+    if(totalGap===0) return 100;
+    const done=Math.abs(bwAvg-sw);
+    return Math.min(100,Math.round((done/totalGap)*100));
+  }
+  // Week 2+ — direction vs previous week
+  const diff=bwAvg-prevBwAvg;
+  if(goalType==='loss'){
+    if(diff<-0.5) return 100; if(diff<-0.2) return 90; if(diff<0) return 75; if(diff<0.3) return 50; return 20;
+  } else if(goalType==='gain'){
+    if(diff>0.5) return 100; if(diff>0.2) return 90; if(diff>0) return 75; if(diff>-0.3) return 50; return 20;
+  } else {
+    if(Math.abs(diff)<=0.3) return 100; if(Math.abs(diff)<=0.7) return 65; return 30;
+  }
+}
+
+function calcTrueScore(w){
+  const ci=appData.weeklyCheckin[w]||freshCheckin();
+  const bwAvg=avg(appData.bw[w]);
+  const prevBwAvg=w>0?avg(appData.bw[w-1]):null;
+  const stepsAvg=avg(appData.steps[w]);
+  const sleepAvg=avg(appData.sleep[w]);
+  const gt=appData.goalType||'loss';
+  const tw=appData.goal?parseFloat(appData.goal):null;
+
+  // If target weight reached this week — bodyweight score is 100% regardless
+  let bwVal=bwScore(bwAvg,prevBwAvg,gt);
+  if(bwAvg!==null && tw!==null){
+    if(gt==='loss' && bwAvg<=tw) bwVal=100;
+    else if(gt==='gain' && bwAvg>=tw) bwVal=100;
+    else if(gt==='maintain' && Math.abs(bwAvg-tw)<=0.5) bwVal=100;
+  }
+
+  // If body fat dropped AND target weight reached — bf score is 100%
+  let bfVal=bfScore(ci.bfDir);
+  if(ci.bfDir==='drop' && bwAvg!==null && tw!==null){
+    if((gt==='loss'&&bwAvg<=tw)||(gt==='gain'&&bwAvg>=tw)||(gt==='maintain'&&Math.abs(bwAvg-tw)<=0.5)){
+      bfVal=100;
+    }
+  }
+
+  const scores={
+    bw:   {val:bwVal,                          weight:30, label:'Bodyweight'},
+    ol:   {val:overloadScore(ci.overload),      weight:25, label:'Overload'},
+    steps:{val:stepsScore(stepsAvg),            weight:20, label:'Steps'},
+    sleep:{val:sleepScore(sleepAvg),            weight:15, label:'Sleep'},
+    bf:   {val:bfVal,                          weight:10, label:'Body fat'},
+  };
+
+  let totalWeight=0, weightedSum=0;
+  Object.values(scores).forEach(s=>{
+    if(s.val!==null){ totalWeight+=s.weight; weightedSum+=s.val*s.weight; }
+  });
+
+  // If target reached + bf dropped — overall is 100%
+  const targetReached=bwAvg!==null&&tw!==null&&(
+    (gt==='loss'&&bwAvg<=tw)||(gt==='gain'&&bwAvg>=tw)||(gt==='maintain'&&Math.abs(bwAvg-tw)<=0.5)
+  );
+  const bfDropped=ci.bfDir==='drop';
+
+  let overall=totalWeight>0?Math.round(weightedSum/totalWeight):null;
+  if(targetReached && bfDropped) overall=100;
+  else if(targetReached && overall!==null) overall=Math.max(overall,95);
+
+  return {overall, scores};
+}
+
+function drawRingBig(id, score, color){
+  const c=document.getElementById(id); if(!c) return;
+  const ctx=c.getContext('2d');
+  const r=36,cx=44,cy=44;
+  ctx.clearRect(0,0,88,88);
+  // Background track segments: red(0-50), yellow(50-75), green(75-100)
+  const segments=[
+    {from:0,   to:0.5,  color:'rgba(239,68,68,0.15)'},
+    {from:0.5, to:0.75, color:'rgba(245,158,11,0.15)'},
+    {from:0.75,to:1,    color:'rgba(22,163,74,0.15)'}
+  ];
+  segments.forEach(s=>{
+    ctx.beginPath();
+    ctx.arc(cx,cy,r,-Math.PI/2+s.from*Math.PI*2,-Math.PI/2+s.to*Math.PI*2);
+    ctx.strokeStyle=s.color; ctx.lineWidth=8; ctx.stroke();
+  });
+  // Score arc
+  if(score!==null&&score>0){
+    const pct=score/100;
+    const ringColor=score>=75?'#16a34a':score>=50?'#f59e0b':'#ef4444';
+    ctx.beginPath();
+    ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+pct*Math.PI*2);
+    ctx.strokeStyle=ringColor; ctx.lineWidth=8; ctx.lineCap='round'; ctx.stroke();
+  }
+  // Score text
+  ctx.fillStyle=score!==null&&score>=75?'#16a34a':score!==null&&score>=50?'#f59e0b':'#ef4444';
+  ctx.font='bold 16px Syne,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(score!==null?score+'%':'—',cx,cy);
+  // Zone label
+  const zone=score===null?'':score>=75?'GREAT':score>=50?'OKAY':'LOW';
+  ctx.fillStyle='#aaaaaa'; ctx.font='8px DM Sans,sans-serif';
+  ctx.fillText(zone,cx,cy+18);
+}
+
+function renderScoreSection(){
+  const {overall,scores}=calcTrueScore(currentWeek);
+  document.getElementById('score-week-num').textContent=currentWeek+1;
+  setTimeout(()=>drawRingBig('ring-overall',overall,null),50);
+
+  let html='';
+  Object.values(scores).forEach(s=>{
+    const pct=s.val!==null?s.val:0;
+    const barColor=pct>=75?'#16a34a':pct>=50?'#f59e0b':'#ef4444';
+    const zone=s.val===null?'Not logged':pct>=75?'🟢 Great':pct>=50?'🟡 Okay':'🔴 Low';
+    const display=s.val!==null?pct+'%':'—';
+    html+='<div class="score-bar-row">'+
+      '<div class="score-bar-label">'+s.label+' <span style="color:#aaa;font-size:10px;">'+s.weight+'%</span></div>'+
+      '<div class="score-bar-track"><div class="score-bar-fill" style="width:'+pct+'%;background:'+barColor+'"></div></div>'+
+      '<div class="score-bar-pct" style="color:'+barColor+';">'+display+'</div>'+
+      '</div>'+
+      '<div style="font-size:10px;color:#999;margin:-4px 0 6px 0;padding-left:94px;">'+zone+'</div>';
+  });
+  document.getElementById('score-breakdown').innerHTML=html;
+}
+
+function render(){
+  renderGoalBtns();
+  const wpb2=document.getElementById('week-pdf-btn');
+  if(wpb2) wpb2.textContent='⬇ Week '+(currentWeek+1)+' Report (PDF)';
+  buildGrid('bw-grid','bw',dotBW);
+  buildGrid('steps-grid','steps',dotSteps);
+  buildGrid('sleep-grid','sleep',dotSleep);
+  renderCheckin();
+
+  const bwAvg=avg(appData.bw[currentWeek]);
+  const stepsAvg=avg(appData.steps[currentWeek]);
+  const sleepAvg=avg(appData.sleep[currentWeek]);
+  const gt=appData.goalType||'loss';
+
+  let stepsBadge='—',stepsClass='badge-gray';
+  if(stepsAvg!==null){
+    if(stepsAvg>=10000){stepsBadge='Excellent!';stepsClass='badge-green';}
+    else if(stepsAvg>=8000){stepsBadge='Good';stepsClass='badge-blue';}
+    else if(stepsAvg>=5000){stepsBadge='Okay';stepsClass='badge-amber';}
+    else{stepsBadge='Go walk!';stepsClass='badge-red';}
+  }
+  let sleepBadge='—',sleepClass='badge-gray';
+  if(sleepAvg!==null){
+    if(sleepAvg>=8&&sleepAvg<=9){sleepBadge='Great recovery';sleepClass='badge-green';}
+    else if(sleepAvg>=6){sleepBadge='Good';sleepClass='badge-blue';}
+    else if(sleepAvg>=5){sleepBadge='Too low';sleepClass='badge-amber';}
+    else{sleepBadge='Critical';sleepClass='badge-red';}
+  }
+
+  document.getElementById('summary-strip').innerHTML=`
+    <div class="sum-card">
+      <div class="sum-label">Avg bodyweight</div>
+      <div class="sum-val">${bwAvg!==null?bwAvg.toFixed(1)+' kg':'—'}</div>
+      <span class="sum-badge badge-gray">Week ${currentWeek+1}</span>
+    </div>
+    <div class="sum-card">
+      <div class="sum-label">Avg daily steps</div>
+      <div class="sum-val">${stepsAvg!==null?Math.round(stepsAvg).toLocaleString():'—'}</div>
+      <span class="sum-badge ${stepsClass}">${stepsBadge}</span>
+    </div>
+    <div class="sum-card">
+      <div class="sum-label">Avg sleep</div>
+      <div class="sum-val">${sleepAvg!==null?sleepAvg.toFixed(1)+' hrs':'—'}</div>
+      <span class="sum-badge ${sleepClass}">${sleepBadge}</span>
+    </div>`;
+
+  renderScoreSection();
+
+  // Feedback
+  const {overall,scores}=calcTrueScore(currentWeek);
+  const name=appData.clientName||'Your client';
+  const ci=appData.weeklyCheckin[currentWeek]||freshCheckin();
+  let fb='';
+  if(!bwAvg&&!stepsAvg&&!sleepAvg&&!ci.overload){
+    fb='Set a goal and enter data above to see your weekly analysis.';
+  } else {
+    fb=`<strong>Week ${currentWeek+1} — ${name}</strong><br>`;
+    if(bwAvg){
+      const prevAvg=currentWeek>0?avg(appData.bw[currentWeek-1]):null;
+      if(prevAvg!==null){
+        const diff=parseFloat((bwAvg-prevAvg).toFixed(1));
+        const dir=diff<-0.1?'down':diff>0.1?'up':'flat';
+        if(gt==='loss'){
+          if(dir==='down') fb+=`Weight down <strong>${Math.abs(diff)} kg</strong> from last week — fat loss on track. `;
+          else if(dir==='up') fb+=`Weight up <strong>${diff} kg</strong> — review calories and adherence this week. `;
+          else fb+=`Weight holding steady — may need a calorie adjustment or activity boost. `;
+        } else if(gt==='gain'){
+          if(dir==='up') fb+=`Weight up <strong>${diff} kg</strong> from last week — muscle gain progressing well. `;
+          else if(dir==='down') fb+=`Weight dropped <strong>${Math.abs(diff)} kg</strong> — increase food intake to support muscle growth. `;
+          else fb+=`Weight holding steady — may need a slight calorie surplus push. `;
+        } else {
+          fb+=`Weight is <strong>${Math.abs(bwAvg-(prevAvg||bwAvg)).toFixed(1)} kg</strong> from last week — `;
+          fb+=Math.abs(bwAvg-(prevAvg||bwAvg))<=0.3?'maintenance is on track. ':'slight drift, monitor closely. ';
+        }
+      } else {
+        fb+=`Starting weight logged: <strong>${bwAvg.toFixed(1)} kg</strong>. `;
+      }
+    }
+    if(ci.overload==='improved') fb+='Lifts are progressing — muscle stimulus confirmed. ';
+    else if(ci.overload==='form') fb+='Form improving — solid foundation being built. ';
+    else if(ci.overload==='same') fb+='No overload progress this week — push harder next session. ';
+    else if(ci.overload==='regressed') fb+='Regression in lifts — check sleep, nutrition, and recovery. ';
+    if(ci.bfDir==='drop') fb+='Body fat dropping — excellent body composition progress even if scale moves slowly. ';
+    else if(ci.bfDir==='rise') fb+='Body fat rising — diet needs tightening regardless of scale weight. ';
+    if(stepsAvg!==null&&stepsAvg<5000) fb+='Steps are critically low — daily movement must improve. ';
+    if(sleepAvg!==null&&sleepAvg<6) fb+='Sleep is insufficient — this is slowing all progress by up to 20%. ';
+    if(overall!==null){
+      const scoreColor=overall>=75?'#16a34a':overall>=50?'#f59e0b':'#ef4444';
+      const scoreMsg=overall>=75?'Strong week overall — keep this momentum!':overall>=50?'Decent week — small improvements across the board will unlock faster results.':'Tough week — focus on sleep, steps, and hitting the gym consistently.';
+      fb+=`<br><span style="color:${scoreColor};font-weight:600">True Progress Score: ${overall}% — ${scoreMsg}</span>`;
+    }
+  }
+  document.getElementById('feedback-box').innerHTML=fb;
+  renderStatsBanner();
+  updateChart();
+}
+
+function populateRangeDropdowns(){
+  ['bw-chart-range','score-chart-range'].forEach(id=>{
+    const sel=document.getElementById(id);
+    if(!sel) return;
+    const cur=sel.value||'all';
+    sel.innerHTML='<option value="all">All weeks</option>';
+    for(let w=0;w<totalWeeks;w++){
+      const opt=document.createElement('option');
+      opt.value=w;
+      opt.textContent='Week '+(w+1);
+      sel.appendChild(opt);
+    }
+    sel.value=cur;
+  });
+  // Populate program report range dropdown
+  const progSel=document.getElementById('program-report-range');
+  if(progSel){
+    const cur=progSel.value||'all';
+    progSel.innerHTML='<option value="all">All '+totalWeeks+' weeks</option>';
+    // Add options in 4-week blocks
+    for(let w=4;w<=totalWeeks;w+=4){
+      const opt=document.createElement('option');
+      opt.value=w;
+      opt.textContent='First '+w+' weeks';
+      progSel.appendChild(opt);
+    }
+    // If totalWeeks not divisible by 4, add exact option
+    if(totalWeeks%4!==0){
+      const opt=document.createElement('option');
+      opt.value=totalWeeks;
+      opt.textContent='All '+totalWeeks+' weeks';
+      progSel.appendChild(opt);
+    }
+    if([...progSel.options].some(o=>o.value===cur)) progSel.value=cur;
+  }
+}
+
+function updateChart(){
+  populateRangeDropdowns();
+  const bwRange=document.getElementById('bw-chart-range')?document.getElementById('bw-chart-range').value:'all';
+  const scRange=document.getElementById('score-chart-range')?document.getElementById('score-chart-range').value:'all';
+  const gridColor='rgba(0,0,0,0.05)';
+  const tickColor='#888888';
+
+  // Build data for selected range
+  function buildData(rangeVal){
+    const labels=[],bwData=[],scoreData=[];
+    const weeks=rangeVal==='all'?Array.from({length:totalWeeks},(_,i)=>i):[parseInt(rangeVal)];
+    const isWeek1Day=(w,d)=>w===0&&d===0;
+    let runningScore=null; // cumulative for gradual build
+    let dayCount=0;
+
+    weeks.forEach(w=>{
+      const ci=appData.weeklyCheckin[w]||freshCheckin();
+      const olS=overloadScore(ci.overload);
+      const bfS=bfScore(ci.bfDir);
+      if(rangeVal==='all'){
+        // All view: one point per week (weekly average)
+        const bwA=avg(appData.bw[w]);
+        const stA=avg(appData.steps[w]);
+        const slA=avg(appData.sleep[w]);
+        labels.push('Week '+(w+1));
+        bwData.push(bwA);
+        const dietS=dietScore(ci.diet);
+        const stressS=stressScore(ci.stress);
+        const hasAny=stA!==null||slA!==null||olS!==null||bfS!==null||dietS!==null||stressS!==null;
+        if(hasAny){
+          let s=0,wt=0;
+          if(stA!==null){s+=stepsScore(stA)*20;wt+=20;}
+          if(slA!==null){s+=sleepScore(slA)*20;wt+=20;}
+          if(olS!==null){s+=olS*20;wt+=20;}
+          if(dietS!==null){s+=dietS*20;wt+=20;}
+          if(stressS!==null){s+=stressS*10;wt+=10;}
+          if(bfS!==null){s+=bfS*10;wt+=10;}
+          scoreData.push(wt>0?Math.round(s/wt):null);
+        } else scoreData.push(null);
+      } else {
+        // Week view: day by day, W1 starts at 0 and builds gradually
+        const isFirstWeek=parseInt(rangeVal)===0;
+        for(let d=0;d<7;d++){
+          labels.push(DAYS[d]);
+          const bv=appData.bw[w][d]!==''?parseFloat(appData.bw[w][d]):null;
+          const sv=appData.steps[w][d]!==''?parseFloat(appData.steps[w][d]):null;
+          const slv=appData.sleep[w][d]!==''?parseFloat(appData.sleep[w][d]):null;
+          bwData.push(bv);
+          const dietS=dietScore(ci.diet);
+          const stressS=stressScore(ci.stress);
+          const hasAny=sv!==null||slv!==null||olS!==null||bfS!==null||dietS!==null||stressS!==null;
+          if(hasAny){
+            let s=0,wt=0;
+            if(sv!==null){s+=stepsScore(sv)*20;wt+=20;}
+            if(slv!==null){s+=sleepScore(slv)*20;wt+=20;}
+            if(olS!==null){s+=olS*20;wt+=20;}
+            if(dietS!==null){s+=dietS*20;wt+=20;}
+            if(stressS!==null){s+=stressS*10;wt+=10;}
+            if(bfS!==null){s+=bfS*10;wt+=10;}
+            scoreData.push(wt>0?Math.round(s/wt):null);
+          } else scoreData.push(null);
+        }
+      }
+    });
+    return {labels,bwData,scoreData};
+  }
+
+  // CHART 1 — Bodyweight
+  if(trendChart){trendChart.destroy();trendChart=null;}
+  const {labels:l1,bwData}=buildData(bwRange);
+  const hasBW=bwData.some(v=>v!==null);
+  if(hasBW){
+    const filled=bwData.filter(v=>v!==null);
+    const gt=appData.goalType||'loss';
+    let msg='Keep logging to see your trend.';
+    if(filled.length>=2){
+      const diff=parseFloat((filled[filled.length-1]-filled[0]).toFixed(1));
+      const span=bwRange==='all'?totalWeeks+' weeks':7+' days';
+      if(gt==='loss') msg=diff<-0.2?'↓ Down '+Math.abs(diff)+' kg over '+span+' — on track!':diff>0.2?'↑ Up '+diff+' kg — review diet.':'→ Holding steady.';
+      else if(gt==='gain') msg=diff>0.2?'↑ Up '+diff+' kg — gaining well!':diff<-0.2?'↓ Down '+Math.abs(diff)+' kg — eat more.':'→ Steady — push surplus.';
+      else msg='Change: '+(diff>0?'+':'')+diff+' kg.';
+    }
+    document.getElementById('trend-summary').textContent=msg;
+    const minV=Math.min(...filled)-1,maxV=Math.max(...filled)+1;
+    trendChart=new Chart(document.getElementById('trendChart'),{
+      type:'line',
+      data:{labels:l1,datasets:[{
+        label:'Weight',data:bwData,
+        borderColor:'#16a34a',backgroundColor:'rgba(22,163,74,0.08)',
+        borderWidth:2,pointRadius:5,pointHoverRadius:7,
+        pointBackgroundColor:'#16a34a',pointBorderColor:'#ffffff',pointBorderWidth:2,
+        tension:0.3,fill:true,spanGaps:true
+      }]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.parsed.y!==null?' '+ctx.parsed.y.toFixed(1)+' kg':null}}},
+        scales:{
+          x:{grid:{color:gridColor},ticks:{color:tickColor,font:{size:11},maxRotation:0},border:{display:false}},
+          y:{min:minV,max:maxV,grid:{color:gridColor},ticks:{color:tickColor,font:{size:11},callback:v=>v.toFixed(1)},border:{display:false}}
+        }
+      }
+    });
+  } else document.getElementById('trend-summary').textContent='Log bodyweight to see your trend.';
+
+  // CHART 2 — Progress Score
+  if(progressChart){progressChart.destroy();progressChart=null;}
+  const {labels:l2,scoreData}=buildData(scRange);
+  const hasScore=scoreData.some(v=>v!==null);
+  if(hasScore){
+    const filled2=scoreData.filter(v=>v!==null);
+    const avgS=Math.round(filled2.reduce((a,b)=>a+b,0)/filled2.length);
+    document.getElementById('progress-summary').textContent=avgS>=75?'Strong — lifestyle and gym working together!':avgS>=50?'Decent — improve steps or sleep to push higher.':'Needs work — focus on sleep, steps and gym.';
+    const ptColors=scoreData.map(v=>v===null?'transparent':v>=75?'#16a34a':v>=50?'#f59e0b':'#ef4444');
+    progressChart=new Chart(document.getElementById('progressChart'),{
+      type:'line',
+      data:{labels:l2,datasets:[{
+        label:'Score',data:scoreData,
+        borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,0.07)',
+        borderWidth:2,pointRadius:6,pointHoverRadius:8,
+        pointBackgroundColor:ptColors,pointBorderColor:'#ffffff',pointBorderWidth:2,
+        tension:0.3,fill:true,spanGaps:true
+      }]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{
+          if(ctx.parsed.y===null) return null;
+          const v=Math.round(ctx.parsed.y);
+          return ' Score: '+v+'% — '+(v>=75?'🟢 Great':v>=50?'🟡 Okay':'🔴 Low');
+        }}}},
+        scales:{
+          x:{grid:{color:gridColor},ticks:{color:tickColor,font:{size:11},maxRotation:0},border:{display:false}},
+          y:{min:0,max:100,grid:{color:gridColor},ticks:{color:tickColor,font:{size:11},callback:v=>v+'%'},border:{display:false}}
+        }
+      }
+    });
+  } else document.getElementById('progress-summary').textContent='Log steps, sleep, overload or body fat to see progress.';
+}
+
+function clearWeek(){
+  appData.bw[currentWeek]=Array(7).fill('');
+  appData.steps[currentWeek]=Array(7).fill('');
+  appData.sleep[currentWeek]=Array(7).fill('');
+  appData.weeklyCheckin[currentWeek]=freshCheckin();
+  save(); render();
+}
+function clearAll(){
+  if(trendChart){trendChart.destroy();trendChart=null;}
+  if(progressChart){progressChart.destroy();progressChart=null;}
+  totalWeeks=4; currentWeek=0;
+  appData.bw=Array.from({length:totalWeeks},()=>Array(7).fill(''));
+  appData.steps=Array.from({length:totalWeeks},()=>Array(7).fill(''));
+  appData.sleep=Array.from({length:totalWeeks},()=>Array(7).fill(''));
+  appData.weeklyCheckin=Array.from({length:totalWeeks},freshCheckin);
+  save(); renderTabs(); render();
+}
+
+
+function renderStatsBanner(){
+  const banner=document.getElementById('stats-banner');
+  if(!banner) return;
+  const sw=appData.startWeight?parseFloat(appData.startWeight):null;
+  const tw=appData.goal?parseFloat(appData.goal):null;
+  const dur=parseInt(appData.programDuration)||8;
+  // current weight = latest logged bw across all weeks
+  let curW=null;
+  for(let w=totalWeeks-1;w>=0;w--){
+    for(let d=6;d>=0;d--){
+      if(appData.bw[w][d]!==''){ curW=parseFloat(appData.bw[w][d]); break; }
+    }
+    if(curW!==null) break;
+  }
+  const toGo=sw!==null&&tw!==null?Math.abs(tw-sw).toFixed(1):null;
+  const done=sw!==null&&curW!==null?Math.abs(sw-curW).toFixed(1):null;
+  const gt=appData.goalType||'loss';
+  const weightProgress=toGo&&done?Math.min(100,Math.round((parseFloat(done)/parseFloat(toGo))*100)):null;
+
+  // If target weight already reached — overall progress = 100%
+  let overallProgress=null;
+  if(curW!==null && tw!==null){
+    const gt2=appData.goalType||'loss';
+    if((gt2==='loss'&&curW<=tw)||(gt2==='gain'&&curW>=tw)||(gt2==='maintain'&&Math.abs(curW-tw)<=0.5)){
+      overallProgress=100;
+    }
+  }
+  // Otherwise average true score across all logged weeks
+  if(overallProgress===null){
+    let scoredWeeks=0, totalScore=0;
+    for(let w=0;w<totalWeeks;w++){
+      const {overall}=calcTrueScore(w);
+      if(overall!==null){ totalScore+=overall; scoredWeeks++; }
+    }
+    overallProgress=scoredWeeks>0?Math.round(totalScore/scoredWeeks):null;
+  }
+
+
+  // Progress bar html
+  const pct=overallProgress!==null?overallProgress:0;
+  const barColor=pct>=75?'#16a34a':pct>=50?'#f59e0b':'#cc0000';
+  const progressBar='<div style="margin-top:6px;height:4px;background:#444;border-radius:2px;overflow:hidden;">'+
+    '<div style="height:100%;width:'+pct+'%;background:'+barColor+';border-radius:2px;transition:width .4s;"></div></div>';
+
+  const progColor=overallProgress===null?'#aaaaaa':overallProgress>=75?'#16a34a':overallProgress>=50?'#f59e0b':'#cc0000';
+  const progZone=overallProgress===null?'':(overallProgress>=75?'GREAT':overallProgress>=50?'OKAY':'LOW');
+
+  // Current weight colour: green if moving toward goal, amber if steady, red if moving away
+  let curWColor='#ffffff';
+  if(curW!==null&&sw!==null){
+    const diff=curW-sw;
+    if(gt==='loss') curWColor=diff<-0.2?'#16a34a':diff>0.2?'#cc0000':'#f59e0b';
+    else if(gt==='gain') curWColor=diff>0.2?'#16a34a':diff<-0.2?'#cc0000':'#f59e0b';
+    else curWColor=Math.abs(diff)<=0.5?'#16a34a':'#f59e0b';
+  }
+
+  banner.innerHTML='<div class="stat-item"><div class="stat-lbl">Start Weight</div><div class="stat-val">'+(sw!==null?sw+' kg':'—')+'</div></div>'+
+    '<div class="stat-item"><div class="stat-lbl">Current Weight</div><div class="stat-val" style="color:'+curWColor+';">'+(curW!==null?curW+' kg':'—')+'</div><div class="stat-sub">'+(done!==null?(gt==='loss'?'−':'+')+done+' kg from start':'')+'</div></div>'+
+    '<div class="stat-item"><div class="stat-lbl">Target Weight</div><div class="stat-val">'+(tw!==null?tw+' kg':'—')+'</div><div class="stat-sub">'+(toGo!==null?toGo+' kg to goal':'')+'</div></div>'+
+    '<div class="stat-item"><div class="stat-lbl">Overall Progress</div>'+
+    '<div class="stat-val" style="color:'+progColor+';">'+(overallProgress!==null?overallProgress+'%':'—')+'</div>'+
+    '<div style="font-size:10px;font-weight:700;color:'+progColor+';margin-bottom:4px;letter-spacing:.06em;">'+progZone+'</div>'+
+    progressBar+'</div>';
+}
+
+function exportPDF(){
+  const { jsPDF } = window.jspdf;
+  if(!jsPDF){ alert('PDF library not loaded. Please check your connection.'); return; }
+  const doc = new jsPDF({orientation:'p',unit:'mm',format:'a4'});
+  const W=210, margin=15;
+  let y=margin;
+
+  // Header
+  doc.setFillColor(17,17,17);
+  doc.rect(0,0,W,30,'F');
+  doc.setFillColor(204,0,0);
+  doc.rect(0,0,3,30,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(16);
+  doc.text('DEVFIT — Weekly Progress Report',margin,12);
+  doc.setFontSize(9);
+  doc.setFont('helvetica','normal');
+  doc.text('Dominance Through Discipline',margin,20);
+  const now=new Date();
+  doc.text('Generated: '+now.toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'}),W-margin,20,{align:'right'});
+  y=38;
+
+  // Client info
+  doc.setTextColor(17,17,17);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(11);
+  doc.text('CLIENT: '+(appData.clientName||'—').toUpperCase(),margin,y);
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(9);
+  doc.text('Goal: '+(appData.goalType==='loss'?'Fat Loss':appData.goalType==='gain'?'Muscle Gain':'Maintain')+'  |  Week '+(currentWeek+1)+'  |  Program: '+(appData.programDuration||'—')+' weeks',margin,y+6);
+  y+=16;
+
+  // Stats bar
+  doc.setFillColor(245,245,245);
+  doc.rect(margin,y,W-margin*2,18,'F');
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(8);
+  doc.setTextColor(100,100,100);
+  const sw=appData.startWeight||'—';
+  const tw=appData.goal||'—';
+  let curW='—';
+  for(let w=totalWeeks-1;w>=0;w--){ for(let d=6;d>=0;d--){ if(appData.bw[w][d]!==''){ curW=parseFloat(appData.bw[w][d]).toFixed(1)+' kg'; break; } } if(curW!=='—') break; }
+  const cols=['START WEIGHT','CURRENT WEIGHT','TARGET WEIGHT'];
+  const vals=[sw?(sw+' kg'):'—',curW,tw?(tw+' kg'):'—'];
+  cols.forEach((c,i)=>{
+    const x=margin+10+(i*(W-margin*2-20)/3);
+    doc.setTextColor(120,120,120); doc.text(c,x,y+6);
+    doc.setTextColor(17,17,17); doc.setFontSize(11);
+    doc.text(vals[i],x,y+14);
+    doc.setFontSize(8);
+  });
+  y+=24;
+
+  // Weekly data table
+  doc.setFillColor(17,17,17);
+  doc.rect(margin,y,W-margin*2,7,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(8);
+  const headers=['Day','Weight (kg)','Steps','Sleep (hrs)'];
+  const colW=[(W-margin*2)*0.2,(W-margin*2)*0.27,(W-margin*2)*0.27,(W-margin*2)*0.26];
+  let xOff=margin;
+  headers.forEach((h,i)=>{ doc.text(h,xOff+2,y+5); xOff+=colW[i]; });
+  y+=7;
+  doc.setTextColor(17,17,17);
+  doc.setFont('helvetica','normal');
+  DAYS.forEach((d,i)=>{
+    const bv=appData.bw[currentWeek][i]||'—';
+    const sv=appData.steps[currentWeek][i]||'—';
+    const sl=appData.sleep[currentWeek][i]||'—';
+    if(i%2===0){ doc.setFillColor(250,250,250); doc.rect(margin,y,W-margin*2,6,'F'); }
+    xOff=margin;
+    [d,bv,sv?parseInt(sv).toLocaleString():'—',sl].forEach((v,j)=>{ doc.text(String(v),xOff+2,y+4); xOff+=colW[j]; });
+    y+=6;
+  });
+  y+=6;
+
+  // Weekly averages
+  const bwAvg=avg(appData.bw[currentWeek]);
+  const stepsAvg=avg(appData.steps[currentWeek]);
+  const sleepAvg=avg(appData.sleep[currentWeek]);
+  doc.setFillColor(204,0,0);
+  doc.rect(margin,y,W-margin*2,7,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold');
+  doc.text('WEEKLY AVERAGES',margin+2,y+5);
+  xOff=margin+colW[0];
+  [bwAvg?bwAvg.toFixed(1)+' kg':'—', stepsAvg?Math.round(stepsAvg).toLocaleString():'—', sleepAvg?sleepAvg.toFixed(1)+' hrs':'—'].forEach((v,j)=>{
+    doc.text(v,xOff+2,y+5); xOff+=colW[j+1];
+  });
+  y+=13;
+
+  // Weekly check-in
+  const ci=appData.weeklyCheckin[currentWeek]||freshCheckin();
+  const olLabels={improved:'Weight/reps increased',form:'Better form',same:'Same as last week',regressed:'Regressed'};
+  const bfLabels={drop:'Dropped',same:'Same',rise:'Increased'};
+  doc.setTextColor(17,17,17);
+  doc.setFillColor(245,245,245);
+  doc.rect(margin,y,W-margin*2,24,'F');
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(9);
+  doc.text('WEEKLY CHECK-IN',margin+2,y+6);
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(8);
+  doc.text('Progressive Overload: '+(olLabels[ci.overload]||'Not logged'),margin+2,y+13);
+  doc.text('Body Fat Direction: '+(bfLabels[ci.bfDir]||'Not logged')+(ci.bf?' ('+ci.bf+'%)':'')+'  |  Trainer Notes: '+(ci.notes||'—'),margin+2,y+19);
+  y+=30;
+
+  // Progress score
+  const {overall,scores}=calcTrueScore(currentWeek);
+  doc.setFillColor(17,17,17);
+  doc.rect(margin,y,W-margin*2,7,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(9);
+  doc.text('TRUE PROGRESS SCORE: '+(overall!==null?overall+'%':'—'),margin+2,y+5);
+  y+=9;
+  doc.setTextColor(17,17,17);
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(8);
+  Object.values(scores).forEach(s=>{
+    const pct=s.val!==null?s.val:0;
+    const display=s.val!==null?pct+'%':'N/A';
+    doc.text(s.label+' ('+s.weight+'%): '+display, margin+2, y+4);
+    // mini bar
+    doc.setFillColor(230,230,230); doc.rect(margin+60,y,50,3,'F');
+    const barColor=pct>=75?[22,163,74]:pct>=50?[245,158,11]:[239,68,68];
+    doc.setFillColor(...barColor); doc.rect(margin+60,y,(50*pct/100),3,'F');
+    y+=7;
+  });
+  y+=4;
+
+  // Feedback
+  const fbEl=document.getElementById('feedback-box');
+  const fbText=fbEl?fbEl.innerText:'';
+  if(fbText&&fbText!=='Set a goal and enter data above to see analysis.'){
+    doc.setFillColor(240,253,244);
+    doc.rect(margin,y,W-margin*2,4,'F');
+    doc.setFillColor(22,163,74);
+    doc.rect(margin,y,2,20,'F');
+    doc.setTextColor(17,17,17);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(9);
+    doc.text('ANALYSIS',margin+4,y+5);
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(8);
+    const lines=doc.splitTextToSize(fbText,W-margin*2-8);
+    lines.slice(0,6).forEach((l,i)=>{ doc.text(l,margin+4,y+10+(i*5)); });
+    y+=10+Math.min(lines.length,6)*5+4;
+  }
+
+  // Footer
+  doc.setFillColor(17,17,17);
+  doc.rect(0,287,W,10,'F');
+  doc.setFillColor(204,0,0);
+  doc.rect(0,287,W,1,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(7);
+  doc.text('DevFit — Dominance Through Discipline  |  devfitcoach.com',margin,293);
+  doc.text('Week '+(currentWeek+1)+' Report — '+(appData.clientName||'Client'),W-margin,293,{align:'right'});
+
+  doc.save('DevFit_Week'+(currentWeek+1)+'_'+(appData.clientName||'Client').replace(/\s/g,'_')+'.pdf');
+}
+
+
+function syncToSheet(){
+  try{
+    const bwAvg=avg(appData.bw[currentWeek]);
+    const stepsAvg=avg(appData.steps[currentWeek]);
+    const sleepAvg=avg(appData.sleep[currentWeek]);
+    const ci=appData.weeklyCheckin[currentWeek]||freshCheckin();
+    const {overall}=calcTrueScore(currentWeek);
+    let curW=null;
+    for(let w=totalWeeks-1;w>=0;w--){for(let d=6;d>=0;d--){if(appData.bw[w][d]!==''){curW=parseFloat(appData.bw[w][d]);break;}}if(curW!==null)break;}
+    const payload={
+      clientName:appData.clientName||'Unknown',
+      goalType:appData.goalType||'loss',
+      startWeight:appData.startWeight||'',
+      goal:appData.goal||'',
+      currentWeight:curW!==null?curW.toFixed(1):'',
+      weekNum:currentWeek+1,
+      bwAvg:bwAvg!==null?bwAvg.toFixed(1):'',
+      stepsAvg:stepsAvg!==null?Math.round(stepsAvg):'',
+      sleepAvg:sleepAvg!==null?sleepAvg.toFixed(1):'',
+      overload:ci.overload||'',
+      bfDir:ci.bfDir||'',
+      score:overall!==null?overall:'',
+      notes:ci.notes||''
+    };
+    fetch(SHEET_URL,{method:'POST',body:JSON.stringify(payload)}).catch(()=>{});
+  }catch(e){}
+}
+
+function manualSync(){
+  const btn=event.target;
+  btn.textContent='Syncing...';
+  const bwAvg=avg(appData.bw[currentWeek]);
+  const stepsAvg=avg(appData.steps[currentWeek]);
+  const sleepAvg=avg(appData.sleep[currentWeek]);
+  const ci=appData.weeklyCheckin[currentWeek]||freshCheckin();
+  const {overall}=calcTrueScore(currentWeek);
+  let curW=null;
+  for(let w=totalWeeks-1;w>=0;w--){for(let d=6;d>=0;d--){if(appData.bw[w][d]!==''){curW=parseFloat(appData.bw[w][d]);break;}}if(curW!==null)break;}
+  const payload={
+    clientName:appData.clientName||'Unknown',
+    goalType:appData.goalType||'loss',
+    startWeight:appData.startWeight||'',
+    goal:appData.goal||'',
+    currentWeight:curW!==null?curW.toFixed(1):'',
+    weekNum:currentWeek+1,
+    bwAvg:bwAvg!==null?bwAvg.toFixed(1):'',
+    stepsAvg:stepsAvg!==null?Math.round(stepsAvg):'',
+    sleepAvg:sleepAvg!==null?sleepAvg.toFixed(1):'',
+    overload:ci.overload||'',
+    bfDir:ci.bfDir||'',
+    score:overall!==null?overall:'',
+    notes:ci.notes||''
+  };
+  fetch(SHEET_URL,{method:'POST',mode:'no-cors',body:JSON.stringify(payload)})
+    .then(()=>{btn.textContent='✓ Synced!';btn.style.background='#16a34a';setTimeout(()=>{btn.textContent='↑ Sync to Trainer';btn.style.background='#1a1a1a';},2500);})
+    .catch(()=>{btn.textContent='✗ Failed';btn.style.background='#cc0000';setTimeout(()=>{btn.textContent='↑ Sync to Trainer';btn.style.background='#1a1a1a';},2500);});
+}
+
+
+function exportProgramPDF(){
+  const { jsPDF } = window.jspdf;
+  if(!jsPDF){ alert('PDF library not loaded.'); return; }
+
+  // Get selected range
+  const rangeSel=document.getElementById('program-report-range');
+  const rangeVal=rangeSel?rangeSel.value:'all';
+  const selectedWeeks=rangeVal==='all'?Array.from({length:totalWeeks},(_,i)=>i):Array.from({length:parseInt(rangeVal)},(_,i)=>i);
+
+  // Capture both charts as images — switch to all view first
+  const bwCanvas = document.getElementById('trendChart');
+  const scoreCanvas = document.getElementById('progressChart');
+  const bwSel = document.getElementById('bw-chart-range');
+  const scSel = document.getElementById('score-chart-range');
+  const prevBW = bwSel?bwSel.value:'all';
+  const prevSC = scSel?scSel.value:'all';
+  if(bwSel) bwSel.value='all';
+  if(scSel) scSel.value='all';
+  updateChart();
+
+  setTimeout(()=>{
+    const bwImg = bwCanvas ? bwCanvas.toDataURL('image/png') : null;
+    const scImg = scoreCanvas ? scoreCanvas.toDataURL('image/png') : null;
+
+    // Restore previous view
+    if(bwSel) bwSel.value=prevBW;
+    if(scSel) scSel.value=prevSC;
+    updateChart();
+
+    const doc = new jsPDF({orientation:'p',unit:'mm',format:'a4'});
+    const W=210, margin=15;
+    let y=margin;
+    const name = appData.clientName||'Client';
+    const dur = parseInt(appData.programDuration)||totalWeeks;
+
+    // HEADER
+    doc.setFillColor(17,17,17);
+    doc.rect(0,0,W,32,'F');
+    doc.setFillColor(204,0,0);
+    doc.rect(0,0,3,32,'F');
+    doc.rect(0,29,W,3,'F');
+    doc.setTextColor(255,255,255);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(18);
+    doc.text('DEVFIT — PROGRAM REPORT',margin,13);
+    doc.setFontSize(9);
+    doc.setFont('helvetica','normal');
+    doc.text('Dominance Through Discipline',margin,21);
+    const now=new Date();
+    doc.text('Generated: '+now.toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'}),W-margin,21,{align:'right'});
+    y=40;
+
+    // CLIENT + PROGRAM INFO
+    doc.setTextColor(17,17,17);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(13);
+    doc.text(name.toUpperCase(),margin,y);
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(9);
+    const goalLabel=appData.goalType==='loss'?'Fat Loss':appData.goalType==='gain'?'Muscle Gain':'Maintain';
+    doc.text('Goal: '+goalLabel+'   |   Program: '+dur+' weeks   |   Weeks logged: '+totalWeeks,margin,y+7);
+    y+=15;
+
+    // STATS BAR
+    const sw=appData.startWeight?parseFloat(appData.startWeight):null;
+    const tw=appData.goal?parseFloat(appData.goal):null;
+    let curW=null;
+    for(let w=totalWeeks-1;w>=0;w--){ for(let d=6;d>=0;d--){ if(appData.bw[w][d]!==''){ curW=parseFloat(appData.bw[w][d]); break; } } if(curW!==null) break; }
+    const weightChange=sw!==null&&curW!==null?parseFloat((curW-sw).toFixed(1)):null;
+
+    doc.setFillColor(245,245,245);
+    doc.rect(margin,y,W-margin*2,16,'F');
+    doc.setFillColor(204,0,0);
+    doc.rect(margin,y,2,16,'F');
+    const stats=[
+      ['Start',sw!==null?sw+' kg':'—'],
+      ['Current',curW!==null?curW+' kg':'—'],
+      ['Target',tw!==null?tw+' kg':'—'],
+      ['Change',weightChange!==null?(weightChange>0?'+':'')+weightChange+' kg':'—']
+    ];
+    stats.forEach((s,i)=>{
+      const x=margin+6+(i*(W-margin*2-8)/4);
+      doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(120,120,120);
+      doc.text(s[0],x,y+6);
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(17,17,17);
+      doc.text(s[1],x,y+13);
+    });
+    y+=22;
+
+    // WEEKLY SUMMARY TABLE
+    doc.setFillColor(17,17,17);
+    doc.rect(margin,y,W-margin*2,7,'F');
+    doc.setTextColor(255,255,255);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(8);
+    const cols=['Week','Avg Weight','Avg Steps','Avg Sleep','Overload','Diet','Stress','Score'];
+    const cw=[(W-margin*2)*0.08,(W-margin*2)*0.13,(W-margin*2)*0.12,(W-margin*2)*0.11,(W-margin*2)*0.14,(W-margin*2)*0.13,(W-margin*2)*0.11,(W-margin*2)*0.18];
+    let xo=margin;
+    cols.forEach((c,i)=>{ doc.text(c,xo+2,y+5); xo+=cw[i]; });
+    y+=7;
+
+    const olLabels={improved:'Improved',form:'Better form',same:'Same',regressed:'Regressed'};
+    const dietLabels={met:'Met',missed_few:'Missed few',binge:'Binge'};
+    const stressLabels={low:'Low',moderate:'Moderate',high:'High'};
+
+    selectedWeeks.forEach((w,idx)=>{
+      const ci=appData.weeklyCheckin[w]||freshCheckin();
+      const bwA=avg(appData.bw[w]);
+      const stA=avg(appData.steps[w]);
+      const slA=avg(appData.sleep[w]);
+      const {overall}=calcTrueScore(w);
+      if(idx%2===0){ doc.setFillColor(250,250,250); doc.rect(margin,y,W-margin*2,6,'F'); }
+      doc.setTextColor(17,17,17); doc.setFont('helvetica','normal'); doc.setFontSize(8);
+      const row=[
+        'W'+(w+1),
+        bwA?bwA.toFixed(1)+' kg':'—',
+        stA?Math.round(stA).toLocaleString():'—',
+        slA?slA.toFixed(1)+' hrs':'—',
+        olLabels[ci.overload]||'—',
+        dietLabels[ci.diet]||'—',
+        stressLabels[ci.stress]||'—',
+        overall!==null?overall+'%':'—'
+      ];
+      xo=margin;
+      row.forEach((v,i)=>{ doc.text(String(v),xo+2,y+4); xo+=cw[i]; });
+      y+=6;
+    });
+    y+=6;
+
+    // BOTH GRAPHS
+    if(bwImg){
+      doc.setFillColor(17,17,17);
+      doc.rect(margin,y,W-margin*2,7,'F');
+      doc.setTextColor(255,255,255);
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(9);
+      doc.text('BODYWEIGHT TREND',margin+2,y+5);
+      y+=9;
+      doc.addImage(bwImg,'PNG',margin,y,W-margin*2,45);
+      y+=48;
+    }
+
+    if(scImg){
+      doc.setFillColor(17,17,17);
+      doc.rect(margin,y,W-margin*2,7,'F');
+      doc.setTextColor(255,255,255);
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(9);
+      doc.text('PROGRESS SCORE TREND',margin+2,y+5);
+      y+=9;
+      doc.addImage(scImg,'PNG',margin,y,W-margin*2,45);
+      y+=48;
+    }
+
+    // OVERALL SCORE SUMMARY
+    let scoredW=0,totalS=0;
+    selectedWeeks.forEach(w=>{
+      const {overall}=calcTrueScore(w);
+      if(overall!==null){totalS+=overall;scoredW++;}
+    });
+    const progOverall=scoredW>0?Math.round(totalS/scoredW):null;
+    if(progOverall!==null){
+      const pColor=progOverall>=75?[22,163,74]:progOverall>=50?[245,158,11]:[204,0,0];
+      doc.setFillColor(...pColor);
+      doc.rect(margin,y,W-margin*2,12,'F');
+      doc.setTextColor(255,255,255);
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(11);
+      doc.text('OVERALL PROGRAM SCORE: '+progOverall+'% — '+(progOverall>=75?'GREAT':progOverall>=50?'OKAY':'NEEDS WORK'),margin+4,y+8);
+      y+=16;
+    }
+
+    // TRAINER NOTES per week
+    const hasNotes=selectedWeeks.map(w=>appData.weeklyCheckin[w]?.notes).some(n=>n&&n.trim());
+    if(hasNotes){
+      doc.setFillColor(17,17,17);
+      doc.rect(margin,y,W-margin*2,7,'F');
+      doc.setTextColor(255,255,255);
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(9);
+      doc.text('TRAINER NOTES',margin+2,y+5);
+      y+=9;
+      selectedWeeks.forEach(w=>{
+        const notes=appData.weeklyCheckin[w]?.notes;
+        if(notes&&notes.trim()){
+          doc.setTextColor(17,17,17);
+          doc.setFont('helvetica','bold');
+          doc.setFontSize(8);
+          doc.text('Week '+(w+1)+':',margin+2,y+4);
+          doc.setFont('helvetica','normal');
+          const lines=doc.splitTextToSize(notes,W-margin*2-25);
+          lines.slice(0,2).forEach((l,i)=>doc.text(l,margin+22,y+4+(i*5)));
+          y+=Math.min(lines.length,2)*5+4;
+        }
+      });
+    }
+
+    // FOOTER
+    doc.setFillColor(17,17,17);
+    doc.rect(0,287,W,10,'F');
+    doc.setFillColor(204,0,0);
+    doc.rect(0,287,W,1,'F');
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(7);
+    doc.text('DevFit — Dominance Through Discipline',margin,293);
+    doc.text((rangeVal==='all'?totalWeeks:rangeVal)+'-Week Program Report — '+name,W-margin,293,{align:'right'});
+
+    doc.save('DevFit_Program_Report_'+name.replace(/\s/g,'_')+'.pdf');
+  }, 500);
+}
+
+function logout(){
+  localStorage.removeItem('devfit_user');
+  window.location.href='https://deva000000.github.io/DevFit/login.html';
+}
+
+function showCountdown(){
+  try{
+    const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+    if(!user.expiry) return;
+
+    const today = new Date(); today.setHours(0,0,0,0);
+    const expiry = new Date(user.expiry);
+    const start = user.startDate ? new Date(user.startDate) : null;
+
+    // Buffer: 1 day before start, 1 day after expiry
+    const accessStart = start ? new Date(start) : null;
+    if(accessStart) accessStart.setDate(accessStart.getDate()-1);
+    const accessEnd = new Date(expiry);
+    accessEnd.setDate(accessEnd.getDate()+1);
+
+    const daysLeft = Math.ceil((accessEnd - today)/(1000*60*60*24));
+    const totalDays = start ? Math.ceil((accessEnd - accessStart)/(1000*60*60*24)) : parseInt(user.plan)*7+2 || 58;
+    const pct = Math.max(0, Math.min(100, (daysLeft/totalDays)*100));
+    const circumference = 150.8;
+    const offset = circumference - (pct/100)*circumference;
+
+    const wrap = document.getElementById('countdown-wrap');
+    const ringProg = document.getElementById('ring-progress');
+    const ringDays = document.getElementById('ring-days');
+    const title = document.getElementById('countdown-title');
+    const sub = document.getElementById('countdown-sub');
+
+    if(!wrap) return;
+    wrap.style.display='flex';
+
+    if(daysLeft <= 0){
+      ringProg.style.stroke='#444444';
+      ringDays.textContent='END';
+      ringDays.style.fontSize='9';
+      title.textContent='Program completed';
+      sub.textContent='Contact your trainer to start a new program';
+      return;
+    }
+
+    ringProg.setAttribute('stroke-dashoffset', offset);
+    ringDays.textContent=daysLeft;
+    ringProg.style.stroke = daysLeft<=3?'#ef4444':daysLeft<=7?'#f59e0b':'#cc0000';
+
+    title.textContent = daysLeft===1?'Last day!':daysLeft<=3?'Ending soon!':'Program active';
+    sub.textContent = daysLeft+' day'+(daysLeft===1?'':' s')+' remaining · '+user.plan;
+
+    // Renewal banner — show last 3 days
+    const renewal = document.getElementById('renewal-banner');
+    const renewalText = document.getElementById('renewal-text');
+    if(renewal && daysLeft<=3 && daysLeft>0){
+      renewal.style.display='flex';
+      renewalText.textContent = daysLeft===1?'⚠️ Your program ends today! Renew to keep your progress.':'⚠️ Your program ends in '+daysLeft+' day'+(daysLeft===1?'':'s')+'!';
+    }
+  }catch(e){}
+}
+
+function showWelcomeScreen(){
+  try{
+    const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+    const welcomed = localStorage.getItem('devfit_welcomed_'+user.email);
+    if(welcomed) return;
+
+    const overlay = document.getElementById('welcome-overlay');
+    const wname = document.getElementById('welcome-name');
+    const wdetail = document.getElementById('welcome-detail');
+    const wstats = document.getElementById('welcome-stats');
+    if(!overlay) return;
+
+    wname.textContent = 'Welcome, '+(user.name||'Champion')+'!';
+    wdetail.textContent = 'Your DevFit program is now active. Log your weight, steps and sleep daily to track your real progress.';
+
+    let statsHtml = '';
+    if(user.plan) statsHtml += '<div class="welcome-stat">Plan: <span>'+user.plan+'</span></div>';
+    if(user.expiry){
+      const exp = new Date(user.expiry);
+      statsHtml += '<div class="welcome-stat">Ends: <span>'+exp.toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'})+'</span></div>';
+    }
+    wstats.innerHTML = statsHtml;
+    overlay.style.display='flex';
+  }catch(e){}
+}
+
+function dismissWelcome(){
+  try{
+    const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+    localStorage.setItem('devfit_welcomed_'+user.email,'1');
+  }catch(e){}
+  const overlay = document.getElementById('welcome-overlay');
+  if(overlay) overlay.style.display='none';
+}
+
+// Check access every 24 hours
+function scheduleAccessCheck(){
+  const INTERVAL = 24*60*60*1000;
+  setInterval(()=>{
+    try{
+      const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+      if(!user.email) return;
+      fetch(SHEET_URL_AUTH+'?action=checkAccess&email='+encodeURIComponent(user.email))
+        .then(r=>r.json())
+        .then(data=>{
+          if(!data.approved){
+            localStorage.removeItem('devfit_user');
+            alert('Your program has ended. Contact your trainer to renew.');
+            window.location.href='https://deva000000.github.io/DevFit/login.html';
+          } else {
+            // Update expiry from sheet
+            if(data.expiry){
+              const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+              u.expiry = data.expiry;
+              localStorage.setItem('devfit_user', JSON.stringify(u));
+            }
+            showCountdown();
+          }
+        })
+        .catch(()=>{});
+    }catch(e){}
+  }, INTERVAL);
+}
+
+loadData();
+renderTabs();
+render();
+showCountdown();
+showWelcomeScreen();
+scheduleAccessCheck();
+</script>
+</body>
+</html>

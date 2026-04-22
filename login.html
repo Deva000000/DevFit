@@ -155,6 +155,12 @@
   }
   @keyframes spin{to{transform:rotate(360deg)}}
 </style>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#cc0000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="DevFit">
+<link rel="apple-touch-icon" href="icon-192.png">
 </head>
 <body>
 
@@ -204,6 +210,7 @@
     <a href="https://wa.me/60183679177" class="contact-link">💬 WhatsApp Trainer</a>
   </div>
 
+  <button id="install-btn" onclick="installApp()" style="display:none;margin-top:12px;background:transparent;border:1px solid #cc0000;color:#cc0000;padding:8px 16px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;font-family:DM Sans,sans-serif;">📲 Install DevFit App</button>
   <div class="footer">DevFit © 2025 · Secure login powered by Google</div>
 
 </div>
@@ -281,6 +288,28 @@ if(saved){
     const user = JSON.parse(saved);
     if(user.approved) window.location.href='https://deva000000.github.io/DevFit/index.html';
   }catch(e){}
+}
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+
+// Add to Home Screen prompt
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt',(e)=>{
+  e.preventDefault();
+  deferredPrompt=e;
+  // Show install button if exists
+  const btn=document.getElementById('install-btn');
+  if(btn) btn.style.display='inline-block';
+});
+function installApp(){
+  if(!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(()=>{deferredPrompt=null;});
 }
 </script>
 </body>

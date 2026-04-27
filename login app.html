@@ -28,7 +28,7 @@
 
   /* HEADER */
   .header{background:#111111;border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:1rem;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;border-left:5px solid #cc0000;border-top:3px solid #cc0000;}
-  .app-title{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:#fff;line-height:1.1}
+  .app-title{font-family:'DM Sans',system-ui,sans-serif;font-size:22px;font-weight:800;color:#fff;line-height:1.1}
   .app-sub{font-size:13px;color:rgba(255,255,255,0.75);margin-top:2px}
   .week-tabs{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
   .wtab{font-size:12px;font-weight:500;padding:6px 14px;border-radius:20px;border:1.5px solid rgba(220,38,38,0.5);background:transparent;color:rgba(255,255,255,0.8);cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif}
@@ -39,10 +39,13 @@
   .wtab-action.danger:hover{background:rgba(255,100,100,0.15)}
 
   /* SHARED TAB NAV — Progress / Nutrition / Training */
-  .devfit-tabnav{background:#111;border-radius:14px;padding:6px;margin-bottom:14px;display:flex;gap:4px;border:1px solid #2a2a2a}
-  .devfit-tabnav a{flex:1;text-align:center;padding:10px 8px;border-radius:8px;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:rgba(255,255,255,0.6);text-decoration:none;transition:all .15s}
-  .devfit-tabnav a:hover{color:rgba(255,255,255,0.9)}
-  .devfit-tabnav a.active{background:#cc0000;color:#fff;box-shadow:0 2px 8px rgba(204,0,0,0.35)}
+  nav.devfit-tabnav{display:flex !important;background:#111;border-radius:14px;padding:6px;margin-bottom:14px;gap:4px;border:1px solid #2a2a2a;width:100%;box-sizing:border-box}
+  nav.devfit-tabnav a{flex:1 1 0;min-width:0;text-align:center;padding:11px 6px;border-radius:8px;font-family:'DM Sans',system-ui,sans-serif;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:rgba(255,255,255,0.7);text-decoration:none;transition:all .15s;white-space:nowrap}
+  nav.devfit-tabnav a:hover{color:#fff}
+  nav.devfit-tabnav a.active{background:#cc0000;color:#fff;box-shadow:0 2px 8px rgba(204,0,0,0.35)}
+  @media(max-width:380px){
+    nav.devfit-tabnav a{font-size:11px;padding:11px 4px;letter-spacing:.02em}
+  }
 
   /* GOAL SELECTOR */
   .goal-row{display:flex;gap:8px;flex-wrap:wrap}
@@ -61,14 +64,14 @@
   .client-row input::placeholder,.text-input::placeholder{color:var(--t2)}
 
   /* SECTION LABEL */
-  .section-label{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;color:#e2e8f0;text-transform:uppercase;margin-bottom:10px}
+  .section-label{font-family:'DM Sans',system-ui,sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;color:#e2e8f0;text-transform:uppercase;margin-bottom:10px}
 
   /* DAY GRID */
   .metric-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
   .day-card{background:#ffffff;border:1px solid var(--bd);border-radius:var(--radius);padding:8px 4px;text-align:center;transition:border-color .2s}
   .day-card:focus-within{border-color:var(--g)}
   .day-lbl{font-size:10px;font-weight:500;color:#888888;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}
-  .day-card input{width:100%;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;text-align:center;border:none;background:transparent;color:#111111;outline:none;padding:2px 0}
+  .day-card input{width:100%;font-family:'DM Sans',system-ui,sans-serif;font-size:15px;font-weight:700;text-align:center;border:none;background:transparent;color:#111111;outline:none;padding:2px 0}
   .day-card input::placeholder{color:var(--bd);font-size:18px;font-weight:400}
   input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
   input[type=number]{-moz-appearance:textfield}
@@ -86,7 +89,7 @@
   .ol-btn.selected-warn{border-color:var(--a);background:#fffbeb;color:#92400e;font-weight:600}
   .ol-btn.selected-bad{border-color:var(--r);background:#fef2f2;color:#991b1b;font-weight:600}
   .bf-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
-  .bf-input{width:90px;font-family:'Syne',sans-serif;font-size:18px;font-weight:700;text-align:center;padding:8px;border:1.5px solid #d1d5db;border-radius:var(--radius);background:#ffffff;color:#111111;outline:none}
+  .bf-input{width:90px;font-family:'DM Sans',system-ui,sans-serif;font-size:18px;font-weight:700;text-align:center;padding:8px;border:1.5px solid #d1d5db;border-radius:var(--radius);background:#ffffff;color:#111111;outline:none}
   .bf-input:focus{border-color:var(--g)}
   .bf-direction{display:flex;gap:6px;flex-wrap:wrap}
   .bf-btn{padding:6px 12px;border-radius:20px;border:1.5px solid #d1d5db;background:#ffffff;color:#444444;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif}
@@ -100,7 +103,7 @@
   .summary-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
   .sum-card{background:#ffffff;border:1px solid var(--bd);border-radius:var(--radius-lg);padding:12px 14px}
   .sum-label{font-size:11px;color:#555555;font-weight:500;margin-bottom:4px}
-  .sum-val{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:#111111;margin-bottom:6px}
+  .sum-val{font-family:'DM Sans',system-ui,sans-serif;font-size:22px;font-weight:800;color:#111111;margin-bottom:6px}
   .sum-badge{display:inline-block;font-size:10px;font-weight:600;padding:3px 9px;border-radius:20px}
   .badge-green{background:#dcfce7;color:#15803d}
   .badge-amber{background:#fef9c3;color:#92400e}
@@ -122,7 +125,7 @@
   .feedback-box{background:#ffffff;border-left:3px solid var(--g);border-radius:var(--radius);padding:12px 16px;font-size:13px;line-height:1.7;color:#111111}
 
   /* CHART */
-  .chart-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--t1);margin-bottom:8px}
+  .chart-title{font-family:'DM Sans',system-ui,sans-serif;font-size:14px;font-weight:700;color:var(--t1);margin-bottom:8px}
   .chart-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--t2);margin-bottom:10px}
   .legend-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:middle}
   .tip-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
@@ -153,7 +156,7 @@
   .stats-banner{background:#1a1a1a;border:1px solid #cc0000;border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:12px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
   .stat-item{text-align:center}
   .stat-lbl{font-size:10px;color:#aaaaaa;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
-  .stat-val{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:#ffffff}
+  .stat-val{font-family:'DM Sans',system-ui,sans-serif;font-size:18px;font-weight:800;color:#ffffff}
   .stat-highlight{color:#cc0000}
   .stat-sub{font-size:10px;color:#888888;margin-top:2px}
   /* PDF BUTTON */
@@ -165,18 +168,18 @@
   .countdown-wrap{display:flex;align-items:center;gap:14px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:var(--radius-lg);padding:12px 16px;margin-bottom:12px;}
   .ring-svg{flex-shrink:0;}
   .countdown-info{flex:1;}
-  .countdown-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#ffffff;margin-bottom:2px;}
+  .countdown-title{font-family:'DM Sans',system-ui,sans-serif;font-size:13px;font-weight:700;color:#ffffff;margin-bottom:2px;}
   .countdown-sub{font-size:11px;color:#888888;}
 
   /* WELCOME SCREEN */
   .welcome-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:9998;display:flex;align-items:center;justify-content:center;padding:1rem;}
   .welcome-card{background:#111111;border:1px solid #2a2a2a;border-top:3px solid #cc0000;border-radius:16px;padding:32px 24px;max-width:380px;width:100%;text-align:center;}
   .welcome-emoji{font-size:48px;margin-bottom:16px;}
-  .welcome-name{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:#ffffff;margin-bottom:8px;}
+  .welcome-name{font-family:'DM Sans',system-ui,sans-serif;font-size:24px;font-weight:800;color:#ffffff;margin-bottom:8px;}
   .welcome-detail{font-size:13px;color:#888888;line-height:1.7;margin-bottom:20px;}
   .welcome-stat{display:inline-block;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:8px 14px;margin:4px;font-size:12px;color:#cccccc;}
   .welcome-stat span{color:#cc0000;font-weight:700;}
-  .welcome-btn{display:block;width:100%;background:#cc0000;color:#fff;border:none;border-radius:10px;padding:13px;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-top:20px;transition:background .15s;}
+  .welcome-btn{display:block;width:100%;background:#cc0000;color:#fff;border:none;border-radius:10px;padding:13px;font-family:'DM Sans',system-ui,sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-top:20px;transition:background .15s;}
   .welcome-btn:hover{background:#aa0000;}
 
   /* RENEWAL PROMPT */
@@ -255,7 +258,7 @@
         stroke-linecap="round" stroke-dasharray="150.8" stroke-dashoffset="150.8"
         transform="rotate(-90 28 28)" style="transition:stroke-dashoffset .6s;"/>
       <text id="ring-days" x="28" y="28" text-anchor="middle" dominant-baseline="middle"
-        font-family="Syne,sans-serif" font-size="11" font-weight="800" fill="#ffffff">—</text>
+        font-family="'DM Sans',system-ui,sans-serif" font-size="11" font-weight="800" fill="#ffffff">—</text>
     </svg>
     <div class="countdown-info">
       <div class="countdown-title" id="countdown-title">Program active</div>
@@ -391,7 +394,7 @@
       <div class="score-breakdown" id="score-breakdown"></div>
     </div>
     <div style="margin-top:12px;font-size:11px;color:#e2e8f0;line-height:1.6;" id="score-legend">
-      Score weighted across 7 signals — Bodyweight 22% · Body fat 13% · Overload 20% · Diet 18% · Sleep 10% · Steps 10% · Stress 7%. Untracked signals are skipped and the rest re-normalise automatically. Recomp credit applies if body-fat drops while weight stalls.
+      Score weighted across 7 signals — Bodyweight 17% · Body fat 11% · Overload 24% · Diet 21% · Sleep 10% · Steps 10% · Stress 7%. Untracked signals are skipped and the rest re-normalise automatically. Recomp credit applies if body-fat drops while weight stalls.
     </div>
   </div>
 
@@ -404,7 +407,7 @@
   <!-- CHART 1: BODYWEIGHT -->
   <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:16px;margin-bottom:12px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-      <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#111111;">Bodyweight (kg)</div>
+      <div style="font-family:'DM Sans',system-ui,sans-serif;font-size:13px;font-weight:700;color:#111111;">Bodyweight (kg)</div>
       <select id="bw-chart-range" onchange="updateChart()" style="font-family:'DM Sans',sans-serif;font-size:12px;padding:5px 10px;border:1px solid #d1d5db;border-radius:20px;background:#f8fafc;color:#333;cursor:pointer;outline:none;"></select>
     </div>
     <div id="trend-summary" style="font-size:12px;color:#666666;margin-bottom:10px;min-height:16px;"></div>
@@ -414,24 +417,24 @@
   <!-- CHART 2: PROGRESS SCORE -->
   <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;padding:16px;margin-bottom:12px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-      <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:#111111;">Progress Score (%)</div>
+      <div style="font-family:'DM Sans',system-ui,sans-serif;font-size:13px;font-weight:700;color:#111111;">Progress Score (%)</div>
       <select id="score-chart-range" onchange="updateChart()" style="font-family:'DM Sans',sans-serif;font-size:12px;padding:5px 10px;border:1px solid #d1d5db;border-radius:20px;background:#f8fafc;color:#333;cursor:pointer;outline:none;"></select>
     </div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:10px;">
       <div style="background:#f8fafc;border-radius:8px;padding:7px 8px;">
-        <div style="font-size:10px;font-weight:700;color:#111;margin-bottom:2px;">Bodyweight 22%</div>
+        <div style="font-size:10px;font-weight:700;color:#111;margin-bottom:2px;">Bodyweight 17%</div>
         <div style="font-size:9px;color:#666;">Direction vs goal<br>+ recomp credit</div>
       </div>
       <div style="background:#f8fafc;border-radius:8px;padding:7px 8px;">
-        <div style="font-size:10px;font-weight:700;color:#111;margin-bottom:2px;">Body fat 13%</div>
+        <div style="font-size:10px;font-weight:700;color:#111;margin-bottom:2px;">Body fat 11%</div>
         <div style="font-size:9px;color:#666;">Drop=100 · Same=50<br>Rise=0 · Optional</div>
       </div>
       <div style="background:#f8fafc;border-radius:8px;padding:7px 8px;">
-        <div style="font-size:10px;font-weight:700;color:#111;margin-bottom:2px;">Overload 20%</div>
+        <div style="font-size:10px;font-weight:700;color:#111;margin-bottom:2px;">Overload 24%</div>
         <div style="font-size:9px;color:#666;">Improved=100 · Form=80<br>Same=55 · Regressed=15</div>
       </div>
       <div style="background:#f8fafc;border-radius:8px;padding:7px 8px;">
-        <div style="font-size:10px;font-weight:700;color:#111;margin-bottom:2px;">Diet 18%</div>
+        <div style="font-size:10px;font-weight:700;color:#111;margin-bottom:2px;">Diet 21%</div>
         <div style="font-size:9px;color:#666;">Met=100 · Few miss=60<br>Binge=20</div>
       </div>
       <div style="background:#f8fafc;border-radius:8px;padding:7px 8px;">
@@ -514,38 +517,33 @@ const SHEET_URL_AUTH = 'https://script.google.com/macros/s/AKfycbyyYXw0ySPYZ51EQ
       window.location.href='https://deva000000.github.io/DevFit/login.html';
       return;
     }
-    document.addEventListener('DOMContentLoaded',function(){
-      const loadDiv = document.createElement('div');
-      loadDiv.id='auth-loading';
-      loadDiv.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:#1a1a1a;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;z-index:9999;';
-      loadDiv.innerHTML='<div style="width:40px;height:40px;border:3px solid #333;border-top-color:#cc0000;border-radius:50%;animation:spin .7s linear infinite;"></div><div style="color:#888;font-family:DM Sans,sans-serif;font-size:13px;">Verifying access...</div><style>@keyframes spin{to{transform:rotate(360deg)}}</style>';
-      document.body.appendChild(loadDiv);
+    // INSTANT LOAD — show app immediately from cached user, verify in background.
+    // Skip background check if verified within last 5 minutes (fast tab switching).
+    const lastVerified = parseInt(localStorage.getItem('devfit_lastVerified')||'0');
+    const FIVE_MIN = 5*60*1000;
+    if(Date.now() - lastVerified < FIVE_MIN) return;
 
-      fetch(SHEET_URL_AUTH+'?action=checkAccess&email='+encodeURIComponent(user.email))
-        .then(r=>r.json())
-        .then(data=>{
-          if(data.approved){
-            try{
-              const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
-              if(data.expiry) u.expiry = data.expiry;
-              if(data.startDate) u.startDate = data.startDate;
-              if(data.plan) u.plan = data.plan;
-              if(data.name) u.name = data.name;
-              localStorage.setItem('devfit_user', JSON.stringify(u));
-            }catch(e){}
-            document.getElementById('auth-loading').remove();
-            setTimeout(showCountdown, 100);
-          } else {
-            localStorage.removeItem('devfit_user');
-            window.location.href='https://deva000000.github.io/DevFit/login.html';
-          }
-        })
-        .catch(()=>{
-          const saved = localStorage.getItem('devfit_user');
-          if(saved){ const ld=document.getElementById('auth-loading'); if(ld) ld.remove(); }
-          else window.location.href='https://deva000000.github.io/DevFit/login.html';
-        });
-    });
+    fetch(SHEET_URL_AUTH+'?action=checkAccess&email='+encodeURIComponent(user.email))
+      .then(r=>r.json())
+      .then(data=>{
+        if(data.approved){
+          try{
+            const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+            if(data.expiry) u.expiry = data.expiry;
+            if(data.startDate) u.startDate = data.startDate;
+            if(data.plan) u.plan = data.plan;
+            if(data.name) u.name = data.name;
+            localStorage.setItem('devfit_user', JSON.stringify(u));
+            localStorage.setItem('devfit_lastVerified', String(Date.now()));
+          }catch(e){}
+          if(typeof showCountdown==='function') showCountdown();
+        } else {
+          localStorage.removeItem('devfit_user');
+          localStorage.removeItem('devfit_lastVerified');
+          window.location.href='https://deva000000.github.io/DevFit/login.html';
+        }
+      })
+      .catch(()=>{ /* offline — trust local session */ });
   }catch(e){
     window.location.href='https://deva000000.github.io/DevFit/login.html';
   }
@@ -788,10 +786,10 @@ function calcTrueScore(w){
 
   // 5. Weighted scores — every visible input now counts
   const scores={
-    bw:     {val:bwVal,                          weight:22, label:'Bodyweight'},
-    bf:     {val:bfVal,                          weight:13, label:'Body fat'},
-    ol:     {val:overloadScore(ci.overload),     weight:20, label:'Overload'},
-    diet:   {val:dietScore(ci.diet),             weight:18, label:'Diet'},
+    bw:     {val:bwVal,                          weight:17, label:'Bodyweight'},
+    bf:     {val:bfVal,                          weight:11, label:'Body fat'},
+    ol:     {val:overloadScore(ci.overload),     weight:24, label:'Overload'},
+    diet:   {val:dietScore(ci.diet),             weight:21, label:'Diet'},
     sleep:  {val:sleepScore(sleepAvg),           weight:10, label:'Sleep'},
     steps:  {val:stepsScore(stepsAvg),           weight:10, label:'Steps'},
     stress: {val:stressScore(ci.stress),         weight:7,  label:'Stress'}
@@ -834,7 +832,7 @@ function drawRingBig(id, score, color){
     ctx.strokeStyle=ringColor; ctx.lineWidth=8; ctx.lineCap='round'; ctx.stroke();
   }
   ctx.fillStyle=score!==null&&score>=75?'#16a34a':score!==null&&score>=50?'#f59e0b':'#ef4444';
-  ctx.font='bold 16px Syne,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.font='bold 16px "DM Sans",system-ui,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText(score!==null?score+'%':'—',cx,cy);
   const zone=score===null?'':score>=75?'GREAT':score>=50?'OKAY':'LOW';
   ctx.fillStyle='#aaaaaa'; ctx.font='8px DM Sans,sans-serif';
@@ -1030,10 +1028,10 @@ function updateChart(){
           let s=0,wt=0;
           if(sv!==null){const v=stepsScore(sv);if(v!==null){s+=v*10;wt+=10;}}
           if(slv!==null){const v=sleepScore(slv);if(v!==null){s+=v*10;wt+=10;}}
-          if(olS!==null){s+=olS*20;wt+=20;}
-          if(dietS!==null){s+=dietS*18;wt+=18;}
+          if(olS!==null){s+=olS*24;wt+=24;}
+          if(dietS!==null){s+=dietS*21;wt+=21;}
           if(stressS!==null){s+=stressS*7;wt+=7;}
-          if(bfS!==null){s+=bfS*13;wt+=13;}
+          if(bfS!==null){s+=bfS*11;wt+=11;}
           scoreData.push(wt>0?Math.round(s/wt):null);
         }
       }

@@ -6,7 +6,7 @@
    - Auto-update: new SW takes control on next reload
 */
 
-const VERSION = 'devfit-v1.0.0';
+const VERSION = 'devfit-v1.2.0';
 const APP_SHELL = 'devfit-shell-' + VERSION;
 const RUNTIME = 'devfit-runtime-' + VERSION;
 
@@ -14,6 +14,8 @@ const RUNTIME = 'devfit-runtime-' + VERSION;
 const SHELL_FILES = [
   './',
   './login app.html',
+  './nutrition.html',
+  './workouts.html',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',

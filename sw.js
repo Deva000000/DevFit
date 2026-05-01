@@ -6,20 +6,21 @@
    - Auto-update: new SW takes control on next reload
 */
 
-const VERSION = 'devfit-v1.2.0';
+const VERSION = 'devfit-v2.0.0';
 const APP_SHELL = 'devfit-shell-' + VERSION;
 const RUNTIME = 'devfit-runtime-' + VERSION;
 
 // Pre-cache the app shell (relative paths so it works under /DevFit/)
 const SHELL_FILES = [
   './',
-  './login app.html',
+  './index.html',
+  './login.html',
   './nutrition.html',
   './workouts.html',
+  './settings.html',
   './manifest.json',
   './icon-192.png',
-  './icon-512.png',
-  './icon-maskable-512.png'
+  './icon-512.png'
 ];
 
 // CDN origins we want to runtime-cache
@@ -91,7 +92,7 @@ async function cacheFirst(req) {
   } catch (e) {
     // Offline fallback for navigation
     if (req.mode === 'navigate') {
-      const fallback = await caches.match('./login app.html');
+      const fallback = await caches.match('./index.html');
       if (fallback) return fallback;
     }
     return new Response('Offline', { status: 503, statusText: 'Offline' });

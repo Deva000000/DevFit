@@ -132,14 +132,24 @@
   .toast.show{opacity:1}
 
   @media(max-width:540px){
-    body{padding:.6rem}
-    .ex-row{grid-template-columns:1.5fr .5fr .5fr 26px;gap:4px}
-    .sets-grid{grid-template-columns:28px 1fr 1fr 1fr 26px;gap:4px}
-    .sets-grid input{font-size:13px;padding:5px 2px}
+    body{padding:.5rem}
+    .page{max-width:100%}
+    .ex-row{grid-template-columns:1.4fr .5fr .5fr 24px;gap:3px}
+    .ex-row input{font-size:12px;padding:4px}
+    .sets-grid{grid-template-columns:24px minmax(0,1fr) minmax(0,1fr) minmax(0,0.8fr) 22px;gap:3px}
+    .sets-grid input{font-size:12px;padding:4px 2px;min-width:0}
+    .sets-grid .last-cell{font-size:9px;min-width:0;overflow:hidden;text-overflow:ellipsis}
+    .sets-grid .h{font-size:8px}
     .app-title{font-size:15px}
     .header-logo{height:38px;width:38px}
     .stat-val{font-size:15px}
     .log-bar{grid-template-columns:1fr;gap:6px}
+    .stat-row{gap:5px}
+    .stat-card{padding:8px}
+  }
+  @media(max-width:380px){
+    .sets-grid{grid-template-columns:22px minmax(0,1fr) minmax(0,1fr) minmax(0,0.7fr) 20px;gap:2px}
+    .ex-row{grid-template-columns:1.3fr .5fr .5fr 22px;gap:2px}
   }
 </style>
 </head>
@@ -157,9 +167,10 @@
 
   <!-- TAB NAV -->
   <nav class="devfit-tabnav">
-    <a href="login app.html">Progress</a>
+    <a href="index.html">Progress</a>
     <a href="nutrition.html">Nutrition</a>
     <a href="workouts.html" class="active">Training</a>
+    <a href="settings.html">Settings</a>
   </nav>
 
   <!-- MODE SWITCH -->
@@ -221,6 +232,18 @@
 
 <script>
 'use strict';
+
+// LOGIN CHECK — redirect to login if no session
+(function(){
+  try{
+    const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+    if(!user.email || !user.approved){
+      window.location.href = 'login.html';
+    }
+  }catch(e){
+    window.location.href = 'login.html';
+  }
+})();
 
 const KEY='devfitTrainingV1';
 let data=load();
@@ -478,7 +501,8 @@ function renderLog(){
 function updateShareBtn(){
   const btn=document.getElementById('share-btn');
   if(!currentSession || !currentSession.sess){btn.disabled=true;return;}
-  const hasData=currentSession.sess.logs.some(l=>l.sets.some(s=>(Number(s.reps)||0)>0&&(Number(s.weight)||0)>0));
+  // Allow share if any set has reps OR weight logged (bodyweight exercises have no weight)
+  const hasData=currentSession.sess.logs.some(l=>l.sets.some(s=>(Number(s.reps)||0)>0||(Number(s.weight)||0)>0));
   btn.disabled=!hasData;
 }
 
@@ -653,7 +677,7 @@ function drawExportCard(canvas,workout,session){
 
   // Build exercise summary lines
   const lines=[];
-  let totalVol=0, totalSets=0, totalReps=0;
+  let totalVolKg=0, totalSetsCt=0, totalRepsCt=0;
   let bestLift={name:'',w:0,r:0};
   workout.exercises.forEach(ex=>{
     const log=session.logs.find(l=>l.exId===ex.id);
@@ -664,7 +688,7 @@ function drawExportCard(canvas,workout,session){
     const setCount=validSets.length;
     const reps=totalReps(validSets);
     const best=bestSet(validSets);
-    totalVol+=vol; totalSets+=setCount; totalReps+=reps;
+    totalVolKg+=vol; totalSetsCt+=setCount; totalRepsCt+=reps;
     if(best && best.w>bestLift.w) bestLift={name:ex.name||'',w:best.w,r:best.r};
 
     // Format like "4 × 8 @ 60kg" using the most common config; fall back to range
@@ -733,9 +757,9 @@ function drawExportCard(canvas,workout,session){
   const gap=18;
   const cardW=(W-120-gap*2)/3;
   const stats=[
-    {lbl:'TOTAL SETS', val:String(totalSets)},
-    {lbl:'TOTAL REPS', val:String(totalReps)},
-    {lbl:'TOTAL VOLUME', val:totalVol.toLocaleString()+' kg'}
+    {lbl:'TOTAL SETS', val:String(totalSetsCt)},
+    {lbl:'TOTAL REPS', val:String(totalRepsCt)},
+    {lbl:'TOTAL VOLUME', val:totalVolKg.toLocaleString()+' kg'}
   ];
   stats.forEach((s,i)=>{
     const x=60+i*(cardW+gap);

@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>DevFit — Settings</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#cc0000">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="DevFit">
+<meta name="mobile-web-app-capable" content="yes">
+
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{--g:#16a34a;--a:#f59e0b;--r:#ef4444;--bd:#d1d5db;--t1:#111;--t2:#555;--radius:10px;--radius-lg:14px}
+  html{font-size:16px}
+  body{font-family:'DM Sans',system-ui,sans-serif;background:#c8c8c8;color:var(--t1);min-height:100vh;padding:1rem;
+    background-image:linear-gradient(rgba(204,0,0,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(204,0,0,0.04) 1px,transparent 1px);
+    background-size:40px 40px,40px 40px;overflow-x:hidden}
+  .page{max-width:740px;margin:0 auto}
+  .page::before{content:'';display:block;height:3px;background:linear-gradient(90deg,#cc0000,#ff4444,#cc0000);border-radius:2px;margin-bottom:12px}
+
+  .header{background:#111;border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:10px;display:flex;align-items:center;gap:12px;border-left:5px solid #cc0000;border-top:3px solid #cc0000}
+  .header-logo{height:46px;width:46px;border-radius:8px;background:#fff;flex-shrink:0;object-fit:cover}
+  .app-title{font-size:18px;font-weight:800;color:#fff;line-height:1.1}
+  .app-sub{font-size:12px;color:rgba(255,255,255,0.7);margin-top:2px}
+
+  nav.devfit-tabnav{display:flex !important;background:#111;border-radius:14px;padding:6px;margin-bottom:14px;gap:4px;border:1px solid #2a2a2a;width:100%;box-sizing:border-box}
+  nav.devfit-tabnav a{flex:1 1 0;min-width:0;text-align:center;padding:11px 6px;border-radius:8px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:rgba(255,255,255,0.7);text-decoration:none;transition:all .15s;white-space:nowrap}
+  nav.devfit-tabnav a:hover{color:#fff}
+  nav.devfit-tabnav a.active{background:#cc0000;color:#fff;box-shadow:0 2px 8px rgba(204,0,0,0.35)}
+  @media(max-width:380px){nav.devfit-tabnav a{font-size:11px;padding:11px 4px;letter-spacing:.02em}}
+
+  .card{background:#2d2d2d;border:1px solid #3a3a3a;border-radius:var(--radius-lg);padding:16px;margin-bottom:12px}
+  .card-light{background:#fff;border:1px solid #e2e8f0;border-radius:var(--radius-lg);padding:16px;margin-bottom:12px}
+  .section-label{font-size:11px;font-weight:700;letter-spacing:.08em;color:#e2e8f0;text-transform:uppercase;margin-bottom:12px}
+  .section-label-dark{font-size:11px;font-weight:700;letter-spacing:.08em;color:#111;text-transform:uppercase;margin-bottom:12px}
+
+  /* PROFILE CARD */
+  .profile-row{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+  .profile-avatar{width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,#cc0000,#ff4444);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:800;flex-shrink:0}
+  .profile-info{flex:1;min-width:0}
+  .profile-name{font-size:16px;font-weight:800;color:#fff;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .profile-email{font-size:12px;color:#aaa;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .info-cell{background:#1a1a1a;border:1px solid #3a3a3a;border-radius:var(--radius);padding:10px 12px}
+  .info-lbl{font-size:9px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+  .info-val{font-size:14px;color:#fff;font-weight:700;margin-top:3px}
+  .info-val.warn{color:#f59e0b}
+  .info-val.danger{color:#ef4444}
+
+  /* ACTION BUTTONS */
+  .setting-btn{display:flex;align-items:center;justify-content:space-between;width:100%;background:#1a1a1a;border:1px solid #3a3a3a;border-radius:var(--radius);padding:14px 16px;color:#fff;font-family:'DM Sans',system-ui,sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;margin-bottom:8px;text-align:left}
+  .setting-btn:hover{background:#2a2a2a;border-color:#cc0000}
+  .setting-btn .icon{width:32px;height:32px;background:#cc0000;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;flex-shrink:0;margin-right:12px}
+  .setting-btn .body{flex:1;min-width:0}
+  .setting-btn .title{font-size:14px;font-weight:700;color:#fff;line-height:1.2}
+  .setting-btn .desc{font-size:11px;color:#888;margin-top:2px;line-height:1.3}
+  .setting-btn .chev{color:#666;font-size:18px;flex-shrink:0;margin-left:8px}
+  .setting-btn.danger .icon{background:#7f1d1d}
+  .setting-btn.danger:hover{border-color:#ef4444}
+
+  /* RANGE PICKER ROW */
+  .range-row{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:6px;align-items:center}
+  .range-row select{font-family:'DM Sans',sans-serif;font-size:13px;padding:9px 14px;border:1px solid #3a3a3a;border-radius:20px;background:#1a1a1a;color:#fff;outline:none;cursor:pointer}
+  .range-row .pdf-btn{background:#cc0000;color:#fff;border:none;border-radius:20px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s;white-space:nowrap}
+  .range-row .pdf-btn:hover{background:#aa0000}
+
+  /* FOOTER */
+  .footer{text-align:center;color:#666;font-size:11px;margin-top:20px;line-height:1.6}
+  .footer a{color:#cc0000;text-decoration:none;font-weight:700}
+
+  /* TOAST */
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#16a34a;color:#fff;padding:10px 18px;border-radius:24px;font-size:13px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.2);z-index:10000;opacity:0;transition:opacity .2s;pointer-events:none}
+  .toast.show{opacity:1}
+  .toast.err{background:#cc0000}
+
+  /* HIDDEN CHARTS — for PDF export */
+  #export-charts{position:absolute;left:-9999px;top:-9999px;width:560px}
+
+  @media(max-width:540px){
+    body{padding:.5rem}
+    .page{max-width:100%}
+    .app-title{font-size:15px}
+    .header-logo{height:38px;width:38px}
+    .info-grid{gap:6px}
+    .info-cell{padding:8px 10px}
+    .info-val{font-size:12px}
+    .setting-btn{padding:12px 14px}
+    .setting-btn .title{font-size:13px}
+    .range-row{grid-template-columns:1fr}
+  }
+  *{min-width:0}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <img src="icon-192.png" alt="DevFit" class="header-logo" onerror="this.style.display='none'">
+    <div>
+      <div class="app-title">DevFit Settings</div>
+      <div class="app-sub">Account, reports &amp; data</div>
+    </div>
+  </div>
+
+  <!-- TAB NAV -->
+  <nav class="devfit-tabnav">
+    <a href="index.html">Progress</a>
+    <a href="nutrition.html">Nutrition</a>
+    <a href="workouts.html">Training</a>
+    <a href="settings.html" class="active">Settings</a>
+  </nav>
+
+  <!-- PROFILE -->
+  <div class="card">
+    <div class="section-label">Account</div>
+    <div class="profile-row">
+      <div class="profile-avatar" id="profile-avatar">DF</div>
+      <div class="profile-info">
+        <div class="profile-name" id="profile-name">—</div>
+        <div class="profile-email" id="profile-email">—</div>
+      </div>
+    </div>
+    <div class="info-grid">
+      <div class="info-cell">
+        <div class="info-lbl">Plan</div>
+        <div class="info-val" id="info-plan">—</div>
+      </div>
+      <div class="info-cell">
+        <div class="info-lbl">Status</div>
+        <div class="info-val" id="info-status">—</div>
+      </div>
+      <div class="info-cell">
+        <div class="info-lbl">Started</div>
+        <div class="info-val" id="info-started">—</div>
+      </div>
+      <div class="info-cell">
+        <div class="info-lbl">Expires</div>
+        <div class="info-val" id="info-expires">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REPORTS -->
+  <div class="card">
+    <div class="section-label">Reports</div>
+
+    <button class="setting-btn" onclick="exportWeekPDF()">
+      <div class="icon">W</div>
+      <div class="body">
+        <div class="title">Week Report (PDF)</div>
+        <div class="desc">Detailed PDF for the currently selected week</div>
+      </div>
+      <div class="chev">›</div>
+    </button>
+
+    <button class="setting-btn" onclick="document.getElementById('range-row').style.display='grid';this.style.display='none'">
+      <div class="icon">P</div>
+      <div class="body">
+        <div class="title">Program Report (PDF)</div>
+        <div class="desc">Multi-week summary across the whole program</div>
+      </div>
+      <div class="chev">›</div>
+    </button>
+
+    <div id="range-row" class="range-row" style="display:none">
+      <select id="program-report-range">
+        <option value="all">All weeks</option>
+      </select>
+      <button class="pdf-btn" onclick="exportProgramPDF()">Generate</button>
+    </div>
+  </div>
+
+  <!-- TRAINER SYNC -->
+  <div class="card">
+    <div class="section-label">Trainer Sync</div>
+    <button class="setting-btn" id="sync-btn" onclick="manualSync()">
+      <div class="icon">S</div>
+      <div class="body">
+        <div class="title" id="sync-btn-title">Sync to Trainer</div>
+        <div class="desc">Push this week's metrics to the trainer's dashboard</div>
+      </div>
+      <div class="chev">›</div>
+    </button>
+    <div style="font-size:11px;color:#888;margin-top:8px;line-height:1.5">Sync sends bodyweight average, steps, sleep, overload, diet compliance, stress, and your weekly score to the trainer's Google Sheet.</div>
+  </div>
+
+  <!-- DATA -->
+  <div class="card">
+    <div class="section-label">Data</div>
+    <button class="setting-btn danger" onclick="resetAll()">
+      <div class="icon">!</div>
+      <div class="body">
+        <div class="title">Reset All Data</div>
+        <div class="desc">Clears all weekly metrics — cannot be undone</div>
+      </div>
+      <div class="chev">›</div>
+    </button>
+  </div>
+
+  <!-- ACCOUNT ACTIONS -->
+  <div class="card">
+    <div class="section-label">Session</div>
+    <button class="setting-btn danger" onclick="logout()">
+      <div class="icon">←</div>
+      <div class="body">
+        <div class="title">Logout</div>
+        <div class="desc">Sign out and return to the login screen</div>
+      </div>
+      <div class="chev">›</div>
+    </button>
+  </div>
+
+  <div class="footer">
+    DevFit · Dominance Through Discipline<br>
+    <a href="https://wa.me/60183679177">Contact trainer</a> · v2.0
+  </div>
+
+</div>
+
+<!-- HIDDEN CHARTS for PDF export -->
+<div id="export-charts">
+  <canvas id="exp-bw" width="560" height="220"></canvas>
+  <canvas id="exp-score" width="560" height="220"></canvas>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+'use strict';
+
+// ---------- AUTH GATE ----------
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbyyYXw0ySPYZ51EQyOlyIN2u04n_gpeNiag1bx4mhGPicxx5A3OjTi997J_1IFF2Wcy/exec';
+
+(function authGate(){
+  try{
+    const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+    if(!user.email || !user.approved){
+      window.location.href = 'login.html';
+    }
+  }catch(e){
+    window.location.href = 'login.html';
+  }
+})();
+
+// ---------- LOAD APP DATA (same shape as Progress page) ----------
+const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+let totalWeeks = 4;
+let currentWeek = 0;
+
+function freshCheckin(){ return {overload:null, bf:'', bfDir:null, diet:null, stress:null, notes:''}; }
+
+let appData = {
+  clientName:'', goal:'', goalType:'loss',
+  startWeight:'', programDuration:'8',
+  bw:   Array.from({length:totalWeeks},()=>Array(7).fill('')),
+  steps:Array.from({length:totalWeeks},()=>Array(7).fill('')),
+  sleep:Array.from({length:totalWeeks},()=>Array(7).fill('')),
+  weeklyCheckin: Array.from({length:totalWeeks},freshCheckin)
+};
+
+(function loadData(){
+  try{
+    const s = localStorage.getItem('progressLog2');
+    if(s){
+      appData = JSON.parse(s);
+      totalWeeks = appData.bw.length || 4;
+    }
+    // Use last week with data as currentWeek for sync/export
+    for(let w = totalWeeks-1; w>=0; w--){
+      const hasData = appData.bw[w].some(v=>v!=='') || (appData.weeklyCheckin[w] && (appData.weeklyCheckin[w].overload || appData.weeklyCheckin[w].diet));
+      if(hasData){ currentWeek = w; return; }
+    }
+  }catch(e){}
+})();
+
+// ---------- TOAST ----------
+function toast(msg, err){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (err?' err':'');
+  setTimeout(()=>t.classList.remove('show'), 1800);
+}
+
+// ---------- POPULATE PROFILE ----------
+(function populateProfile(){
+  try{
+    const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+    const name = user.name || appData.clientName || 'Client';
+    document.getElementById('profile-name').textContent = name;
+    document.getElementById('profile-email').textContent = user.email || '—';
+    document.getElementById('profile-avatar').textContent = (name[0]||'D').toUpperCase();
+    document.getElementById('info-plan').textContent = user.plan ? user.plan + ' weeks' : (appData.programDuration||'8') + ' weeks';
+
+    // Status + days remaining
+    if(user.expiry){
+      const today = new Date(); today.setHours(0,0,0,0);
+      const expiry = new Date(user.expiry);
+      const accessEnd = new Date(expiry); accessEnd.setDate(accessEnd.getDate()+1);
+      const daysLeft = Math.round((accessEnd - today)/(1000*60*60*24));
+      const statusEl = document.getElementById('info-status');
+      const expEl = document.getElementById('info-expires');
+      if(daysLeft <= 0){
+        statusEl.textContent = 'Ended';
+        statusEl.className = 'info-val danger';
+      } else if(daysLeft <= 7){
+        statusEl.textContent = daysLeft + ' days left';
+        statusEl.className = 'info-val warn';
+      } else {
+        statusEl.textContent = 'Active';
+      }
+      expEl.textContent = expiry.toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'});
+    } else {
+      document.getElementById('info-status').textContent = 'Active';
+      document.getElementById('info-expires').textContent = '—';
+    }
+    if(user.startDate){
+      document.getElementById('info-started').textContent = new Date(user.startDate).toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'});
+    } else {
+      document.getElementById('info-started').textContent = '—';
+    }
+
+    // Populate program report range select
+    const sel = document.getElementById('program-report-range');
+    sel.innerHTML = '<option value="all">All weeks</option>';
+    for(let i=1;i<=totalWeeks;i++){
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = 'Last ' + i + ' week' + (i>1?'s':'');
+      sel.appendChild(opt);
+    }
+  }catch(e){}
+})();
+
+// ---------- HELPERS (mirrored from Progress page) ----------
+function avg(arr){
+  const n = arr.filter(v=>v!=='').map(Number).filter(n=>!isNaN(n)&&n>0);
+  return n.length ? n.reduce((a,b)=>a+b,0)/n.length : null;
+}
+function stepsScore(s){if(s===null)return null;if(s>=10000)return 100;if(s>=7500)return 80;if(s>=5000)return 55;if(s>=3000)return 35;return 15;}
+function sleepScore(h){if(h===null)return null;if(h>=7&&h<=9)return 100;if(h>=6&&h<10)return 75;if(h>=5)return 45;return 20;}
+function overloadScore(ol){if(ol==='improved')return 100;if(ol==='form')return 80;if(ol==='same')return 55;if(ol==='regressed')return 15;return null;}
+function bfScore(dir){if(dir==='drop')return 100;if(dir==='same')return 50;if(dir==='rise')return 0;return null;}
+function dietScore(d){if(d==='met')return 100;if(d==='missed_few')return 60;if(d==='binge')return 20;return null;}
+function stressScore(s){if(s==='low')return 100;if(s==='moderate')return 60;if(s==='high')return 20;return null;}
+
+function bwScore(bwAvg, prevBwAvg, goalType){
+  if(bwAvg===null) return null;
+  const sw = appData.startWeight ? parseFloat(appData.startWeight) : null;
+  const tw = appData.goal ? parseFloat(appData.goal) : null;
+  if(tw!==null){
+    if(goalType==='loss'&&bwAvg<=tw) return 100;
+    if(goalType==='gain'&&bwAvg>=tw) return 100;
+    if(goalType==='maintain'&&Math.abs(bwAvg-tw)<=0.5) return 100;
+  }
+  if(prevBwAvg===null){
+    if(sw===null||tw===null) return null;
+    const totalGap = Math.abs(tw-sw);
+    if(totalGap===0) return 100;
+    const done = Math.abs(bwAvg-sw);
+    return Math.min(100, Math.round((done/totalGap)*100));
+  }
+  const diff = bwAvg-prevBwAvg;
+  if(goalType==='loss'){
+    if(diff<-0.5) return 100; if(diff<-0.2) return 90; if(diff<0) return 75; if(diff<0.3) return 50; return 20;
+  } else if(goalType==='gain'){
+    if(diff>0.5) return 100; if(diff>0.2) return 90; if(diff>0) return 75; if(diff>-0.3) return 50; return 20;
+  }
+  if(Math.abs(diff)<=0.3) return 100;
+  if(Math.abs(diff)<=0.7) return 65;
+  return 30;
+}
+
+function calcTrueScore(w){
+  const ci = appData.weeklyCheckin[w] || freshCheckin();
+  const bwAvg = avg(appData.bw[w]);
+  const prevBwAvg = w>0 ? avg(appData.bw[w-1]) : null;
+  const stepsAvg = avg(appData.steps[w]);
+  const sleepAvg = avg(appData.sleep[w]);
+  const gt = appData.goalType||'loss';
+  const tw = appData.goal ? parseFloat(appData.goal) : null;
+  let bwVal = bwScore(bwAvg, prevBwAvg, gt);
+  let bfVal = bfScore(ci.bfDir);
+  if(ci.bfDir==='drop' && bwVal!==null && bwVal<75) bwVal=75;
+  const targetReached = bwAvg!==null && tw!==null && (
+    (gt==='loss'&&bwAvg<=tw) ||
+    (gt==='gain'&&bwAvg>=tw) ||
+    (gt==='maintain'&&Math.abs(bwAvg-tw)<=0.5)
+  );
+  if(targetReached) bwVal = 100;
+  if(targetReached && ci.bfDir==='drop') bfVal = 100;
+
+  const scores = {
+    bw:     {val:bwVal,                      weight:17, label:'Bodyweight'},
+    bf:     {val:bfVal,                      weight:11, label:'Body fat'},
+    ol:     {val:overloadScore(ci.overload), weight:24, label:'Overload'},
+    diet:   {val:dietScore(ci.diet),         weight:21, label:'Diet'},
+    sleep:  {val:sleepScore(sleepAvg),       weight:10, label:'Sleep'},
+    steps:  {val:stepsScore(stepsAvg),       weight:10, label:'Steps'},
+    stress: {val:stressScore(ci.stress),     weight:7,  label:'Stress'}
+  };
+  let totalWeight=0, weightedSum=0;
+  Object.values(scores).forEach(s=>{
+    if(s.val!==null){ totalWeight+=s.weight; weightedSum+=s.val*s.weight; }
+  });
+  const overall = totalWeight>0 ? Math.round(weightedSum/totalWeight) : null;
+  return {overall, scores, totalWeight};
+}
+
+function getCurrentWeight(){
+  for(let w=totalWeeks-1; w>=0; w--){
+    for(let d=6; d>=0; d--){
+      if(appData.bw[w][d]!=='') return parseFloat(appData.bw[w][d]);
+    }
+  }
+  return null;
+}
+
+// ---------- LOGOUT ----------
+function logout(){
+  if(!confirm('Logout from DevFit?')) return;
+  localStorage.removeItem('devfit_user');
+  localStorage.removeItem('devfit_lastVerified');
+  window.location.href = 'login.html';
+}
+
+// ---------- RESET ALL DATA ----------
+function resetAll(){
+  if(!confirm('Reset ALL weekly data? This cannot be undone.')) return;
+  if(!confirm('Are you sure? All bodyweight, steps, sleep, and check-in data will be erased.')) return;
+  totalWeeks = 4; currentWeek = 0;
+  appData.bw = Array.from({length:totalWeeks},()=>Array(7).fill(''));
+  appData.steps = Array.from({length:totalWeeks},()=>Array(7).fill(''));
+  appData.sleep = Array.from({length:totalWeeks},()=>Array(7).fill(''));
+  appData.weeklyCheckin = Array.from({length:totalWeeks},freshCheckin);
+  try{localStorage.setItem('progressLog2', JSON.stringify(appData));}catch(e){}
+  toast('All data reset');
+}
+
+// ---------- SYNC ----------
+function manualSync(){
+  const titleEl = document.getElementById('sync-btn-title');
+  const orig = titleEl.textContent;
+  titleEl.textContent = 'Syncing...';
+
+  const bwAvg = avg(appData.bw[currentWeek]);
+  const stepsAvg = avg(appData.steps[currentWeek]);
+  const sleepAvg = avg(appData.sleep[currentWeek]);
+  const ci = appData.weeklyCheckin[currentWeek] || freshCheckin();
+  const {overall} = calcTrueScore(currentWeek);
+  const curW = getCurrentWeight();
+
+  const payload = {
+    clientName: appData.clientName || 'Unknown',
+    goalType: appData.goalType || 'loss',
+    startWeight: appData.startWeight || '',
+    goal: appData.goal || '',
+    currentWeight: curW!==null ? curW.toFixed(1) : '',
+    weekNum: currentWeek+1,
+    bwAvg: bwAvg!==null ? bwAvg.toFixed(1) : '',
+    stepsAvg: stepsAvg!==null ? Math.round(stepsAvg) : '',
+    sleepAvg: sleepAvg!==null ? sleepAvg.toFixed(1) : '',
+    overload: ci.overload || '',
+    diet: ci.diet || '',
+    stress: ci.stress || '',
+    bfDir: ci.bfDir || '',
+    score: overall!==null ? overall : '',
+    notes: ci.notes || ''
+  };
+
+  fetch(SHEET_URL, {method:'POST', mode:'no-cors', body:JSON.stringify(payload)})
+    .then(()=>{
+      titleEl.textContent = 'Synced!';
+      setTimeout(()=>{titleEl.textContent = orig;}, 2200);
+      toast('Week '+(currentWeek+1)+' synced to trainer');
+    })
+    .catch(()=>{
+      titleEl.textContent = 'Sync failed';
+      setTimeout(()=>{titleEl.textContent = orig;}, 2200);
+      toast('Sync failed — check connection', true);
+    });
+}
+
+// ---------- BUILD CHARTS FOR PDF ----------
+function buildExportCharts(){
+  // Bodyweight chart
+  const bwLabels = [];
+  const bwData = [];
+  for(let w=0; w<totalWeeks; w++){
+    DAYS.forEach((d,i)=>{
+      const v = appData.bw[w][i];
+      if(v!==''){ bwLabels.push('W'+(w+1)+' '+d); bwData.push(parseFloat(v)); }
+    });
+  }
+  const bwCtx = document.getElementById('exp-bw').getContext('2d');
+  if(window._expBwChart) window._expBwChart.destroy();
+  window._expBwChart = new Chart(bwCtx, {
+    type:'line',
+    data:{ labels: bwLabels, datasets:[{ label:'Bodyweight (kg)', data: bwData, borderColor:'#cc0000', backgroundColor:'rgba(204,0,0,0.1)', tension:0.3, pointRadius:3, fill:true }] },
+    options:{ responsive:false, animation:false, plugins:{ legend:{display:false} }, scales:{ x:{ticks:{font:{size:9}}}, y:{ticks:{font:{size:10}}} } }
+  });
+
+  // Score chart
+  const scLabels = [], scData = [];
+  for(let w=0; w<totalWeeks; w++){
+    const {overall} = calcTrueScore(w);
+    scLabels.push('Week '+(w+1));
+    scData.push(overall===null ? 0 : overall);
+  }
+  const scCtx = document.getElementById('exp-score').getContext('2d');
+  if(window._expScChart) window._expScChart.destroy();
+  window._expScChart = new Chart(scCtx, {
+    type:'bar',
+    data:{ labels: scLabels, datasets:[{ label:'Score %', data: scData, backgroundColor: scData.map(v=>v>=75?'#16a34a':v>=50?'#f59e0b':'#ef4444'), borderRadius:6 }] },
+    options:{ responsive:false, animation:false, plugins:{legend:{display:false}}, scales:{ y:{beginAtZero:true, max:100, ticks:{font:{size:10}}} } }
+  });
+}
+
+// ---------- WEEK PDF ----------
+function exportWeekPDF(){
+  if(!window.jspdf){ toast('PDF library still loading…', true); return; }
+  const { jsPDF } = window.jspdf;
+  if(!jsPDF){ toast('PDF library failed to load', true); return; }
+
+  buildExportCharts();
+  setTimeout(()=>{
+    try{
+      const pdf = new jsPDF('p','mm','a4');
+      const w = currentWeek;
+      const ci = appData.weeklyCheckin[w] || freshCheckin();
+      const bwAvg = avg(appData.bw[w]);
+      const stepsAvg = avg(appData.steps[w]);
+      const sleepAvg = avg(appData.sleep[w]);
+      const {overall, scores} = calcTrueScore(w);
+
+      pdf.setFillColor(204,0,0); pdf.rect(0,0,210,12,'F');
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(22); pdf.setTextColor(17,17,17);
+      pdf.text('DevFit · Week ' + (w+1) + ' Report', 14, 25);
+      pdf.setFontSize(11); pdf.setFont('helvetica','normal'); pdf.setTextColor(100,100,100);
+      pdf.text(appData.clientName || 'Client', 14, 32);
+      const today = new Date().toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'});
+      pdf.text(today, 14, 37);
+
+      let y = 50;
+      pdf.setDrawColor(204,0,0); pdf.setLineWidth(0.4);
+      pdf.line(14,y,196,y); y+=8;
+
+      pdf.setFontSize(13); pdf.setFont('helvetica','bold'); pdf.setTextColor(17,17,17);
+      pdf.text('Overall Score: ' + (overall===null?'—':overall+'%'), 14, y); y+=8;
+
+      pdf.setFontSize(10); pdf.setFont('helvetica','normal');
+      pdf.text('Bodyweight avg: ' + (bwAvg===null?'—':bwAvg.toFixed(1)+' kg'), 14, y); y+=6;
+      pdf.text('Steps avg: ' + (stepsAvg===null?'—':Math.round(stepsAvg).toLocaleString()), 14, y); y+=6;
+      pdf.text('Sleep avg: ' + (sleepAvg===null?'—':sleepAvg.toFixed(1)+' h'), 14, y); y+=6;
+      pdf.text('Overload: ' + (ci.overload||'—'), 14, y); y+=6;
+      pdf.text('Diet: ' + (ci.diet||'—'), 14, y); y+=6;
+      pdf.text('Stress: ' + (ci.stress||'—'), 14, y); y+=6;
+      pdf.text('Body fat: ' + (ci.bfDir||'—') + (ci.bf?(' ('+ci.bf+'%)'):''), 14, y); y+=10;
+
+      // Add bodyweight chart
+      const bwImg = document.getElementById('exp-bw').toDataURL('image/png');
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(11); pdf.text('Bodyweight Trend', 14, y); y+=4;
+      pdf.addImage(bwImg, 'PNG', 14, y, 182, 70); y+=78;
+
+      if(ci.notes){
+        pdf.setFont('helvetica','bold'); pdf.setFontSize(11); pdf.text('Trainer notes', 14, y); y+=6;
+        pdf.setFont('helvetica','normal'); pdf.setFontSize(10);
+        pdf.text(pdf.splitTextToSize(ci.notes, 180), 14, y);
+      }
+
+      pdf.setFillColor(204,0,0); pdf.rect(0,287,210,10,'F');
+      pdf.setTextColor(255,255,255); pdf.setFontSize(9);
+      pdf.text('DevFit · Dominance Through Discipline', 14, 293);
+
+      pdf.save('DevFit_Week'+(w+1)+'_Report.pdf');
+      toast('Week report saved');
+    }catch(e){ console.error(e); toast('Export failed', true); }
+  }, 300);
+}
+
+// ---------- PROGRAM PDF ----------
+function exportProgramPDF(){
+  if(!window.jspdf){ toast('PDF library still loading…', true); return; }
+  const { jsPDF } = window.jspdf;
+  if(!jsPDF){ toast('PDF library failed to load', true); return; }
+
+  const rangeVal = document.getElementById('program-report-range').value;
+  const weeksToInclude = rangeVal==='all' ? totalWeeks : parseInt(rangeVal);
+
+  buildExportCharts();
+  setTimeout(()=>{
+    try{
+      const pdf = new jsPDF('p','mm','a4');
+      pdf.setFillColor(204,0,0); pdf.rect(0,0,210,12,'F');
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(22); pdf.setTextColor(17,17,17);
+      pdf.text('DevFit · Program Report', 14, 25);
+      pdf.setFontSize(11); pdf.setFont('helvetica','normal'); pdf.setTextColor(100,100,100);
+      pdf.text(appData.clientName || 'Client', 14, 32);
+      const today = new Date().toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'});
+      pdf.text(today + ' · ' + weeksToInclude + ' weeks', 14, 37);
+
+      let y = 50;
+      pdf.setDrawColor(204,0,0); pdf.setLineWidth(0.4);
+      pdf.line(14,y,196,y); y+=8;
+
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(13); pdf.setTextColor(17,17,17);
+      pdf.text('Weekly Summary', 14, y); y+=8;
+      pdf.setFontSize(9); pdf.setFont('helvetica','normal');
+
+      // Table header
+      pdf.setFillColor(240,240,240); pdf.rect(14,y-4,182,7,'F');
+      pdf.setFont('helvetica','bold');
+      pdf.text('Week',16,y); pdf.text('BW avg',40,y); pdf.text('Steps',70,y); pdf.text('Sleep',95,y); pdf.text('Overload',115,y); pdf.text('Diet',150,y); pdf.text('Score',180,y);
+      y+=8;
+
+      pdf.setFont('helvetica','normal');
+      const startW = totalWeeks - weeksToInclude;
+      for(let w=startW; w<totalWeeks; w++){
+        const ci = appData.weeklyCheckin[w] || freshCheckin();
+        const bwA = avg(appData.bw[w]);
+        const stA = avg(appData.steps[w]);
+        const slA = avg(appData.sleep[w]);
+        const {overall} = calcTrueScore(w);
+        pdf.text('W'+(w+1), 16, y);
+        pdf.text(bwA===null?'—':bwA.toFixed(1), 40, y);
+        pdf.text(stA===null?'—':Math.round(stA).toLocaleString(), 70, y);
+        pdf.text(slA===null?'—':slA.toFixed(1), 95, y);
+        pdf.text((ci.overload||'—').slice(0,10), 115, y);
+        pdf.text((ci.diet||'—').slice(0,10), 150, y);
+        pdf.text(overall===null?'—':overall+'%', 180, y);
+        y+=6;
+        if(y>270){ pdf.addPage(); y=20; }
+      }
+
+      y+=6;
+      const bwImg = document.getElementById('exp-bw').toDataURL('image/png');
+      const scImg = document.getElementById('exp-score').toDataURL('image/png');
+      if(y>180){ pdf.addPage(); y=20; }
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(11); pdf.text('Bodyweight Trend', 14, y); y+=4;
+      pdf.addImage(bwImg, 'PNG', 14, y, 182, 60); y+=68;
+      if(y>200){ pdf.addPage(); y=20; }
+      pdf.text('Weekly Progress Score', 14, y); y+=4;
+      pdf.addImage(scImg, 'PNG', 14, y, 182, 60);
+
+      pdf.setFillColor(204,0,0); pdf.rect(0,287,210,10,'F');
+      pdf.setTextColor(255,255,255); pdf.setFontSize(9);
+      pdf.text('DevFit · Dominance Through Discipline', 14, 293);
+
+      pdf.save('DevFit_Program_Report.pdf');
+      toast('Program report saved');
+    }catch(e){ console.error(e); toast('Export failed', true); }
+  }, 400);
+}
+
+// ---------- SERVICE WORKER ----------
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+</script>
+</body>
+</html>

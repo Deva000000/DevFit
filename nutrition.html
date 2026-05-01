@@ -81,13 +81,27 @@
 
   /* RESPONSIVE */
   @media(max-width:540px){
-    body{padding:.6rem}
-    .four-grid{gap:5px}
-    .input-cell input{font-size:17px}
-    .input-cell .lbl{font-size:9px}
-    .delta-cell .val{font-size:12px}
+    body{padding:.5rem}
+    .page{max-width:100%}
+    .four-grid{gap:4px;grid-template-columns:repeat(4,minmax(0,1fr))}
+    .input-cell{padding:8px 4px;min-width:0;overflow:hidden}
+    .input-cell input{font-size:16px;min-width:0;width:100%}
+    .input-cell .lbl{font-size:8px;letter-spacing:.02em}
+    .input-cell .unit{font-size:8px}
+    .delta-strip{gap:4px;grid-template-columns:repeat(4,minmax(0,1fr))}
+    .delta-cell{padding:6px 3px;min-width:0;overflow:hidden}
+    .delta-cell .lbl{font-size:8px;letter-spacing:.02em}
+    .delta-cell .val{font-size:10px;line-height:1.2}
+    .week-sum{grid-template-columns:1fr 1fr;gap:6px}
+    .week-val{font-size:16px}
     .app-title{font-size:15px}
     .header-logo{height:38px;width:38px}
+    .card{padding:12px}
+    .card-light{padding:12px}
+  }
+  @media(max-width:380px){
+    .input-cell input{font-size:14px}
+    .delta-cell .val{font-size:9px}
   }
 </style>
 </head>
@@ -105,9 +119,10 @@
 
   <!-- TAB NAV -->
   <nav class="devfit-tabnav">
-    <a href="login app.html">Progress</a>
+    <a href="index.html">Progress</a>
     <a href="nutrition.html" class="active">Nutrition</a>
     <a href="workouts.html">Training</a>
+    <a href="settings.html">Settings</a>
   </nav>
 
   <!-- DAILY TARGETS -->
@@ -165,6 +180,18 @@
 
 <script>
 'use strict';
+
+// LOGIN CHECK — redirect to login if no session
+(function(){
+  try{
+    const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+    if(!user.email || !user.approved){
+      window.location.href = 'login.html';
+    }
+  }catch(e){
+    window.location.href = 'login.html';
+  }
+})();
 
 const KEY='devfitNutritionV2';
 let data=load();

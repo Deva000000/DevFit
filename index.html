@@ -17,11 +17,12 @@
   }
 
   html{font-size:16px}
-  body{font-family:'DM Sans',sans-serif;background:#c8c8c8;color:var(--t1);min-height:100vh;padding:1rem;
-    background-image:
-      linear-gradient(rgba(204,0,0,0.06) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(204,0,0,0.04) 1px, transparent 1px);
-    background-size: 40px 40px, 40px 40px;
+  body{font-family:'DM Sans',sans-serif;color:#e8e8ea;min-height:100vh;padding:1rem;overflow-x:hidden;
+    background:
+      radial-gradient(1100px 600px at 18% -10%, rgba(204,0,0,0.22), transparent 60%),
+      radial-gradient(900px 500px at 95% 110%, rgba(204,0,0,0.14), transparent 60%),
+      linear-gradient(180deg,#080809 0%,#101012 60%,#0a0a0b 100%);
+    background-attachment:fixed;
   }
   .page{max-width:740px;margin:0 auto}
   .page::before{content:'';display:block;height:3px;background:linear-gradient(90deg,#cc0000,#ff4444,#cc0000);border-radius:2px;margin-bottom:12px;}
@@ -231,6 +232,22 @@
   /* Prevent any element from overflowing */
   img,canvas,svg{max-width:100%;height:auto}
   *{min-width:0}
+  /* PREMIUM POLISH */
+  .card,.card-light{box-shadow:0 10px 30px rgba(0,0,0,0.45),0 1px 0 rgba(255,255,255,0.04) inset;backdrop-filter:saturate(130%) blur(2px)}
+  .header{box-shadow:0 12px 36px rgba(204,0,0,0.18),0 1px 0 rgba(255,255,255,0.05) inset}
+  nav.devfit-tabnav a{transition:all .2s cubic-bezier(.2,.8,.2,1)}
+  nav.devfit-tabnav a.active{box-shadow:0 8px 22px rgba(204,0,0,0.45)}
+  .wtab,.wtab-action,button{transition:all .18s cubic-bezier(.2,.8,.2,1)}
+  .wtab.active{box-shadow:0 6px 18px rgba(220,38,38,0.45)}
+  button:active{transform:scale(0.97)}
+  ::selection{background:rgba(204,0,0,0.5);color:#fff}
+  @keyframes devfit-fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .page>*{animation:devfit-fadein .4s cubic-bezier(.2,.8,.2,1) both}
+  .page>*:nth-child(2){animation-delay:.04s}.page>*:nth-child(3){animation-delay:.08s}
+  .page>*:nth-child(4){animation-delay:.12s}.page>*:nth-child(5){animation-delay:.16s}
+  .page>*:nth-child(6){animation-delay:.20s}.page>*:nth-child(7){animation-delay:.24s}
+  .page>*:nth-child(8){animation-delay:.28s}.page>*:nth-child(9){animation-delay:.32s}
+  body::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(800px 400px at 50% -5%,rgba(255,68,68,0.08),transparent 60%);z-index:-1}
 </style>
 
 <!-- PWA -->
@@ -1668,4 +1685,122 @@ function showCountdown(){
 
 function showWelcomeScreen(){
   try{
-    const user = JSON.pars
+    const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+    const welcomed = localStorage.getItem('devfit_welcomed_'+user.email);
+    if(welcomed) return;
+    const overlay = document.getElementById('welcome-overlay');
+    const wname = document.getElementById('welcome-name');
+    const wdetail = document.getElementById('welcome-detail');
+    const wstats = document.getElementById('welcome-stats');
+    if(!overlay) return;
+    wname.textContent = 'Welcome, '+(user.name||'Champion')+'!';
+    wdetail.textContent = 'Your DevFit program is now active. Log your weight, steps and sleep daily to track your real progress.';
+    let statsHtml = '';
+    if(user.plan) statsHtml += '<div class="welcome-stat">Plan: <span>'+user.plan+'</span></div>';
+    if(user.expiry){
+      const exp = new Date(user.expiry);
+      statsHtml += '<div class="welcome-stat">Ends: <span>'+exp.toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'})+'</span></div>';
+    }
+    wstats.innerHTML = statsHtml;
+    overlay.style.display='flex';
+  }catch(e){}
+}
+
+function dismissWelcome(){
+  try{
+    const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+    localStorage.setItem('devfit_welcomed_'+user.email,'1');
+  }catch(e){}
+  const overlay = document.getElementById('welcome-overlay');
+  if(overlay) overlay.style.display='none';
+}
+
+function scheduleAccessCheck(){
+  const INTERVAL = 24*60*60*1000;
+  setInterval(()=>{
+    try{
+      const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+      if(!user.email) return;
+      fetch(SHEET_URL_AUTH+'?action=checkAccess&email='+encodeURIComponent(user.email))
+        .then(r=>r.json())
+        .then(data=>{
+          if(!data.approved){
+            localStorage.removeItem('devfit_user');
+            alert('Your program has ended. Contact your trainer to renew.');
+            window.location.href='login.html';
+          } else {
+            if(data.expiry){
+              const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+              u.expiry = data.expiry;
+              localStorage.setItem('devfit_user', JSON.stringify(u));
+            }
+            showCountdown();
+          }
+        })
+        .catch(()=>{});
+    }catch(e){}
+  }, INTERVAL);
+}
+
+loadData();
+renderTabs();
+render();
+applyTierGates();
+showCountdown();
+showWelcomeScreen();
+scheduleAccessCheck();
+</script>
+
+<!-- ============ DevFit PWA runtime ============ -->
+<script>
+(function(){
+  if('serviceWorker' in navigator){
+    window.addEventListener('load',()=>{
+      navigator.serviceWorker.register('sw.js').then(reg=>{
+        document.addEventListener('visibilitychange',()=>{ if(!document.hidden) reg.update(); });
+        reg.addEventListener('updatefound',()=>{
+          const sw=reg.installing; if(!sw) return;
+          sw.addEventListener('statechange',()=>{
+            if(sw.state==='installed' && navigator.serviceWorker.controller){
+              document.getElementById('pwa-update-bar').classList.add('show');
+              window.__pwaWaiting=sw;
+            }
+          });
+        });
+      }).catch(()=>{});
+      let refreshing=false;
+      navigator.serviceWorker.addEventListener('controllerchange',()=>{
+        if(refreshing) return; refreshing=true; window.location.reload();
+      });
+    });
+  }
+  let dp=null;
+  window.addEventListener('beforeinstallprompt',(e)=>{
+    e.preventDefault(); dp=e;
+    if(localStorage.getItem('pwa-install-dismissed')==='1') return;
+    document.getElementById('pwa-install-bar').classList.add('show');
+  });
+  window.pwaInstall=async function(){
+    if(!dp) return;
+    dp.prompt(); await dp.userChoice; dp=null;
+    document.getElementById('pwa-install-bar').classList.remove('show');
+  };
+  window.pwaDismiss=function(){
+    localStorage.setItem('pwa-install-dismissed','1');
+    document.getElementById('pwa-install-bar').classList.remove('show');
+  };
+  const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStandalone=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone;
+  if(isIOS && !isStandalone && localStorage.getItem('ios-hint-dismissed')!=='1'){
+    setTimeout(()=>document.getElementById('ios-hint').classList.add('show'),3000);
+    document.getElementById('ios-hint').querySelector('.x').addEventListener('click',()=>localStorage.setItem('ios-hint-dismissed','1'));
+  }
+  window.pwaApplyUpdate=function(){ if(window.__pwaWaiting) window.__pwaWaiting.postMessage({type:'SKIP_WAITING'}); };
+  window.addEventListener('appinstalled',()=>{
+    localStorage.setItem('pwa-installed-at',new Date().toISOString());
+    document.getElementById('pwa-install-bar').classList.remove('show');
+  });
+})();
+</script>
+</body>
+</html>

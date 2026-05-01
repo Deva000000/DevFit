@@ -23,9 +23,12 @@
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   :root{--g:#16a34a;--a:#f59e0b;--r:#ef4444;--bd:#d1d5db;--t1:#111;--t2:#555;--radius:10px;--radius-lg:14px}
   html{font-size:16px}
-  body{font-family:'DM Sans',system-ui,sans-serif;background:#c8c8c8;color:var(--t1);min-height:100vh;padding:1rem;
-    background-image:linear-gradient(rgba(204,0,0,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(204,0,0,0.04) 1px,transparent 1px);
-    background-size:40px 40px,40px 40px;overflow-x:hidden}
+  body{font-family:'DM Sans',system-ui,sans-serif;color:#e8e8ea;min-height:100vh;padding:1rem;overflow-x:hidden;
+    background:
+      radial-gradient(1100px 600px at 18% -10%, rgba(204,0,0,0.22), transparent 60%),
+      radial-gradient(900px 500px at 95% 110%, rgba(204,0,0,0.14), transparent 60%),
+      linear-gradient(180deg,#080809 0%,#101012 60%,#0a0a0b 100%);
+    background-attachment:fixed}
   .page{max-width:740px;margin:0 auto}
   .page::before{content:'';display:block;height:3px;background:linear-gradient(90deg,#cc0000,#ff4444,#cc0000);border-radius:2px;margin-bottom:12px}
 
@@ -116,6 +119,22 @@
   /* Premium polish */
   .setting-btn:active{transform:scale(0.985);background:#2a2a2a}
   .upgrade-btn:active{transform:scale(0.985)}
+  .card,.card-light{box-shadow:0 10px 30px rgba(0,0,0,0.45),0 1px 0 rgba(255,255,255,0.04) inset;backdrop-filter:saturate(130%) blur(2px)}
+  .header{box-shadow:0 12px 36px rgba(204,0,0,0.18),0 1px 0 rgba(255,255,255,0.05) inset}
+  .setting-btn,.upgrade-btn,nav.devfit-tabnav a,.pdf-btn{transition:transform .18s cubic-bezier(.2,.8,.2,1),background .2s ease,box-shadow .25s ease,border-color .2s ease,color .2s ease}
+  .setting-btn:hover{transform:translateY(-1px);box-shadow:0 10px 26px rgba(204,0,0,0.22)}
+  .upgrade-btn:hover{transform:translateY(-2px)}
+  nav.devfit-tabnav a.active{box-shadow:0 8px 22px rgba(204,0,0,0.45)}
+  .setting-btn .icon{box-shadow:0 6px 14px rgba(204,0,0,0.35),0 1px 0 rgba(255,255,255,0.18) inset}
+  .profile-avatar{box-shadow:0 8px 22px rgba(204,0,0,0.35),0 1px 0 rgba(255,255,255,0.18) inset}
+  ::selection{background:rgba(204,0,0,0.5);color:#fff}
+  @keyframes devfit-fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .page>*{animation:devfit-fadein .4s cubic-bezier(.2,.8,.2,1) both}
+  .page>*:nth-child(2){animation-delay:.04s}.page>*:nth-child(3){animation-delay:.08s}
+  .page>*:nth-child(4){animation-delay:.12s}.page>*:nth-child(5){animation-delay:.16s}
+  .page>*:nth-child(6){animation-delay:.20s}.page>*:nth-child(7){animation-delay:.24s}
+  .page>*:nth-child(8){animation-delay:.28s}.page>*:nth-child(9){animation-delay:.32s}
+  body::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(800px 400px at 50% -5%,rgba(255,68,68,0.08),transparent 60%);z-index:-1}
 </style>
 </head>
 <body>
@@ -288,7 +307,7 @@
 
   <div class="footer">
     DevFit · Dominance Through Discipline<br>
-    <a href="https://wa.me/60183679177">Contact trainer</a> · v2.1.0
+    <a href="https://wa.me/60183679177">Contact trainer</a> · v3.0.0
   </div>
 
 
@@ -648,4 +667,277 @@ function exportWeekPDF(){
       pdf.text('Body fat: ' + (ci.bfDir||'—') + (ci.bf?(' ('+ci.bf+'%)'):''), 14, y); y+=10;
 
       // Add bodyweight chart
-    
+      const bwImg = document.getElementById('exp-bw').toDataURL('image/png');
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(11); pdf.text('Bodyweight Trend', 14, y); y+=4;
+      pdf.addImage(bwImg, 'PNG', 14, y, 182, 70); y+=78;
+
+      if(ci.notes){
+        pdf.setFont('helvetica','bold'); pdf.setFontSize(11); pdf.text('Trainer notes', 14, y); y+=6;
+        pdf.setFont('helvetica','normal'); pdf.setFontSize(10);
+        pdf.text(pdf.splitTextToSize(ci.notes, 180), 14, y);
+      }
+
+      pdf.setFillColor(204,0,0); pdf.rect(0,287,210,10,'F');
+      pdf.setTextColor(255,255,255); pdf.setFontSize(9);
+      pdf.text('DevFit · Dominance Through Discipline', 14, 293);
+
+      pdf.save('DevFit_Week'+(w+1)+'_Report.pdf');
+      toast('Week report saved');
+    }catch(e){ console.error(e); toast('Export failed', true); }
+  }, 300);
+}
+
+// ---------- PROGRAM PDF ----------
+function exportProgramPDF(){
+  if(!window.jspdf){ toast('PDF library still loading…', true); return; }
+  const { jsPDF } = window.jspdf;
+  if(!jsPDF){ toast('PDF library failed to load', true); return; }
+
+  const rangeVal = document.getElementById('program-report-range').value;
+  const weeksToInclude = rangeVal==='all' ? totalWeeks : parseInt(rangeVal);
+
+  buildExportCharts();
+  setTimeout(()=>{
+    try{
+      const pdf = new jsPDF('p','mm','a4');
+      pdf.setFillColor(204,0,0); pdf.rect(0,0,210,12,'F');
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(22); pdf.setTextColor(17,17,17);
+      pdf.text('DevFit · Program Report', 14, 25);
+      pdf.setFontSize(11); pdf.setFont('helvetica','normal'); pdf.setTextColor(100,100,100);
+      pdf.text(appData.clientName || 'Client', 14, 32);
+      const today = new Date().toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'});
+      pdf.text(today + ' · ' + weeksToInclude + ' weeks', 14, 37);
+
+      let y = 50;
+      pdf.setDrawColor(204,0,0); pdf.setLineWidth(0.4);
+      pdf.line(14,y,196,y); y+=8;
+
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(13); pdf.setTextColor(17,17,17);
+      pdf.text('Weekly Summary', 14, y); y+=8;
+      pdf.setFontSize(9); pdf.setFont('helvetica','normal');
+
+      // Table header
+      pdf.setFillColor(240,240,240); pdf.rect(14,y-4,182,7,'F');
+      pdf.setFont('helvetica','bold');
+      pdf.text('Week',16,y); pdf.text('BW avg',40,y); pdf.text('Steps',70,y); pdf.text('Sleep',95,y); pdf.text('Overload',115,y); pdf.text('Diet',150,y); pdf.text('Score',180,y);
+      y+=8;
+
+      pdf.setFont('helvetica','normal');
+      const startW = totalWeeks - weeksToInclude;
+      for(let w=startW; w<totalWeeks; w++){
+        const ci = appData.weeklyCheckin[w] || freshCheckin();
+        const bwA = avg(appData.bw[w]);
+        const stA = avg(appData.steps[w]);
+        const slA = avg(appData.sleep[w]);
+        const {overall} = calcTrueScore(w);
+        pdf.text('W'+(w+1), 16, y);
+        pdf.text(bwA===null?'—':bwA.toFixed(1), 40, y);
+        pdf.text(stA===null?'—':Math.round(stA).toLocaleString(), 70, y);
+        pdf.text(slA===null?'—':slA.toFixed(1), 95, y);
+        pdf.text((ci.overload||'—').slice(0,10), 115, y);
+        pdf.text((ci.diet||'—').slice(0,10), 150, y);
+        pdf.text(overall===null?'—':overall+'%', 180, y);
+        y+=6;
+        if(y>270){ pdf.addPage(); y=20; }
+      }
+
+      y+=6;
+      const bwImg = document.getElementById('exp-bw').toDataURL('image/png');
+      const scImg = document.getElementById('exp-score').toDataURL('image/png');
+      if(y>180){ pdf.addPage(); y=20; }
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(11); pdf.text('Bodyweight Trend', 14, y); y+=4;
+      pdf.addImage(bwImg, 'PNG', 14, y, 182, 60); y+=68;
+      if(y>200){ pdf.addPage(); y=20; }
+      pdf.text('Weekly Progress Score', 14, y); y+=4;
+      pdf.addImage(scImg, 'PNG', 14, y, 182, 60);
+
+      pdf.setFillColor(204,0,0); pdf.rect(0,287,210,10,'F');
+      pdf.setTextColor(255,255,255); pdf.setFontSize(9);
+      pdf.text('DevFit · Dominance Through Discipline', 14, 293);
+
+      pdf.save('DevFit_Program_Report.pdf');
+      toast('Program report saved');
+    }catch(e){ console.error(e); toast('Export failed', true); }
+  }, 400);
+}
+
+// ---------- TIER GATING ----------
+function getUserTier(){
+  try { return (JSON.parse(localStorage.getItem('devfit_user')||'{}').tier || 'pro').toLowerCase(); }
+  catch(e){ return 'pro'; }
+}
+function isPro(){ return getUserTier() === 'pro'; }
+
+(function renderTier(){
+  try{
+  const pro = isPro();
+  const badge = document.getElementById('tier-badge');
+  const name = document.getElementById('tier-name');
+  const desc = document.getElementById('tier-desc');
+  const upgradeBtn = document.getElementById('upgrade-btn');
+  const upgradeFeatures = document.getElementById('upgrade-features');
+  const subCard = document.getElementById('subscription-card');
+
+  if(pro){
+    badge.textContent = 'PRO';
+    badge.className = 'tier-badge pro';
+    name.textContent = 'DevFit Pro';
+    desc.textContent = 'Full access — history, charts, share, reports, sync';
+    upgradeBtn.style.display = 'none';
+    upgradeFeatures.style.display = 'none';
+  } else {
+    badge.textContent = 'FREE';
+    badge.className = 'tier-badge free';
+    name.textContent = 'DevFit Free';
+    desc.textContent = 'Current week only · plan view · basic logging';
+    const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+    const msg = encodeURIComponent('Hi, I\'d like to upgrade DevFit to Pro. My account: ' + (u.email||'(my email)'));
+    upgradeBtn.href = 'https://wa.me/60183679177?text=' + msg;
+    upgradeBtn.style.display = 'block';
+    upgradeFeatures.style.display = 'block';
+    // Hide Pro-only sections for free users
+    const reportsCard = document.querySelectorAll('.card')[2]; // Reports
+    const syncCard = document.querySelectorAll('.card')[3];    // Trainer Sync
+    if(reportsCard) reportsCard.style.display = 'none';
+    if(syncCard) syncCard.style.display = 'none';
+  }
+  }catch(e){ console.error('[renderTier]', e); }
+})();
+
+// ---------- PWA INSTALL ----------
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  document.getElementById('install-app-btn').style.display = 'flex';
+});
+
+function installApp(){
+  if(!deferredInstallPrompt){
+    toast('Install prompt not available — your browser may have already installed it');
+    return;
+  }
+  deferredInstallPrompt.prompt();
+  deferredInstallPrompt.userChoice.then((choice) => {
+    if(choice.outcome === 'accepted') toast('DevFit installed!');
+    deferredInstallPrompt = null;
+    document.getElementById('install-app-btn').style.display = 'none';
+  });
+}
+
+// iOS detection — Safari on iOS doesn't fire beforeinstallprompt
+function isIOS(){
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
+function isStandalone(){
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+function showIosHint(){
+  document.getElementById('ios-hint-modal').style.display = 'flex';
+}
+(function setupIosInstall(){
+  try{
+    if(isIOS() && !isStandalone()){
+      const el = document.getElementById('ios-install-hint-btn');
+      if(el) el.style.display = 'flex';
+    }
+  }catch(e){ console.error('[iosInstall]', e); }
+})();
+
+// ---------- CHECK FOR UPDATES ----------
+async function checkForUpdates(){
+  toast('Checking for updates…');
+  try {
+    if('serviceWorker' in navigator){
+      const reg = await navigator.serviceWorker.getRegistration();
+      if(reg){
+        await reg.update();
+        // If a new worker is installing or waiting, activate it
+        if(reg.waiting){
+          reg.waiting.postMessage({type:'SKIP_WAITING'});
+        }
+      }
+    }
+    // Force a clean reload bypassing cache
+    setTimeout(()=>{
+      // Clear app caches and hard reload
+      if('caches' in window){
+        caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))))
+          .finally(()=>{ window.location.reload(true); });
+      } else {
+        window.location.reload(true);
+      }
+    }, 600);
+  } catch(e){
+    toast('Update check failed', true);
+  }
+}
+
+// ---------- WIRE UP BUTTONS (bulletproof: direct bind + global delegation fallback) ----------
+const ACTION_MAP = {
+  'week-report-btn'           : () => exportWeekPDF(),
+  'program-report-toggle-btn' : () => {
+    document.getElementById('range-row').style.display = 'grid';
+    document.getElementById('program-report-toggle-btn').style.display = 'none';
+  },
+  'program-report-btn'        : () => exportProgramPDF(),
+  'sync-btn'                  : () => manualSync(),
+  'install-app-btn'           : () => installApp(),
+  'ios-install-hint-btn'      : () => showIosHint(),
+  'check-updates-btn'         : () => checkForUpdates(),
+  'reset-all-btn'             : () => resetAll(),
+  'logout-btn'                : () => logout(),
+  'ios-hint-close'            : () => { document.getElementById('ios-hint-modal').style.display = 'none'; }
+};
+
+function runAction(id, ev){
+  const fn = ACTION_MAP[id];
+  if(!fn) return;
+  if(ev) ev.preventDefault();
+  try { fn(); } catch(e){ console.error('[action]', id, e); toast('Action failed', true); }
+}
+
+function wireDirect(){
+  Object.keys(ACTION_MAP).forEach(id => {
+    const el = document.getElementById(id);
+    if(el && !el._devfitBound){
+      el.addEventListener('click', (ev) => runAction(id, ev), {passive:false});
+      el._devfitBound = true;
+    }
+  });
+}
+
+// 1. Direct bind now
+wireDirect();
+// 2. Re-bind on DOM ready (in case any element was added after script ran)
+if(document.readyState !== 'complete') document.addEventListener('DOMContentLoaded', wireDirect);
+// 3. Global delegation — works even if direct bind failed for any reason
+document.addEventListener('click', (ev) => {
+  const target = ev.target.closest('[id]');
+  if(!target) return;
+  if(ACTION_MAP[target.id] && !target._devfitBound){
+    runAction(target.id, ev);
+  }
+}, true);
+
+// ---------- SERVICE WORKER ----------
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      // Auto-detect updates and offer reload
+      reg.addEventListener('updatefound', () => {
+        const nw = reg.installing;
+        if(!nw) return;
+        nw.addEventListener('statechange', () => {
+          if(nw.state === 'installed' && navigator.serviceWorker.controller){
+            // A new version is ready
+            toast('New version available — tap "Check for Updates"');
+          }
+        });
+      });
+    }).catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>

@@ -22,9 +22,12 @@
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   :root{--g:#16a34a;--a:#f59e0b;--r:#ef4444;--b:#3b82f6;--bd:#d1d5db;--t1:#111;--t2:#555;--radius:10px;--radius-lg:14px}
   html{font-size:16px}
-  body{font-family:'DM Sans',system-ui,sans-serif;background:#c8c8c8;color:var(--t1);min-height:100vh;padding:1rem;
-    background-image:linear-gradient(rgba(204,0,0,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(204,0,0,0.04) 1px,transparent 1px);
-    background-size:40px 40px,40px 40px}
+  body{font-family:'DM Sans',system-ui,sans-serif;color:#e8e8ea;min-height:100vh;padding:1rem;overflow-x:hidden;
+    background:
+      radial-gradient(1100px 600px at 18% -10%, rgba(204,0,0,0.22), transparent 60%),
+      radial-gradient(900px 500px at 95% 110%, rgba(204,0,0,0.14), transparent 60%),
+      linear-gradient(180deg,#080809 0%,#101012 60%,#0a0a0b 100%);
+    background-attachment:fixed}
   .page{max-width:740px;margin:0 auto}
   .page::before{content:'';display:block;height:3px;background:linear-gradient(90deg,#cc0000,#ff4444,#cc0000);border-radius:2px;margin-bottom:12px}
 
@@ -103,6 +106,21 @@
     .input-cell input{font-size:14px}
     .delta-cell .val{font-size:9px}
   }
+  /* PREMIUM POLISH */
+  .card,.card-light{box-shadow:0 10px 30px rgba(0,0,0,0.45),0 1px 0 rgba(255,255,255,0.04) inset;backdrop-filter:saturate(130%) blur(2px)}
+  .header{box-shadow:0 12px 36px rgba(204,0,0,0.18),0 1px 0 rgba(255,255,255,0.05) inset}
+  nav.devfit-tabnav a{transition:all .2s cubic-bezier(.2,.8,.2,1)}
+  nav.devfit-tabnav a.active{box-shadow:0 8px 22px rgba(204,0,0,0.45)}
+  .input-cell,.week-card,.delta-cell{transition:transform .15s ease,box-shadow .2s ease,border-color .2s ease}
+  .input-cell:focus-within{transform:translateY(-1px);border-color:#cc0000;box-shadow:0 6px 18px rgba(204,0,0,0.18)}
+  ::selection{background:rgba(204,0,0,0.5);color:#fff}
+  @keyframes devfit-fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .page>*{animation:devfit-fadein .4s cubic-bezier(.2,.8,.2,1) both}
+  .page>*:nth-child(2){animation-delay:.04s}.page>*:nth-child(3){animation-delay:.08s}
+  .page>*:nth-child(4){animation-delay:.12s}.page>*:nth-child(5){animation-delay:.16s}
+  .page>*:nth-child(6){animation-delay:.20s}.page>*:nth-child(7){animation-delay:.24s}
+  .page>*:nth-child(8){animation-delay:.28s}.page>*:nth-child(9){animation-delay:.32s}
+  body::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(800px 400px at 50% -5%,rgba(255,68,68,0.08),transparent 60%);z-index:-1}
 </style>
 </head>
 <body>
@@ -396,4 +414,64 @@ function renderTrend(){
         data:vals.map(v=>v===null?0:v),
         backgroundColor:vals.map(v=>{
           if(v===null) return 'rgba(200,200,200,0.3)';
-          if(!target) return '
+          if(!target) return 'rgba(204,0,0,0.7)';
+          const diff=v-target;
+          if(Math.abs(diff)<=100) return 'rgba(34,197,94,0.85)';
+          if(diff>0) return 'rgba(239,68,68,0.85)';
+          return 'rgba(245,158,11,0.85)';
+        }),
+        borderRadius:6,
+        borderSkipped:false,
+        barThickness:'flex',
+        maxBarThickness:42
+      }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:c=>vals[c.dataIndex]===null?'No data':vals[c.dataIndex]+' kcal'}}
+      },
+      scales:{
+        y:{beginAtZero:true,ticks:{font:{size:10}},grid:{color:'#eee'}},
+        x:{ticks:{font:{size:10}},grid:{display:false}}
+      }
+    }
+  });
+
+  if(target){
+    Chart.register({
+      id:'targetLine_'+Date.now(),
+      afterDraw:function(chart){
+        if(chart!==trendChart||!target) return;
+        const yScale=chart.scales.y;
+        const y=yScale.getPixelForValue(target);
+        const ctx=chart.ctx;
+        ctx.save();
+        ctx.strokeStyle='#111';
+        ctx.lineWidth=1.5;
+        ctx.setLineDash([4,4]);
+        ctx.beginPath();
+        ctx.moveTo(chart.chartArea.left,y);
+        ctx.lineTo(chart.chartArea.right,y);
+        ctx.stroke();
+        ctx.fillStyle='#111';
+        ctx.font='bold 10px DM Sans,system-ui,sans-serif';
+        ctx.fillText('Target '+target,chart.chartArea.left+4,y-4);
+        ctx.restore();
+      }
+    });
+    trendChart.update();
+  }
+}
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+
+renderDay();
+applyNutritionTierGates();
+</script>
+</body>
+</html>

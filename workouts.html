@@ -24,9 +24,10 @@
   html{font-size:16px}
   body{font-family:'DM Sans',system-ui,sans-serif;color:#e8e8ea;min-height:100vh;padding:1rem;overflow-x:hidden;
     background:
-      radial-gradient(1100px 600px at 18% -10%, rgba(204,0,0,0.22), transparent 60%),
-      radial-gradient(900px 500px at 95% 110%, rgba(204,0,0,0.14), transparent 60%),
-      linear-gradient(180deg,#080809 0%,#101012 60%,#0a0a0b 100%);
+      radial-gradient(700px 500px at 15% -5%, rgba(204,0,0,0.20), transparent 60%),
+      radial-gradient(700px 500px at 85% -5%, rgba(204,0,0,0.20), transparent 60%),
+      radial-gradient(900px 600px at 50% 110%, rgba(204,0,0,0.14), transparent 60%),
+      linear-gradient(180deg,#08080a 0%,#101013 60%,#0a0a0c 100%);
     background-attachment:fixed}
   .page{max-width:740px;margin:0 auto}
   .page::before{content:'';display:block;height:3px;background:linear-gradient(90deg,#cc0000,#ff4444,#cc0000);border-radius:2px;margin-bottom:12px}
@@ -162,21 +163,24 @@
     .sets-grid{grid-template-columns:22px minmax(0,1fr) minmax(0,1fr) minmax(0,0.7fr) 20px;gap:2px}
     .ex-row{grid-template-columns:1.3fr .5fr .5fr 22px;gap:2px}
   }
-  /* PREMIUM POLISH */
-  .card,.card-light{box-shadow:0 10px 30px rgba(0,0,0,0.45),0 1px 0 rgba(255,255,255,0.04) inset;backdrop-filter:saturate(130%) blur(2px)}
-  .header{box-shadow:0 12px 36px rgba(204,0,0,0.18),0 1px 0 rgba(255,255,255,0.05) inset}
+  /* PREMIUM POLISH — glass cards, balanced gradient, safe motion */
+  .card{background:rgba(28,28,32,0.62)!important;border:1px solid rgba(255,255,255,0.08)!important;backdrop-filter:saturate(160%) blur(14px);-webkit-backdrop-filter:saturate(160%) blur(14px);box-shadow:0 12px 40px rgba(0,0,0,0.55),0 1px 0 rgba(255,255,255,0.06) inset}
+  .card-light{background:rgba(255,255,255,0.96)!important;color:#111!important;border:1px solid rgba(0,0,0,0.06)!important;backdrop-filter:saturate(140%) blur(10px);-webkit-backdrop-filter:saturate(140%) blur(10px);box-shadow:0 12px 40px rgba(0,0,0,0.35)}
+  .header{box-shadow:0 14px 40px rgba(204,0,0,0.22),0 1px 0 rgba(255,255,255,0.06) inset}
+  nav.devfit-tabnav{background:rgba(17,17,17,0.7)!important;backdrop-filter:saturate(150%) blur(10px);-webkit-backdrop-filter:saturate(150%) blur(10px)}
   nav.devfit-tabnav a{transition:all .2s cubic-bezier(.2,.8,.2,1)}
   nav.devfit-tabnav a.active{box-shadow:0 8px 22px rgba(204,0,0,0.45)}
   button,.stat-card,.ex-row,.set-row{transition:transform .15s ease,box-shadow .2s ease,border-color .2s ease,background .2s ease}
   button:active{transform:scale(0.97)}
   .stat-card:hover{transform:translateY(-1px)}
   ::selection{background:rgba(204,0,0,0.5);color:#fff}
-  @keyframes devfit-fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-  .page>*{animation:devfit-fadein .4s cubic-bezier(.2,.8,.2,1) both}
+  @keyframes devfit-rise{from{transform:translateY(10px)}to{transform:none}}
+  .page>*{animation:devfit-rise .45s cubic-bezier(.2,.8,.2,1) both}
   .page>*:nth-child(2){animation-delay:.04s}.page>*:nth-child(3){animation-delay:.08s}
   .page>*:nth-child(4){animation-delay:.12s}.page>*:nth-child(5){animation-delay:.16s}
   .page>*:nth-child(6){animation-delay:.20s}.page>*:nth-child(7){animation-delay:.24s}
-  body::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(800px 400px at 50% -5%,rgba(255,68,68,0.08),transparent 60%);z-index:-1}
+  @media (prefers-reduced-motion: reduce){.page>*{animation:none}}
+  body::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(900px 400px at 50% 50%,rgba(255,68,68,0.04),transparent 60%);z-index:-1}
 </style>
 </head>
 <body>

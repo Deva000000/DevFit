@@ -10,18 +10,19 @@
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   body{
     font-family:'DM Sans',sans-serif;
-    min-height:100vh;
-    background:#1a1a1a;
-    background-image:
-      linear-gradient(rgba(204,0,0,0.06) 1px,transparent 1px),
-      linear-gradient(90deg,rgba(204,0,0,0.04) 1px,transparent 1px);
-    background-size:40px 40px;
+    min-height:100vh;color:#e8e8ea;
+    background:
+      radial-gradient(900px 500px at 50% -10%, rgba(204,0,0,0.22), transparent 60%),
+      radial-gradient(700px 400px at 50% 110%, rgba(204,0,0,0.16), transparent 60%),
+      linear-gradient(180deg,#080809 0%,#101012 60%,#0a0a0b 100%);
+    background-attachment:fixed;
     display:flex;
     align-items:center;
     justify-content:center;
     padding:1rem;
     overflow-x:hidden;
   }
+  .card{backdrop-filter:saturate(140%) blur(8px);-webkit-backdrop-filter:saturate(140%) blur(8px)}
   .card{
     background:#111111;
     border:1px solid #2a2a2a;
@@ -89,7 +90,7 @@
   <div class="welcome">Welcome back</div>
   <p class="subtitle">Sign in with your Google account to access your personalised progress tracker.</p>
 
-  <button class="google-btn" onclick="signInWithGoogle()">
+  <button class="google-btn" id="google-signin-btn" type="button">
     <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
       <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
       <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -110,7 +111,7 @@
     <a href="https://wa.me/60183679177" class="contact-link">WhatsApp Trainer</a>
   </div>
 
-  <button id="install-btn" class="install-btn" onclick="installApp()">Install DevFit App</button>
+  <button id="install-btn" class="install-btn" type="button">Install DevFit App</button>
   <div class="footer">DevFit · Secure login powered by Google</div>
 </div>
 
@@ -187,6 +188,21 @@ async function checkApproval(email, name){
   }
 }
 
+// Wire up buttons (addEventListener — iOS PWA reliable)
+document.addEventListener('DOMContentLoaded', () => {
+  const g = document.getElementById('google-signin-btn');
+  if(g) g.addEventListener('click', (e)=>{ e.preventDefault(); signInWithGoogle(); });
+  const i = document.getElementById('install-btn');
+  if(i) i.addEventListener('click', (e)=>{ e.preventDefault(); installApp(); });
+});
+// Bind immediately too in case DOMContentLoaded already fired
+{
+  const g = document.getElementById('google-signin-btn');
+  if(g) g.addEventListener('click', (e)=>{ e.preventDefault(); signInWithGoogle(); });
+  const i = document.getElementById('install-btn');
+  if(i) i.addEventListener('click', (e)=>{ e.preventDefault(); installApp(); });
+}
+
 // Already logged in? Go straight to app
 const saved = localStorage.getItem('devfit_user');
 if(saved){
@@ -214,4 +230,8 @@ window.addEventListener('beforeinstallprompt',(e)=>{
 function installApp(){
   if(!deferredPrompt) return;
   deferredPrompt.prompt();
-  deferredPrompt.userChoice.then(()=>{ deferredPrompt=null; document.getElementById('install-btn').style.
+  deferredPrompt.userChoice.then(()=>{ deferredPrompt=null; document.getElementById('install-btn').style.display='none'; });
+}
+</script>
+</body>
+</html>

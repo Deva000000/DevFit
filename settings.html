@@ -109,8 +109,13 @@
     .setting-btn{padding:12px 14px}
     .setting-btn .title{font-size:13px}
     .range-row{grid-template-columns:1fr}
+    .card{padding:14px}
+    .tier-name{font-size:14px}
+    .tier-desc{font-size:10px}
   }
-  *{min-width:0}
+  /* Premium polish */
+  .setting-btn:active{transform:scale(0.985);background:#2a2a2a}
+  .upgrade-btn:active{transform:scale(0.985)}
 </style>
 </head>
 <body>
@@ -167,7 +172,7 @@
   <div class="card">
     <div class="section-label">Reports</div>
 
-    <button class="setting-btn" onclick="exportWeekPDF()">
+    <button class="setting-btn" id="week-report-btn" type="button">
       <div class="icon">W</div>
       <div class="body">
         <div class="title">Week Report (PDF)</div>
@@ -176,7 +181,7 @@
       <div class="chev">›</div>
     </button>
 
-    <button class="setting-btn" onclick="document.getElementById('range-row').style.display='grid';this.style.display='none'">
+    <button class="setting-btn" id="program-report-toggle-btn" type="button">
       <div class="icon">P</div>
       <div class="body">
         <div class="title">Program Report (PDF)</div>
@@ -189,14 +194,14 @@
       <select id="program-report-range">
         <option value="all">All weeks</option>
       </select>
-      <button class="pdf-btn" onclick="exportProgramPDF()">Generate</button>
+      <button class="pdf-btn" id="program-report-btn" type="button">Generate</button>
     </div>
   </div>
 
   <!-- TRAINER SYNC -->
   <div class="card">
     <div class="section-label">Trainer Sync</div>
-    <button class="setting-btn" id="sync-btn" onclick="manualSync()">
+    <button class="setting-btn" id="sync-btn" type="button">
       <div class="icon">S</div>
       <div class="body">
         <div class="title" id="sync-btn-title">Sync to Trainer</div>
@@ -227,7 +232,7 @@
   <div class="card">
     <div class="section-label">App</div>
 
-    <button class="setting-btn" id="install-app-btn" onclick="installApp()" style="display:none">
+    <button class="setting-btn" id="install-app-btn" type="button" style="display:none">
       <div class="icon">↓</div>
       <div class="body">
         <div class="title">Install DevFit</div>
@@ -236,7 +241,7 @@
       <div class="chev">›</div>
     </button>
 
-    <button class="setting-btn" id="ios-install-hint-btn" onclick="showIosHint()" style="display:none">
+    <button class="setting-btn" id="ios-install-hint-btn" type="button" style="display:none">
       <div class="icon">↓</div>
       <div class="body">
         <div class="title">Install on iPhone</div>
@@ -245,7 +250,7 @@
       <div class="chev">›</div>
     </button>
 
-    <button class="setting-btn" onclick="checkForUpdates()">
+    <button class="setting-btn" id="check-updates-btn" type="button">
       <div class="icon">↻</div>
       <div class="body">
         <div class="title">Check for Updates</div>
@@ -258,7 +263,7 @@
   <!-- DATA -->
   <div class="card">
     <div class="section-label">Data</div>
-    <button class="setting-btn danger" onclick="resetAll()">
+    <button class="setting-btn danger" id="reset-all-btn" type="button">
       <div class="icon">!</div>
       <div class="body">
         <div class="title">Reset All Data</div>
@@ -271,7 +276,7 @@
   <!-- ACCOUNT ACTIONS -->
   <div class="card">
     <div class="section-label">Session</div>
-    <button class="setting-btn danger" onclick="logout()">
+    <button class="setting-btn danger" id="logout-btn" type="button">
       <div class="icon">←</div>
       <div class="body">
         <div class="title">Logout</div>
@@ -286,20 +291,21 @@
     <a href="https://wa.me/60183679177">Contact trainer</a> · v2.1.0
   </div>
 
-  <!-- iOS install hint modal -->
-  <div id="ios-hint-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;padding:1rem">
-    <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-top:3px solid #cc0000;border-radius:14px;padding:24px;max-width:380px;width:100%;text-align:center">
-      <div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:14px">Install DevFit on iPhone</div>
-      <div style="font-size:13px;color:#aaa;line-height:1.7;margin-bottom:18px;text-align:left">
-        1. Tap the <strong style="color:#cc0000">Share</strong> button at the bottom of Safari (square with up arrow).<br><br>
-        2. Scroll down and tap <strong style="color:#cc0000">"Add to Home Screen"</strong>.<br><br>
-        3. Tap <strong style="color:#cc0000">Add</strong> in the top right.<br><br>
-        DevFit will appear on your home screen like a native app.
-      </div>
-      <button onclick="document.getElementById('ios-hint-modal').style.display='none'" style="background:#cc0000;color:#fff;border:none;border-radius:10px;padding:11px 24px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer">Got it</button>
-    </div>
-  </div>
 
+</div>
+
+<!-- iOS install hint modal (outside .page so it covers entire viewport cleanly) -->
+<div id="ios-hint-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;padding:1rem">
+  <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-top:3px solid #cc0000;border-radius:14px;padding:24px;max-width:380px;width:100%;text-align:center">
+    <div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:14px">Install DevFit on iPhone</div>
+    <div style="font-size:13px;color:#aaa;line-height:1.7;margin-bottom:18px;text-align:left">
+      1. Tap the <strong style="color:#cc0000">Share</strong> button at the bottom of Safari (square with up arrow).<br><br>
+      2. Scroll down and tap <strong style="color:#cc0000">"Add to Home Screen"</strong>.<br><br>
+      3. Tap <strong style="color:#cc0000">Add</strong> in the top right.<br><br>
+      DevFit will appear on your home screen like a native app.
+    </div>
+    <button id="ios-hint-close" type="button" style="background:#cc0000;color:#fff;border:none;border-radius:10px;padding:11px 24px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer">Got it</button>
+  </div>
 </div>
 
 <!-- HIDDEN CHARTS for PDF export -->
@@ -642,6 +648,4 @@ function exportWeekPDF(){
       pdf.text('Body fat: ' + (ci.bfDir||'—') + (ci.bf?(' ('+ci.bf+'%)'):''), 14, y); y+=10;
 
       // Add bodyweight chart
-      const bwImg = document.getElementById('exp-bw').toDataURL('image/png');
-      pdf.setFont('helvetica','bold'); pdf.setFontSize(11); pdf.text('Bodyweight Trend', 14, y); y+=4;
-      pdf.
+    

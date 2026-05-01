@@ -77,8 +77,10 @@
   .add-btn.light:hover{border-color:#cc0000;color:#cc0000}
 
   /* LOG MODE */
-  .log-bar{display:grid;grid-template-columns:1fr 1.4fr;gap:8px;margin-bottom:10px}
-  .session-empty{background:#fff;border:2px dashed var(--bd);border-radius:var(--radius);padding:30px 16px;text-align:center;color:#666;font-size:13px}
+  .log-bar{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:8px;margin-bottom:10px;width:100%;max-width:100%}
+  .log-bar .inp{min-width:0;width:100%;max-width:100%}
+  .session-empty{background:linear-gradient(135deg,#1a1a1a,#0f0f0f);border:1px solid #2a2a2a;border-radius:var(--radius);padding:36px 20px;text-align:center;color:#888;font-size:13px;line-height:1.6}
+  .session-empty strong{color:#cc0000;font-weight:800}
 
   .log-ex{background:#fff;border:1px solid var(--bd);border-radius:var(--radius);padding:12px;margin-bottom:8px}
   .log-ex-name{font-family:'DM Sans',system-ui,sans-serif;font-size:14px;font-weight:800;color:#111;margin-bottom:3px}
@@ -135,7 +137,7 @@
   .toast.show{opacity:1}
 
   @media(max-width:540px){
-    body{padding:.5rem}
+    body{padding:.5rem;overflow-x:hidden}
     .page{max-width:100%}
     .ex-row{grid-template-columns:1.4fr .5fr .5fr 24px;gap:3px}
     .ex-row input{font-size:12px;padding:4px}
@@ -147,8 +149,11 @@
     .header-logo{height:38px;width:38px}
     .stat-val{font-size:15px}
     .log-bar{grid-template-columns:1fr;gap:6px}
+    .log-bar .inp{font-size:13px;padding:9px 12px}
     .stat-row{gap:5px}
     .stat-card{padding:8px}
+    .card{padding:12px}
+    .session-empty{padding:24px 14px;font-size:12px}
   }
   @media(max-width:380px){
     .sets-grid{grid-template-columns:22px minmax(0,1fr) minmax(0,1fr) minmax(0,0.7fr) 20px;gap:2px}
@@ -426,6 +431,7 @@ function renderLog(){
   const area=document.getElementById('log-area');
   const shareBtn=document.getElementById('share-btn');
   shareBtn.disabled=true;
+  shareBtn.style.display='none';
 
   if(!data.plan.workouts.length){
     area.innerHTML='<div class="session-empty">No workouts in your plan yet.<br><br>Switch to <strong>Edit Plan</strong> to create one.</div>';
@@ -533,10 +539,11 @@ function renderLog(){
 
 function updateShareBtn(){
   const btn=document.getElementById('share-btn');
-  if(!currentSession || !currentSession.sess){btn.disabled=true;return;}
+  if(!currentSession || !currentSession.sess){btn.disabled=true;btn.style.display='none';return;}
   // Allow share if any set has reps OR weight logged (bodyweight exercises have no weight)
   const hasData=currentSession.sess.logs.some(l=>l.sets.some(s=>(Number(s.reps)||0)>0||(Number(s.weight)||0)>0));
   btn.disabled=!hasData;
+  btn.style.display=hasData?'block':'none';
 }
 
 function refreshPill(exId,log,last){
@@ -836,13 +843,4 @@ document.getElementById('btn-download').addEventListener('click',()=>{
   const canvas=document.getElementById('export-canvas');
   canvas.toBlob(blob=>{
     if(!blob) return;
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    const wName=(currentSession&&currentSession.sess?(data.plan.workouts.find(x=>x.id===currentSession.sess.workoutId)||{}).name:'workout')||'workout';
-    a.href=url;
-    a.download='DevFit_'+wName.replace(/\s+/g,'_')+'_'+(currentSession.sess.date||todayStr())+'.png';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-    toas
+   

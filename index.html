@@ -299,7 +299,7 @@
     <div class="client-row" style="margin-bottom:12px;">
       <input id="clientName" placeholder="Client name" onblur="save();render()">
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
       <div>
         <div class="section-label" style="margin-bottom:5px;">Start weight (kg)</div>
         <input style="width:100%;font-family:'DM Sans',sans-serif;font-size:14px;padding:8px 12px;border:1px solid #d1d5db;border-radius:var(--radius);background:#fff;color:#111;outline:none;" id="startWeight" placeholder="e.g. 80" type="number" step="0.1" inputmode="decimal" onblur="save();render()">
@@ -308,22 +308,22 @@
         <div class="section-label" style="margin-bottom:5px;">Target weight (kg)</div>
         <input style="width:100%;font-family:'DM Sans',sans-serif;font-size:14px;padding:8px 12px;border:1px solid #d1d5db;border-radius:var(--radius);background:#fff;color:#111;outline:none;" id="goalInput" placeholder="e.g. 70" type="number" step="0.1" inputmode="decimal" onblur="save();render()">
       </div>
-      <div>
-        <div class="section-label" style="margin-bottom:5px;">Program duration</div>
-        <select style="width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 12px;border:1px solid #d1d5db;border-radius:var(--radius);background:#fff;color:#111;outline:none;cursor:pointer;" id="programDuration" onchange="save();render()">
-          <option value="4">4 weeks</option>
-          <option value="8" selected>8 weeks</option>
-          <option value="12">12 weeks</option>
-          <option value="16">16 weeks</option>
-        </select>
-      </div>
-      <div>
-        <div class="section-label" style="margin-bottom:5px;">Goal type</div>
-        <div class="goal-row">
-          <button class="goal-btn" id="goal-loss" onclick="setGoal('loss')">Loss</button>
-          <button class="goal-btn" id="goal-gain" onclick="setGoal('gain')">Gain</button>
-          <button class="goal-btn" id="goal-maintain" onclick="setGoal('maintain')">Maintain</button>
-        </div>
+    </div>
+    <div style="margin-bottom:10px;">
+      <div class="section-label" style="margin-bottom:5px;">Program duration</div>
+      <select style="width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:9px 12px;border:1px solid #d1d5db;border-radius:var(--radius);background:#fff;color:#111;outline:none;cursor:pointer;" id="programDuration" onchange="save();render()">
+        <option value="4">4 weeks</option>
+        <option value="8" selected>8 weeks</option>
+        <option value="12">12 weeks</option>
+        <option value="16">16 weeks</option>
+      </select>
+    </div>
+    <div>
+      <div class="section-label" style="margin-bottom:5px;">Goal type</div>
+      <div class="goal-row" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
+        <button class="goal-btn" id="goal-loss" onclick="setGoal('loss')">Loss</button>
+        <button class="goal-btn" id="goal-gain" onclick="setGoal('gain')">Gain</button>
+        <button class="goal-btn" id="goal-maintain" onclick="setGoal('maintain')">Maintain</button>
       </div>
     </div>
   </div>
@@ -1668,5 +1668,4 @@ function showCountdown(){
 
 function showWelcomeScreen(){
   try{
-    const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
-    const welc
+    const user = JSON.pars

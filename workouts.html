@@ -118,8 +118,11 @@
   .share-overlay.show{display:flex}
   .share-modal{background:#1a1a1a;border:1px solid #2a2a2a;border-top:3px solid #cc0000;border-radius:14px;padding:18px;max-width:420px;width:100%;max-height:95vh;overflow:auto}
   .share-modal h3{font-family:'DM Sans',system-ui,sans-serif;color:#fff;font-size:15px;font-weight:800;margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em}
-  .share-preview{background:#000;border-radius:10px;overflow:hidden;margin-bottom:14px}
+  .share-preview{background:repeating-conic-gradient(#222 0% 25%, #2a2a2a 0% 50%) 50% / 20px 20px;border-radius:10px;overflow:hidden;margin-bottom:14px}
   .share-preview img{display:block;width:100%;height:auto}
+  .theme-picker{display:flex;gap:6px;margin-bottom:12px;background:#0a0a0a;border:1px solid #2a2a2a;border-radius:10px;padding:4px}
+  .theme-btn{flex:1;background:transparent;border:none;color:rgba(255,255,255,0.6);font-family:'DM Sans',system-ui,sans-serif;font-size:12px;font-weight:700;padding:8px;border-radius:7px;cursor:pointer;transition:all .15s;text-transform:uppercase;letter-spacing:.04em}
+  .theme-btn.active{background:#cc0000;color:#fff}
   .share-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .share-actions button{padding:12px;border:none;border-radius:10px;font-family:'DM Sans',system-ui,sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:.04em;transition:all .15s}
   .btn-share{background:#cc0000;color:#fff}
@@ -219,7 +222,12 @@
 <div class="share-overlay" id="share-overlay">
   <div class="share-modal">
     <h3>Share workout</h3>
-    <div class="share-preview"><img id="share-preview-img" alt="Workout preview"></div>
+    <div class="theme-picker" id="theme-picker">
+      <button class="theme-btn active" data-theme="light">Light</button>
+      <button class="theme-btn" data-theme="dark">Dark</button>
+      <button class="theme-btn" data-theme="transparent">Transparent</button>
+    </div>
+    <div class="share-preview" id="share-preview"><img id="share-preview-img" alt="Workout preview"></div>
     <div class="share-actions">
       <button class="btn-download" id="btn-download">Download</button>
       <button class="btn-share"    id="btn-do-share">Share</button>
@@ -228,7 +236,7 @@
   </div>
 </div>
 
-<canvas id="export-canvas" width="1080" height="1350" style="display:none"></canvas>
+<canvas id="export-canvas" width="1080" height="1080" style="display:none"></canvas>
 
 <script>
 'use strict';
@@ -244,6 +252,24 @@
     window.location.href = 'login.html';
   }
 })();
+
+// TIER HELPERS
+function getUserTier(){
+  try { return (JSON.parse(localStorage.getItem('devfit_user')||'{}').tier || 'pro').toLowerCase(); }
+  catch(e){ return 'pro'; }
+}
+function isPro(){ return getUserTier() === 'pro'; }
+
+function paywallHTML(featureName){
+  const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+  const msg = encodeURIComponent('Hi, I\'d like to upgrade DevFit to Pro. My account: ' + (u.email||'(my email)'));
+  return `<div style="background:linear-gradient(135deg,#1a0000,#2a0000);border:1px solid #cc0000;border-radius:14px;padding:24px;text-align:center;margin:8px 0">
+    <div style="font-size:11px;font-weight:800;letter-spacing:.08em;color:#ff8888;margin-bottom:8px">PRO FEATURE</div>
+    <div style="font-size:16px;color:#fff;font-weight:800;margin-bottom:8px">${featureName}</div>
+    <div style="font-size:13px;color:#aaa;line-height:1.5;margin-bottom:14px">Available on DevFit Pro. Track sessions across weeks, see your progression, and share workout cards.</div>
+    <a href="https://wa.me/60183679177?text=${msg}" style="display:inline-block;background:#cc0000;color:#fff;text-decoration:none;padding:10px 22px;border-radius:20px;font-weight:700;font-size:13px">Upgrade to Pro</a>
+  </div>`;
+}
 
 const KEY='devfitTrainingV1';
 let data=load();
@@ -382,6 +408,13 @@ document.getElementById('log-date').addEventListener('change',renderLog);
 document.getElementById('log-workout').addEventListener('change',renderLog);
 
 function renderLog(){
+  // FREE TIER GATE — no session logging
+  if(!isPro()){
+    document.getElementById('log-area').innerHTML = paywallHTML('Daily Session Logging');
+    document.querySelector('.log-bar').style.display = 'none';
+    document.getElementById('share-btn').style.display = 'none';
+    return;
+  }
   const sel=document.getElementById('log-workout');
   const prevSel=sel.value;
   sel.innerHTML='<option value="">Pick a workout…</option>'+
@@ -531,6 +564,12 @@ function refreshPill(exId,log,last){
 // ---------- PROGRESS VIEW ----------
 let progChart=null;
 function renderProgressView(){
+  // FREE TIER GATE
+  if(!isPro()){
+    document.getElementById('view-progress').querySelector('.card').innerHTML =
+      '<div class="section-label">Exercise progression</div>' + paywallHTML('Training Progress Charts');
+    return;
+  }
   const sel=document.getElementById('prog-ex');
   const prev=sel.value;
   const seen=new Map();
@@ -585,230 +624,192 @@ let logoImg=null;
 
 document.getElementById('share-btn').addEventListener('click',openShareModal);
 
+let currentShareTheme = 'light'; // light | dark | transparent
+
 async function openShareModal(){
   if(!currentSession || !currentSession.sess) return;
   const sess=currentSession.sess;
   const w=data.plan.workouts.find(x=>x.id===sess.workoutId);
   if(!w) return;
-
-  const canvas=document.getElementById('export-canvas');
-  drawExportCard(canvas,w,sess);
-  const dataURL=canvas.toDataURL('image/png');
-  document.getElementById('share-preview-img').src=dataURL;
+  rerenderShareCard();
   document.getElementById('share-overlay').classList.add('show');
 }
 
-function drawExportCard(canvas,workout,session){
-  const ctx=canvas.getContext('2d');
-  const W=canvas.width, H=canvas.height;
+function rerenderShareCard(){
+  if(!currentSession || !currentSession.sess) return;
+  const sess=currentSession.sess;
+  const w=data.plan.workouts.find(x=>x.id===sess.workoutId);
+  if(!w) return;
+  const canvas=document.getElementById('export-canvas');
+  drawExportCard(canvas, w, sess, currentShareTheme);
+  const dataURL=canvas.toDataURL('image/png');
+  document.getElementById('share-preview-img').src=dataURL;
+}
 
-  // Background — deep black with subtle gradient
-  const bg=ctx.createLinearGradient(0,0,0,H);
-  bg.addColorStop(0,'#0a0a0a');
-  bg.addColorStop(1,'#1a1a1a');
-  ctx.fillStyle=bg;
-  ctx.fillRect(0,0,W,H);
+// Theme picker
+document.querySelectorAll('.theme-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    currentShareTheme = btn.dataset.theme;
+    document.querySelectorAll('.theme-btn').forEach(b=>b.classList.toggle('active', b===btn));
+    rerenderShareCard();
+  });
+});
 
-  // Top red accent bar
-  ctx.fillStyle='#cc0000';
-  ctx.fillRect(0,0,W,12);
+// MINIMAL HEVY-STYLE SHARE CARD
+// theme: 'light' (white card on transparent bg) | 'dark' (black card) | 'transparent' (no fill, just text)
+function drawExportCard(canvas, workout, session, theme){
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  theme = theme || 'light';
 
-  // Subtle red glow on left
-  const glow=ctx.createLinearGradient(0,0,80,0);
-  glow.addColorStop(0,'rgba(204,0,0,0.25)');
-  glow.addColorStop(1,'rgba(204,0,0,0)');
-  ctx.fillStyle=glow;
-  ctx.fillRect(0,12,80,H-12);
+  // Theme palette
+  const palette = {
+    light:       {bg:'#ffffff', fg:'#0a0a0a', sub:'#7a7a7a', accent:'#cc0000', divider:'rgba(0,0,0,0.08)'},
+    dark:        {bg:'#0a0a0a', fg:'#ffffff', sub:'#9a9a9a', accent:'#ff3a3a', divider:'rgba(255,255,255,0.10)'},
+    transparent: {bg:null,      fg:'#ffffff', sub:'#cccccc', accent:'#ff3a3a', divider:'rgba(255,255,255,0.10)'}
+  };
+  const p = palette[theme] || palette.light;
 
-  // ---- HEADER ----
-  let y=80;
-  if(logoImg){
-    try{
-      // White rounded square behind logo
-      roundRect(ctx,60,y,80,80,12);
-      ctx.fillStyle='#fff';
-      ctx.fill();
-      ctx.drawImage(logoImg,66,y+6,68,68);
-    }catch(e){}
+  // Clear (transparent) or fill background
+  ctx.clearRect(0,0,W,H);
+  if(p.bg){
+    // Outer card with subtle rounded look
+    ctx.fillStyle = p.bg;
+    roundRect(ctx, 0, 0, W, H, 0);
+    ctx.fill();
   }
-  ctx.fillStyle='#fff';
-  ctx.font='800 38px "DM Sans",system-ui,sans-serif';
-  ctx.textBaseline='top';
-  ctx.fillText('DEVFIT',logoImg?160:60,y+6);
-  ctx.fillStyle='rgba(255,255,255,0.55)';
-  ctx.font='600 16px "DM Sans",system-ui,sans-serif';
-  ctx.fillText('DOMINANCE THROUGH DISCIPLINE',logoImg?160:60,y+52);
 
-  // Divider
-  y=200;
-  ctx.fillStyle='#cc0000';
-  ctx.fillRect(60,y,W-120,3);
+  const PAD = 80;
+  let y = PAD + 30;
 
-  // ---- WORKOUT TITLE ----
-  y=240;
-  const wName=(workout.name||'WORKOUT').toUpperCase();
-  ctx.fillStyle='#fff';
-  ctx.font='800 70px "DM Sans",system-ui,sans-serif';
-  // truncate if too long
-  let title=wName;
-  while(ctx.measureText(title).width>W-120 && title.length>3){
-    title=title.slice(0,-1);
+  // ---- WORKOUT TITLE (e.g. "Push Day") ----
+  ctx.fillStyle = p.fg;
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'left';
+  let titleSize = 78;
+  ctx.font = `800 ${titleSize}px "DM Sans",system-ui,sans-serif`;
+  let title = workout.name || 'Workout';
+  while(ctx.measureText(title).width > W - PAD*2 && titleSize > 40){
+    titleSize -= 4;
+    ctx.font = `800 ${titleSize}px "DM Sans",system-ui,sans-serif`;
   }
-  if(title!==wName) title=title.slice(0,-3)+'...';
-  ctx.fillText(title,60,y);
+  ctx.fillText(title, PAD, y);
+  y += titleSize + 12;
 
-  ctx.fillStyle='rgba(255,255,255,0.45)';
-  ctx.font='500 22px "DM Sans",system-ui,sans-serif';
-  ctx.fillText(fmtDate(session.date),60,y+86);
+  // Date subtitle
+  ctx.font = '500 24px "DM Sans",system-ui,sans-serif';
+  ctx.fillStyle = p.sub;
+  ctx.fillText(fmtDate(session.date), PAD, y);
+  y += 60;
+
+  // Thin divider
+  ctx.fillStyle = p.divider;
+  ctx.fillRect(PAD, y, W - PAD*2, 1);
+  y += 40;
 
   // ---- EXERCISE LIST ----
-  y=380;
-  ctx.fillStyle='rgba(255,255,255,0.4)';
-  ctx.font='700 14px "DM Sans",system-ui,sans-serif';
-  ctx.fillText('EXERCISE',60,y);
-  ctx.textAlign='right';
-  ctx.fillText('SETS · REPS · LOAD',W-60,y);
-  ctx.textAlign='left';
-
-  y+=20;
-  ctx.strokeStyle='rgba(255,255,255,0.12)';
-  ctx.lineWidth=1;
-  ctx.beginPath(); ctx.moveTo(60,y); ctx.lineTo(W-60,y); ctx.stroke();
-
-  // Build exercise summary lines
-  const lines=[];
-  let totalVolKg=0, totalSetsCt=0, totalRepsCt=0;
-  let bestLift={name:'',w:0,r:0};
-  workout.exercises.forEach(ex=>{
-    const log=session.logs.find(l=>l.exId===ex.id);
+  // Format: "Exercise Name              3×10 @ 60kg"
+  const lines = [];
+  workout.exercises.forEach(ex => {
+    const log = session.logs.find(l => l.exId === ex.id);
     if(!log) return;
-    const validSets=log.sets.filter(s=>(Number(s.reps)||0)>0||(Number(s.weight)||0)>0);
+    const validSets = log.sets.filter(s => (Number(s.reps)||0)>0 || (Number(s.weight)||0)>0);
     if(!validSets.length) return;
-    const vol=totalVolume(validSets);
-    const setCount=validSets.length;
-    const reps=totalReps(validSets);
-    const best=bestSet(validSets);
-    totalVolKg+=vol; totalSetsCt+=setCount; totalRepsCt+=reps;
-    if(best && best.w>bestLift.w) bestLift={name:ex.name||'',w:best.w,r:best.r};
 
-    // Format like "4 × 8 @ 60kg" using the most common config; fall back to range
-    const repsList=validSets.map(s=>Number(s.reps)||0);
-    const wtList=validSets.map(s=>Number(s.weight)||0);
-    const sameReps=repsList.every(r=>r===repsList[0]);
-    const sameWt=wtList.every(w=>w===wtList[0]);
+    const setCount = validSets.length;
+    const repsList = validSets.map(s => Number(s.reps)||0);
+    const wtList   = validSets.map(s => Number(s.weight)||0);
+    const sameReps = repsList.every(r => r === repsList[0]);
+    const sameWt   = wtList.every(w => w === wtList[0]);
+    const hasWeight = wtList.some(w => w > 0);
+
     let summary;
     if(sameReps && sameWt){
-      summary=`${setCount} × ${repsList[0]} @ ${wtList[0]}kg`;
+      summary = hasWeight
+        ? `${setCount}×${repsList[0]} @ ${wtList[0]}kg`
+        : `${setCount}×${repsList[0]}`;
     } else {
-      const minW=Math.min(...wtList.filter(w=>w>0));
-      const maxW=Math.max(...wtList);
-      const minR=Math.min(...repsList.filter(r=>r>0));
-      const maxR=Math.max(...repsList);
-      const repTxt=minR===maxR?String(minR):minR+'–'+maxR;
-      const wtTxt=minW===maxW?String(minW):minW+'–'+maxW;
-      summary=`${setCount} × ${repTxt} @ ${wtTxt}kg`;
+      const minR = Math.min(...repsList.filter(r=>r>0));
+      const maxR = Math.max(...repsList);
+      const repTxt = minR === maxR ? String(minR) : `${minR}–${maxR}`;
+      if(hasWeight){
+        const minW = Math.min(...wtList.filter(w=>w>0));
+        const maxW = Math.max(...wtList);
+        const wtTxt = minW === maxW ? String(minW) : `${minW}–${maxW}`;
+        summary = `${setCount}×${repTxt} @ ${wtTxt}kg`;
+      } else {
+        summary = `${setCount}×${repTxt}`;
+      }
     }
-    lines.push({name:ex.name||'(unnamed)',summary,vol});
+    lines.push({name: ex.name || 'Exercise', summary, sets: setCount});
   });
 
-  // Cap to 8 exercises max for one-page export
-  const showLines=lines.slice(0,8);
-  const overflow=lines.length-showLines.length;
+  // Calculate available space and row height
+  const footerY = H - PAD - 60;
+  const available = footerY - y - 40;
+  const maxLines = Math.min(lines.length, 10);
+  const rowH = Math.min(80, Math.floor(available / Math.max(maxLines,1)));
 
-  y+=24;
-  ctx.font='700 26px "DM Sans",system-ui,sans-serif';
-  showLines.forEach(line=>{
-    ctx.fillStyle='#fff';
-    ctx.textAlign='left';
-    let nameTxt=line.name.toUpperCase();
-    while(ctx.measureText(nameTxt).width>W*0.55 && nameTxt.length>3){nameTxt=nameTxt.slice(0,-1);}
-    if(nameTxt!==line.name.toUpperCase()) nameTxt=nameTxt.slice(0,-3)+'...';
-    ctx.fillText(nameTxt,60,y);
+  const showLines = lines.slice(0, maxLines);
+  const overflow = lines.length - showLines.length;
 
-    ctx.fillStyle='rgba(255,255,255,0.85)';
-    ctx.textAlign='right';
-    ctx.font='800 26px "DM Sans",system-ui,sans-serif';
-    ctx.fillText(line.summary,W-60,y);
-    ctx.font='700 26px "DM Sans",system-ui,sans-serif';
+  ctx.font = '700 32px "DM Sans",system-ui,sans-serif';
+  showLines.forEach(line => {
+    // Set count badge (red, like "3x" in Hevy)
+    ctx.fillStyle = p.accent;
+    ctx.textAlign = 'left';
+    ctx.font = '800 32px "DM Sans",system-ui,sans-serif';
+    const setBadge = `${line.sets}x`;
+    ctx.fillText(setBadge, PAD, y);
 
-    // small total below
-    ctx.fillStyle='rgba(255,255,255,0.4)';
-    ctx.font='600 14px "DM Sans",system-ui,sans-serif';
-    ctx.fillText(line.vol.toLocaleString()+' kg total',W-60,y+24);
-    ctx.font='700 26px "DM Sans",system-ui,sans-serif';
+    // Exercise name
+    ctx.fillStyle = p.fg;
+    ctx.font = '600 30px "DM Sans",system-ui,sans-serif';
+    let nameTxt = line.name;
+    const nameStartX = PAD + 70;
+    const nameMaxW = W - PAD - nameStartX - 280; // leave room for summary on right
+    while(ctx.measureText(nameTxt).width > nameMaxW && nameTxt.length > 3){
+      nameTxt = nameTxt.slice(0, -1);
+    }
+    if(nameTxt !== line.name) nameTxt = nameTxt.slice(0, -1) + '…';
+    ctx.fillText(nameTxt, nameStartX, y + 2);
 
-    y+=58;
-    // separator
-    ctx.strokeStyle='rgba(255,255,255,0.07)';
-    ctx.beginPath(); ctx.moveTo(60,y-12); ctx.lineTo(W-60,y-12); ctx.stroke();
+    // Summary right-aligned
+    ctx.fillStyle = p.sub;
+    ctx.textAlign = 'right';
+    ctx.font = '700 26px "DM Sans",system-ui,sans-serif';
+    ctx.fillText(line.summary, W - PAD, y + 4);
+
+    y += rowH;
   });
 
-  if(overflow>0){
-    ctx.fillStyle='rgba(255,255,255,0.5)';
-    ctx.textAlign='center';
-    ctx.font='600 18px "DM Sans",system-ui,sans-serif';
-    ctx.fillText('+ '+overflow+' more exercise'+(overflow>1?'s':''),W/2,y);
-    y+=30;
+  if(overflow > 0){
+    ctx.fillStyle = p.sub;
+    ctx.textAlign = 'center';
+    ctx.font = '500 22px "DM Sans",system-ui,sans-serif';
+    ctx.fillText('+ ' + overflow + ' more exercise' + (overflow>1?'s':''), W/2, y);
   }
 
-  // ---- STATS CARDS ----
-  const statY=H-360;
-  const cardH=140;
-  const gap=18;
-  const cardW=(W-120-gap*2)/3;
-  const stats=[
-    {lbl:'TOTAL SETS', val:String(totalSetsCt)},
-    {lbl:'TOTAL REPS', val:String(totalRepsCt)},
-    {lbl:'TOTAL VOLUME', val:totalVolKg.toLocaleString()+' kg'}
-  ];
-  stats.forEach((s,i)=>{
-    const x=60+i*(cardW+gap);
-    roundRect(ctx,x,statY,cardW,cardH,12);
-    ctx.fillStyle='rgba(255,255,255,0.04)';
-    ctx.fill();
-    ctx.strokeStyle='rgba(255,255,255,0.1)';
-    ctx.lineWidth=1;
-    ctx.stroke();
-    ctx.textAlign='center';
-    ctx.fillStyle='rgba(255,255,255,0.5)';
-    ctx.font='700 13px "DM Sans",system-ui,sans-serif';
-    ctx.fillText(s.lbl,x+cardW/2,statY+30);
-    ctx.fillStyle='#fff';
-    ctx.font='800 34px "DM Sans",system-ui,sans-serif';
-    // shrink if needed
-    let v=s.val;
-    while(ctx.measureText(v).width>cardW-20 && parseInt(ctx.font)>16){
-      const sz=parseInt(ctx.font)-2;
-      ctx.font='800 '+sz+'px "DM Sans",system-ui,sans-serif';
-    }
-    ctx.fillText(v,x+cardW/2,statY+85);
-  });
+  // ---- FOOTER: DEVFIT logo (left) + @handle (right) ----
+  const fy = H - PAD - 30;
+  ctx.textBaseline = 'alphabetic';
 
-  // ---- PR BANNER ----
-  if(bestLift.w>0){
-    const prY=statY+cardH+24;
-    roundRect(ctx,60,prY,W-120,72,12);
-    ctx.fillStyle='#cc0000';
-    ctx.fill();
-    ctx.fillStyle='rgba(255,255,255,0.7)';
-    ctx.font='700 13px "DM Sans",system-ui,sans-serif';
-    ctx.textAlign='left';
-    ctx.fillText('TOP LIFT',82,prY+24);
-    ctx.fillStyle='#fff';
-    ctx.font='800 28px "DM Sans",system-ui,sans-serif';
-    let prTxt=bestLift.name.toUpperCase()+' · '+bestLift.w+'kg × '+bestLift.r;
-    while(ctx.measureText(prTxt).width>W-160 && prTxt.length>10){prTxt=prTxt.slice(0,-1);}
-    if(prTxt.length<bestLift.name.length+15) prTxt=prTxt.slice(0,-3)+'...';
-    ctx.fillText(prTxt,82,prY+58);
-  }
+  // DEVFIT brand
+  ctx.fillStyle = p.accent;
+  ctx.font = '900 38px "DM Sans",system-ui,sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('DEVFIT', PAD, fy);
 
-  // ---- FOOTER ----
-  ctx.textAlign='center';
-  ctx.fillStyle='rgba(255,255,255,0.4)';
-  ctx.font='600 16px "DM Sans",system-ui,sans-serif';
-  ctx.fillText('DevFit · Train with intention',W/2,H-40);
-  ctx.fillStyle='#cc0000';
-  ctx.fillRect(0,H-12,W,12);
+  // @handle
+  ctx.fillStyle = p.sub;
+  ctx.font = '600 26px "DM Sans",system-ui,sans-serif';
+  ctx.textAlign = 'right';
+  let handle = '@user';
+  try {
+    const u = JSON.parse(localStorage.getItem('devfit_user') || '{}');
+    if(u.email) handle = '@' + u.email.split('@')[0];
+  } catch(e){}
+  ctx.fillText(handle, W - PAD, fy);
 }
 
 function roundRect(ctx,x,y,w,h,r){
@@ -844,42 +845,4 @@ document.getElementById('btn-download').addEventListener('click',()=>{
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-    toast('Saved to Downloads');
-  },'image/png',0.95);
-});
-
-document.getElementById('btn-do-share').addEventListener('click',async()=>{
-  const canvas=document.getElementById('export-canvas');
-  canvas.toBlob(async blob=>{
-    if(!blob) return;
-    const wName=(currentSession&&currentSession.sess?(data.plan.workouts.find(x=>x.id===currentSession.sess.workoutId)||{}).name:'workout')||'workout';
-    const file=new File([blob],'DevFit_'+wName.replace(/\s+/g,'_')+'.png',{type:'image/png'});
-    if(navigator.canShare && navigator.canShare({files:[file]})){
-      try{
-        await navigator.share({files:[file],title:'DevFit · '+wName,text:'DevFit · Train with intention'});
-        toast('Shared!');
-        return;
-      }catch(e){if(e.name==='AbortError') return;}
-    }
-    // Fallback: download
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=url;
-    a.download='DevFit_'+wName.replace(/\s+/g,'_')+'_'+(currentSession.sess.date||todayStr())+'.png';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-    toast('Sharing not supported — downloaded instead');
-  },'image/png',0.95);
-});
-
-// ---------- SERVICE WORKER ----------
-if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
-}
-
-renderLog();
-</script>
-</body>
-</html>
+    toas

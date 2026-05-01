@@ -75,6 +75,17 @@
   .range-row .pdf-btn{background:#cc0000;color:#fff;border:none;border-radius:20px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s;white-space:nowrap}
   .range-row .pdf-btn:hover{background:#aa0000}
 
+  /* SUBSCRIPTION */
+  .tier-row{display:flex;align-items:center;gap:14px}
+  .tier-badge{padding:8px 14px;border-radius:8px;font-size:13px;font-weight:800;letter-spacing:.06em}
+  .tier-badge.free{background:#3a3a3a;color:#aaa;border:1px solid #4a4a4a}
+  .tier-badge.pro{background:linear-gradient(135deg,#cc0000,#ff4444);color:#fff;box-shadow:0 4px 12px rgba(204,0,0,0.35)}
+  .tier-info{flex:1;min-width:0}
+  .tier-name{font-size:15px;font-weight:800;color:#fff;line-height:1.2}
+  .tier-desc{font-size:11px;color:#aaa;margin-top:3px;line-height:1.4}
+  .upgrade-btn{display:block;background:linear-gradient(135deg,#cc0000,#ff4444);color:#fff;text-decoration:none;text-align:center;padding:13px;border-radius:10px;font-weight:800;font-size:14px;margin-top:14px;letter-spacing:.04em;text-transform:uppercase;transition:transform .15s,box-shadow .15s;box-shadow:0 4px 12px rgba(204,0,0,0.3)}
+  .upgrade-btn:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(204,0,0,0.4)}
+
   /* FOOTER */
   .footer{text-align:center;color:#666;font-size:11px;margin-top:20px;line-height:1.6}
   .footer a{color:#cc0000;text-decoration:none;font-weight:700}
@@ -196,6 +207,54 @@
     <div style="font-size:11px;color:#888;margin-top:8px;line-height:1.5">Sync sends bodyweight average, steps, sleep, overload, diet compliance, stress, and your weekly score to the trainer's Google Sheet.</div>
   </div>
 
+  <!-- SUBSCRIPTION -->
+  <div class="card" id="subscription-card">
+    <div class="section-label">Subscription</div>
+    <div class="tier-row" id="tier-row">
+      <div class="tier-badge" id="tier-badge">PRO</div>
+      <div class="tier-info">
+        <div class="tier-name" id="tier-name">DevFit Pro</div>
+        <div class="tier-desc" id="tier-desc">Full access · history, charts, share, reports, sync</div>
+      </div>
+    </div>
+    <a href="#" id="upgrade-btn" class="upgrade-btn" style="display:none">Upgrade to Pro — Contact Trainer</a>
+    <div id="upgrade-features" style="display:none;font-size:11px;color:#888;margin-top:10px;line-height:1.6">
+      Pro unlocks: multi-week history · trend charts · workout share card · session logging · training progress · 7-day nutrition trends · PDF reports · trainer sync
+    </div>
+  </div>
+
+  <!-- APP -->
+  <div class="card">
+    <div class="section-label">App</div>
+
+    <button class="setting-btn" id="install-app-btn" onclick="installApp()" style="display:none">
+      <div class="icon">↓</div>
+      <div class="body">
+        <div class="title">Install DevFit</div>
+        <div class="desc">Add to your home screen for one-tap access</div>
+      </div>
+      <div class="chev">›</div>
+    </button>
+
+    <button class="setting-btn" id="ios-install-hint-btn" onclick="showIosHint()" style="display:none">
+      <div class="icon">↓</div>
+      <div class="body">
+        <div class="title">Install on iPhone</div>
+        <div class="desc">Tap to see how to add to home screen</div>
+      </div>
+      <div class="chev">›</div>
+    </button>
+
+    <button class="setting-btn" onclick="checkForUpdates()">
+      <div class="icon">↻</div>
+      <div class="body">
+        <div class="title">Check for Updates</div>
+        <div class="desc">Pull the latest version — no need to wait for trainer</div>
+      </div>
+      <div class="chev">›</div>
+    </button>
+  </div>
+
   <!-- DATA -->
   <div class="card">
     <div class="section-label">Data</div>
@@ -224,7 +283,21 @@
 
   <div class="footer">
     DevFit · Dominance Through Discipline<br>
-    <a href="https://wa.me/60183679177">Contact trainer</a> · v2.0
+    <a href="https://wa.me/60183679177">Contact trainer</a> · v2.1.0
+  </div>
+
+  <!-- iOS install hint modal -->
+  <div id="ios-hint-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;padding:1rem">
+    <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-top:3px solid #cc0000;border-radius:14px;padding:24px;max-width:380px;width:100%;text-align:center">
+      <div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:14px">Install DevFit on iPhone</div>
+      <div style="font-size:13px;color:#aaa;line-height:1.7;margin-bottom:18px;text-align:left">
+        1. Tap the <strong style="color:#cc0000">Share</strong> button at the bottom of Safari (square with up arrow).<br><br>
+        2. Scroll down and tap <strong style="color:#cc0000">"Add to Home Screen"</strong>.<br><br>
+        3. Tap <strong style="color:#cc0000">Add</strong> in the top right.<br><br>
+        DevFit will appear on your home screen like a native app.
+      </div>
+      <button onclick="document.getElementById('ios-hint-modal').style.display='none'" style="background:#cc0000;color:#fff;border:none;border-radius:10px;padding:11px 24px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer">Got it</button>
+    </div>
   </div>
 
 </div>
@@ -571,102 +644,4 @@ function exportWeekPDF(){
       // Add bodyweight chart
       const bwImg = document.getElementById('exp-bw').toDataURL('image/png');
       pdf.setFont('helvetica','bold'); pdf.setFontSize(11); pdf.text('Bodyweight Trend', 14, y); y+=4;
-      pdf.addImage(bwImg, 'PNG', 14, y, 182, 70); y+=78;
-
-      if(ci.notes){
-        pdf.setFont('helvetica','bold'); pdf.setFontSize(11); pdf.text('Trainer notes', 14, y); y+=6;
-        pdf.setFont('helvetica','normal'); pdf.setFontSize(10);
-        pdf.text(pdf.splitTextToSize(ci.notes, 180), 14, y);
-      }
-
-      pdf.setFillColor(204,0,0); pdf.rect(0,287,210,10,'F');
-      pdf.setTextColor(255,255,255); pdf.setFontSize(9);
-      pdf.text('DevFit · Dominance Through Discipline', 14, 293);
-
-      pdf.save('DevFit_Week'+(w+1)+'_Report.pdf');
-      toast('Week report saved');
-    }catch(e){ console.error(e); toast('Export failed', true); }
-  }, 300);
-}
-
-// ---------- PROGRAM PDF ----------
-function exportProgramPDF(){
-  if(!window.jspdf){ toast('PDF library still loading…', true); return; }
-  const { jsPDF } = window.jspdf;
-  if(!jsPDF){ toast('PDF library failed to load', true); return; }
-
-  const rangeVal = document.getElementById('program-report-range').value;
-  const weeksToInclude = rangeVal==='all' ? totalWeeks : parseInt(rangeVal);
-
-  buildExportCharts();
-  setTimeout(()=>{
-    try{
-      const pdf = new jsPDF('p','mm','a4');
-      pdf.setFillColor(204,0,0); pdf.rect(0,0,210,12,'F');
-      pdf.setFont('helvetica','bold'); pdf.setFontSize(22); pdf.setTextColor(17,17,17);
-      pdf.text('DevFit · Program Report', 14, 25);
-      pdf.setFontSize(11); pdf.setFont('helvetica','normal'); pdf.setTextColor(100,100,100);
-      pdf.text(appData.clientName || 'Client', 14, 32);
-      const today = new Date().toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'});
-      pdf.text(today + ' · ' + weeksToInclude + ' weeks', 14, 37);
-
-      let y = 50;
-      pdf.setDrawColor(204,0,0); pdf.setLineWidth(0.4);
-      pdf.line(14,y,196,y); y+=8;
-
-      pdf.setFont('helvetica','bold'); pdf.setFontSize(13); pdf.setTextColor(17,17,17);
-      pdf.text('Weekly Summary', 14, y); y+=8;
-      pdf.setFontSize(9); pdf.setFont('helvetica','normal');
-
-      // Table header
-      pdf.setFillColor(240,240,240); pdf.rect(14,y-4,182,7,'F');
-      pdf.setFont('helvetica','bold');
-      pdf.text('Week',16,y); pdf.text('BW avg',40,y); pdf.text('Steps',70,y); pdf.text('Sleep',95,y); pdf.text('Overload',115,y); pdf.text('Diet',150,y); pdf.text('Score',180,y);
-      y+=8;
-
-      pdf.setFont('helvetica','normal');
-      const startW = totalWeeks - weeksToInclude;
-      for(let w=startW; w<totalWeeks; w++){
-        const ci = appData.weeklyCheckin[w] || freshCheckin();
-        const bwA = avg(appData.bw[w]);
-        const stA = avg(appData.steps[w]);
-        const slA = avg(appData.sleep[w]);
-        const {overall} = calcTrueScore(w);
-        pdf.text('W'+(w+1), 16, y);
-        pdf.text(bwA===null?'—':bwA.toFixed(1), 40, y);
-        pdf.text(stA===null?'—':Math.round(stA).toLocaleString(), 70, y);
-        pdf.text(slA===null?'—':slA.toFixed(1), 95, y);
-        pdf.text((ci.overload||'—').slice(0,10), 115, y);
-        pdf.text((ci.diet||'—').slice(0,10), 150, y);
-        pdf.text(overall===null?'—':overall+'%', 180, y);
-        y+=6;
-        if(y>270){ pdf.addPage(); y=20; }
-      }
-
-      y+=6;
-      const bwImg = document.getElementById('exp-bw').toDataURL('image/png');
-      const scImg = document.getElementById('exp-score').toDataURL('image/png');
-      if(y>180){ pdf.addPage(); y=20; }
-      pdf.setFont('helvetica','bold'); pdf.setFontSize(11); pdf.text('Bodyweight Trend', 14, y); y+=4;
-      pdf.addImage(bwImg, 'PNG', 14, y, 182, 60); y+=68;
-      if(y>200){ pdf.addPage(); y=20; }
-      pdf.text('Weekly Progress Score', 14, y); y+=4;
-      pdf.addImage(scImg, 'PNG', 14, y, 182, 60);
-
-      pdf.setFillColor(204,0,0); pdf.rect(0,287,210,10,'F');
-      pdf.setTextColor(255,255,255); pdf.setFontSize(9);
-      pdf.text('DevFit · Dominance Through Discipline', 14, 293);
-
-      pdf.save('DevFit_Program_Report.pdf');
-      toast('Program report saved');
-    }catch(e){ console.error(e); toast('Export failed', true); }
-  }, 400);
-}
-
-// ---------- SERVICE WORKER ----------
-if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
-}
-</script>
-</body>
-</html>
+      pdf.

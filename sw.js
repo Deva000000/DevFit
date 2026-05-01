@@ -6,7 +6,7 @@
    - Auto-update: new SW takes control on next reload
 */
 
-const VERSION = 'devfit-v2.0.0';
+const VERSION = 'devfit-v2.1.0';
 const APP_SHELL = 'devfit-shell-' + VERSION;
 const RUNTIME = 'devfit-runtime-' + VERSION;
 

@@ -167,7 +167,8 @@ async function checkApproval(email, name){
         email, name, approved:true,
         plan: data.plan||'',
         expiry: data.expiry||'',
-        startDate: data.startDate||''
+        startDate: data.startDate||'',
+        tier: (data.tier||'pro').toLowerCase()
       }));
       localStorage.setItem('devfit_lastVerified', String(Date.now()));
       window.location.href = 'index.html';
@@ -213,8 +214,4 @@ window.addEventListener('beforeinstallprompt',(e)=>{
 function installApp(){
   if(!deferredPrompt) return;
   deferredPrompt.prompt();
-  deferredPrompt.userChoice.then(()=>{ deferredPrompt=null; document.getElementById('install-btn').style.display='none'; });
-}
-</script>
-</body>
-</html>
+  deferredPrompt.userChoice.then(()=>{ deferredPrompt=null; document.getElementById('install-btn').style.

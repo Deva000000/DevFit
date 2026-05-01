@@ -312,7 +312,7 @@
 
   <div class="footer">
     DevFit · Dominance Through Discipline<br>
-    <a href="https://wa.me/60183679177">Contact trainer</a> · v3.1.0
+    <a href="https://wa.me/60183679177">Contact trainer</a> · v3.2.0
   </div>
 
 
@@ -356,6 +356,44 @@ const SHEET_URL = 'https://script.google.com/macros/s/AKfycbyyYXw0ySPYZ51EQyOlyI
     window.location.href = 'login.html';
   }
 })();
+
+// ---------- BACKGROUND RE-VERIFY (auto-syncs tier/expiry from sheet, no logout needed) ----------
+async function reverifyAccess(){
+  try{
+    const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+    if(!user.email) return;
+    const url = SHEET_URL + '?action=checkAccess&email=' + encodeURIComponent(user.email) + '&_=' + Date.now();
+    const res = await fetch(url, {cache:'no-store', headers:{'Cache-Control':'no-cache'}});
+    const data = await res.json();
+    if(!data || !data.approved){
+      // Lost access — kick to login
+      localStorage.removeItem('devfit_user');
+      localStorage.removeItem('devfit_lastVerified');
+      window.location.href = 'login.html';
+      return;
+    }
+    // Update local with fresh sheet values
+    const fresh = {
+      email: user.email,
+      name: user.name,
+      approved: true,
+      plan: data.plan || '',
+      expiry: data.expiry || '',
+      startDate: data.startDate || '',
+      tier: (data.tier || 'pro').toLowerCase()
+    };
+    const changed = (fresh.tier !== (user.tier||'').toLowerCase()) ||
+                    (fresh.expiry !== (user.expiry||''));
+    localStorage.setItem('devfit_user', JSON.stringify(fresh));
+    localStorage.setItem('devfit_lastVerified', String(Date.now()));
+    if(changed){
+      // Tier or expiry changed — reload to apply new gating
+      setTimeout(()=>window.location.reload(), 50);
+    }
+  }catch(e){ /* offline — keep using cached */ }
+}
+// Run in background ~600ms after page settles, so UI paints first
+setTimeout(reverifyAccess, 600);
 
 // ---------- LOAD APP DATA (same shape as Progress page) ----------
 const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];

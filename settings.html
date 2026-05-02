@@ -222,6 +222,23 @@
     </div>
   </div>
 
+  <!-- SHARE CARD CUSTOMISATION -->
+  <div class="card" id="sharecard-card">
+    <div class="section-label">Share Card</div>
+    <label style="display:block;font-size:11px;color:#aaa;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Display name (shown as @handle)</label>
+    <input type="text" id="display-name-input" maxlength="22" placeholder="@yourname" style="width:100%;background:rgba(20,20,24,0.55);border:1px solid rgba(255,255,255,0.10);color:#fff;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;padding:11px 14px;border-radius:10px;outline:none;margin-bottom:12px">
+    <label style="display:block;font-size:11px;color:#aaa;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Font style on card</label>
+    <select id="sharecard-font" style="width:100%;background:rgba(20,20,24,0.55);border:1px solid rgba(255,255,255,0.10);color:#fff;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;padding:11px 14px;border-radius:10px;outline:none;cursor:pointer">
+      <option value="dmsans">Modern (DM Sans)</option>
+      <option value="dmsans-bold">Modern Bold</option>
+      <option value="dmsans-italic">Modern Italic</option>
+      <option value="serif">Classic Serif</option>
+      <option value="mono">Mono / Tech</option>
+      <option value="condensed">Condensed</option>
+    </select>
+    <div style="font-size:11px;color:#888;margin-top:10px;line-height:1.5">Personalises the workout card you share to IG / WhatsApp.</div>
+  </div>
+
   <!-- TRAINER SYNC -->
   <div class="card">
     <div class="section-label">Trainer Sync</div>
@@ -312,7 +329,7 @@
 
   <div class="footer">
     DevFit · Dominance Through Discipline<br>
-    <a href="https://wa.me/60183679177">Contact trainer</a> · v3.3.0
+    <a href="https://wa.me/60183679177">Contact trainer</a> · v3.4.0
   </div>
 
 
@@ -394,6 +411,26 @@ async function reverifyAccess(){
 }
 // Run in background ~600ms after page settles, so UI paints first
 setTimeout(reverifyAccess, 600);
+
+// ---------- SHARE CARD PREFERENCES ----------
+(function bindSharePrefs(){
+  try{
+    const nameInput = document.getElementById('display-name-input');
+    const fontSel = document.getElementById('sharecard-font');
+    const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+    const savedName = localStorage.getItem('devfit_displayName') || (u.email ? u.email.split('@')[0] : '');
+    const savedFont = localStorage.getItem('devfit_shareFont') || 'dmsans';
+    if(nameInput) nameInput.value = savedName;
+    if(fontSel) fontSel.value = savedFont;
+    if(nameInput) nameInput.addEventListener('input', () => {
+      const v = (nameInput.value||'').trim().replace(/^@+/,'').slice(0,22);
+      localStorage.setItem('devfit_displayName', v);
+    });
+    if(fontSel) fontSel.addEventListener('change', () => {
+      localStorage.setItem('devfit_shareFont', fontSel.value);
+    });
+  }catch(e){ console.error('[sharePrefs]', e); }
+})();
 
 // ---------- LOAD APP DATA (same shape as Progress page) ----------
 const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
@@ -982,5 +1019,25 @@ if('serviceWorker' in navigator){
   });
 }
 </script>
+
+<!-- DEVFIT GLASS BOTTOM NAV -->
+<style>
+nav.devfit-tabnav{display:none!important}
+body{padding-bottom:104px!important}
+.devfit-bottomnav{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;display:flex;gap:4px;padding:8px;background:rgba(20,20,24,0.55);border:1px solid rgba(255,255,255,0.10);backdrop-filter:saturate(180%) blur(22px);-webkit-backdrop-filter:saturate(180%) blur(22px);border-radius:36px;box-shadow:0 16px 44px rgba(0,0,0,0.55),0 1px 0 rgba(255,255,255,0.08) inset;z-index:9000;max-width:calc(100vw - 16px)}
+.devfit-bottomnav a{display:flex;flex-direction:column;align-items:center;justify-content:center;text-decoration:none;color:rgba(255,255,255,0.55);padding:10px 16px;border-radius:28px;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:700;letter-spacing:.04em;transition:all .25s cubic-bezier(.2,.8,.2,1);min-width:64px}
+.devfit-bottomnav a svg{width:22px;height:22px;margin-bottom:3px;display:block;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.devfit-bottomnav a:hover{color:#fff}
+.devfit-bottomnav a.active{background:linear-gradient(135deg,#cc0000,#ff4444);color:#fff;box-shadow:0 6px 18px rgba(204,0,0,0.45)}
+.devfit-bottomnav a:active{transform:scale(0.94)}
+@media(max-width:380px){.devfit-bottomnav a{padding:9px 11px;min-width:56px;font-size:9px}.devfit-bottomnav a svg{width:20px;height:20px}}
+</style>
+<nav class="devfit-bottomnav">
+  <a href="index.html"><svg viewBox="0 0 24 24"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg><span>Progress</span></a>
+  <a href="nutrition.html"><svg viewBox="0 0 24 24"><path d="M12 2c1 4 5 7 5 11a5 5 0 1 1-10 0c0-4 4-7 5-11z"/></svg><span>Nutrition</span></a>
+  <a href="workouts.html"><svg viewBox="0 0 24 24"><path d="M6 7v10M18 7v10M2 10v4M22 10v4M6 12h12"/></svg><span>Training</span></a>
+  <a href="settings.html"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>Settings</span></a>
+</nav>
+<script>(function(){var p=(location.pathname.split('/').pop()||'index.html');if(!p||p==='/')p='index.html';document.querySelectorAll('.devfit-bottomnav a').forEach(function(a){if(a.getAttribute('href')===p)a.classList.add('active');});})();</script>
 </body>
 </html>

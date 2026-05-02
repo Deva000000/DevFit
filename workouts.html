@@ -691,13 +691,28 @@ function drawExportCard(canvas, workout, session, theme){
   const W = canvas.width, H = canvas.height;
   theme = theme || 'light';
 
-  // Theme palette
+  // Theme palette — transparent now uses pure WHITE for readability over phone wallpapers
   const palette = {
     light:       {bg:'#ffffff', fg:'#0a0a0a', sub:'#7a7a7a', accent:'#cc0000', divider:'rgba(0,0,0,0.08)'},
-    dark:        {bg:'#0a0a0a', fg:'#ffffff', sub:'#9a9a9a', accent:'#ff3a3a', divider:'rgba(255,255,255,0.10)'},
-    transparent: {bg:null,      fg:'#ffffff', sub:'#cccccc', accent:'#ff3a3a', divider:'rgba(255,255,255,0.10)'}
+    dark:        {bg:'#0a0a0a', fg:'#ffffff', sub:'#dcdcdc', accent:'#ff3a3a', divider:'rgba(255,255,255,0.14)'},
+    transparent: {bg:null,      fg:'#ffffff', sub:'#ffffff', accent:'#ff3a3a', divider:'rgba(255,255,255,0.18)'}
   };
   const p = palette[theme] || palette.light;
+
+  // Font variant from Settings page
+  const fontPref = (function(){
+    try { return localStorage.getItem('devfit_shareFont') || 'dmsans'; } catch(e){ return 'dmsans'; }
+  })();
+  const fontMap = {
+    'dmsans':         {face:'"DM Sans",system-ui,sans-serif', bodyW:'600', titleW:'800', italic:''},
+    'dmsans-bold':    {face:'"DM Sans",system-ui,sans-serif', bodyW:'700', titleW:'900', italic:''},
+    'dmsans-italic':  {face:'"DM Sans",system-ui,sans-serif', bodyW:'600', titleW:'800', italic:'italic '},
+    'serif':          {face:'Georgia,"Times New Roman",serif', bodyW:'500', titleW:'800', italic:''},
+    'mono':           {face:'"Courier New",ui-monospace,monospace', bodyW:'600', titleW:'800', italic:''},
+    'condensed':      {face:'"Arial Narrow","Roboto Condensed",sans-serif', bodyW:'600', titleW:'900', italic:''}
+  };
+  const fv = fontMap[fontPref] || fontMap.dmsans;
+  const FACE = fv.face, BW = fv.bodyW, TW = fv.titleW, IT = fv.italic;
 
   // Clear (transparent) or fill background
   ctx.clearRect(0,0,W,H);
@@ -716,17 +731,17 @@ function drawExportCard(canvas, workout, session, theme){
   ctx.textBaseline = 'top';
   ctx.textAlign = 'left';
   let titleSize = 120;
-  ctx.font = `800 ${titleSize}px "DM Sans",system-ui,sans-serif`;
+  ctx.font = `${IT}${TW} ${titleSize}px ${FACE}`;
   let title = workout.name || 'Workout';
   while(ctx.measureText(title).width > W - PAD*2 && titleSize > 60){
     titleSize -= 4;
-    ctx.font = `800 ${titleSize}px "DM Sans",system-ui,sans-serif`;
+    ctx.font = `${IT}${TW} ${titleSize}px ${FACE}`;
   }
   ctx.fillText(title, PAD, y);
   y += titleSize + 16;
 
   // Date subtitle
-  ctx.font = '600 40px "DM Sans",system-ui,sans-serif';
+  ctx.font = `${IT}${BW} 40px ${FACE}`;
   ctx.fillStyle = p.sub;
   ctx.fillText(fmtDate(session.date), PAD, y);
   y += 80;
@@ -787,16 +802,16 @@ function drawExportCard(canvas, workout, session, theme){
     // Set count badge (red, like "3x" in Hevy)
     ctx.fillStyle = p.accent;
     ctx.textAlign = 'left';
-    ctx.font = '800 56px "DM Sans",system-ui,sans-serif';
+    ctx.font = `${IT}${TW} 56px ${FACE}`;
     const setBadge = `${line.sets}x`;
     ctx.fillText(setBadge, PAD, y);
 
     // Exercise name
     ctx.fillStyle = p.fg;
-    ctx.font = '600 52px "DM Sans",system-ui,sans-serif';
+    ctx.font = `${IT}${BW} 52px ${FACE}`;
     let nameTxt = line.name;
     const nameStartX = PAD + 130;
-    const nameMaxW = W - PAD - nameStartX - 420; // leave room for bigger summary on right
+    const nameMaxW = W - PAD - nameStartX - 420;
     while(ctx.measureText(nameTxt).width > nameMaxW && nameTxt.length > 3){
       nameTxt = nameTxt.slice(0, -1);
     }
@@ -806,7 +821,7 @@ function drawExportCard(canvas, workout, session, theme){
     // Summary right-aligned
     ctx.fillStyle = p.sub;
     ctx.textAlign = 'right';
-    ctx.font = '700 44px "DM Sans",system-ui,sans-serif';
+    ctx.font = `${IT}${BW} 44px ${FACE}`;
     ctx.fillText(line.summary, W - PAD, y + 8);
 
     y += rowH;
@@ -815,7 +830,7 @@ function drawExportCard(canvas, workout, session, theme){
   if(overflow > 0){
     ctx.fillStyle = p.sub;
     ctx.textAlign = 'center';
-    ctx.font = '500 36px "DM Sans",system-ui,sans-serif';
+    ctx.font = `${IT}500 36px ${FACE}`;
     ctx.fillText('+ ' + overflow + ' more exercise' + (overflow>1?'s':''), W/2, y);
   }
 
@@ -825,18 +840,23 @@ function drawExportCard(canvas, workout, session, theme){
 
   // DEVFIT brand
   ctx.fillStyle = p.accent;
-  ctx.font = '900 60px "DM Sans",system-ui,sans-serif';
+  ctx.font = `${IT}900 60px ${FACE}`;
   ctx.textAlign = 'left';
   ctx.fillText('DEVFIT', PAD, fy);
 
-  // @handle
+  // @handle — uses Settings display name first, falls back to email prefix
   ctx.fillStyle = p.sub;
-  ctx.font = '600 40px "DM Sans",system-ui,sans-serif';
+  ctx.font = `${IT}${BW} 40px ${FACE}`;
   ctx.textAlign = 'right';
   let handle = '@user';
   try {
-    const u = JSON.parse(localStorage.getItem('devfit_user') || '{}');
-    if(u.email) handle = '@' + u.email.split('@')[0];
+    const customName = (localStorage.getItem('devfit_displayName')||'').trim();
+    if(customName){
+      handle = '@' + customName.replace(/^@+/,'');
+    } else {
+      const u = JSON.parse(localStorage.getItem('devfit_user') || '{}');
+      if(u.email) handle = '@' + u.email.split('@')[0];
+    }
   } catch(e){}
   ctx.fillText(handle, W - PAD, fy);
 }
@@ -911,5 +931,25 @@ if('serviceWorker' in navigator){
 
 renderLog();
 </script>
+
+<!-- DEVFIT GLASS BOTTOM NAV -->
+<style>
+nav.devfit-tabnav{display:none!important}
+body{padding-bottom:104px!important}
+.devfit-bottomnav{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;display:flex;gap:4px;padding:8px;background:rgba(20,20,24,0.55);border:1px solid rgba(255,255,255,0.10);backdrop-filter:saturate(180%) blur(22px);-webkit-backdrop-filter:saturate(180%) blur(22px);border-radius:36px;box-shadow:0 16px 44px rgba(0,0,0,0.55),0 1px 0 rgba(255,255,255,0.08) inset;z-index:9000;max-width:calc(100vw - 16px)}
+.devfit-bottomnav a{display:flex;flex-direction:column;align-items:center;justify-content:center;text-decoration:none;color:rgba(255,255,255,0.55);padding:10px 16px;border-radius:28px;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:700;letter-spacing:.04em;transition:all .25s cubic-bezier(.2,.8,.2,1);min-width:64px}
+.devfit-bottomnav a svg{width:22px;height:22px;margin-bottom:3px;display:block;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.devfit-bottomnav a:hover{color:#fff}
+.devfit-bottomnav a.active{background:linear-gradient(135deg,#cc0000,#ff4444);color:#fff;box-shadow:0 6px 18px rgba(204,0,0,0.45)}
+.devfit-bottomnav a:active{transform:scale(0.94)}
+@media(max-width:380px){.devfit-bottomnav a{padding:9px 11px;min-width:56px;font-size:9px}.devfit-bottomnav a svg{width:20px;height:20px}}
+</style>
+<nav class="devfit-bottomnav">
+  <a href="index.html"><svg viewBox="0 0 24 24"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg><span>Progress</span></a>
+  <a href="nutrition.html"><svg viewBox="0 0 24 24"><path d="M12 2c1 4 5 7 5 11a5 5 0 1 1-10 0c0-4 4-7 5-11z"/></svg><span>Nutrition</span></a>
+  <a href="workouts.html"><svg viewBox="0 0 24 24"><path d="M6 7v10M18 7v10M2 10v4M22 10v4M6 12h12"/></svg><span>Training</span></a>
+  <a href="settings.html"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>Settings</span></a>
+</nav>
+<script>(function(){var p=(location.pathname.split('/').pop()||'index.html');if(!p||p==='/')p='index.html';document.querySelectorAll('.devfit-bottomnav a').forEach(function(a){if(a.getAttribute('href')===p)a.classList.add('active');});})();</script>
 </body>
 </html>

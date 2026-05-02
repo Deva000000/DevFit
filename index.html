@@ -554,25 +554,25 @@ const SHEET_URL_AUTH = 'https://script.google.com/macros/s/AKfycbyyYXw0ySPYZ51EQ
       window.location.href='login.html';
       return;
     }
-    // INSTANT LOAD — show app immediately from cached user, verify in background.
-    // Skip background check if verified within last 5 minutes (fast tab switching).
-    const lastVerified = parseInt(localStorage.getItem('devfit_lastVerified')||'0');
-    const FIVE_MIN = 5*60*1000;
-    if(Date.now() - lastVerified < FIVE_MIN) return;
-
-    fetch(SHEET_URL_AUTH+'?action=checkAccess&email='+encodeURIComponent(user.email))
+    // Verify on every page load with cache-bust — sheet edits propagate within seconds (no 5-min cache)
+    const url = SHEET_URL_AUTH+'?action=checkAccess&email='+encodeURIComponent(user.email)+'&_='+Date.now();
+    fetch(url, {cache:'no-store', headers:{'Cache-Control':'no-cache'}})
       .then(r=>r.json())
       .then(data=>{
         if(data.approved){
           try{
             const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+            const oldTier = (u.tier||'').toLowerCase();
+            const newTier = (data.tier||'pro').toLowerCase();
             if(data.expiry) u.expiry = data.expiry;
             if(data.startDate) u.startDate = data.startDate;
             if(data.plan) u.plan = data.plan;
             if(data.name) u.name = data.name;
-            if(data.tier) u.tier = (data.tier||'pro').toLowerCase();
+            u.tier = newTier;
             localStorage.setItem('devfit_user', JSON.stringify(u));
             localStorage.setItem('devfit_lastVerified', String(Date.now()));
+            // Tier changed (e.g. pro→free or free→pro) — reload so gating applies immediately
+            if(oldTier && oldTier !== newTier){ setTimeout(()=>window.location.reload(), 50); return; }
           }catch(e){}
           if(typeof showCountdown==='function') showCountdown();
         } else {

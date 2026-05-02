@@ -715,21 +715,21 @@ function drawExportCard(canvas, workout, session, theme){
   ctx.fillStyle = p.fg;
   ctx.textBaseline = 'top';
   ctx.textAlign = 'left';
-  let titleSize = 78;
+  let titleSize = 120;
   ctx.font = `800 ${titleSize}px "DM Sans",system-ui,sans-serif`;
   let title = workout.name || 'Workout';
-  while(ctx.measureText(title).width > W - PAD*2 && titleSize > 40){
+  while(ctx.measureText(title).width > W - PAD*2 && titleSize > 60){
     titleSize -= 4;
     ctx.font = `800 ${titleSize}px "DM Sans",system-ui,sans-serif`;
   }
   ctx.fillText(title, PAD, y);
-  y += titleSize + 12;
+  y += titleSize + 16;
 
   // Date subtitle
-  ctx.font = '500 24px "DM Sans",system-ui,sans-serif';
+  ctx.font = '600 40px "DM Sans",system-ui,sans-serif';
   ctx.fillStyle = p.sub;
   ctx.fillText(fmtDate(session.date), PAD, y);
-  y += 60;
+  y += 80;
 
   // Thin divider
   ctx.fillStyle = p.divider;
@@ -773,30 +773,30 @@ function drawExportCard(canvas, workout, session, theme){
     lines.push({name: ex.name || 'Exercise', summary, sets: setCount});
   });
 
-  // Calculate available space and row height
-  const footerY = H - PAD - 60;
+  // Calculate row height — NO upper cap, so few exercises fill the full canvas (kills empty middle gap)
+  const footerY = H - PAD - 80;
   const available = footerY - y - 40;
   const maxLines = Math.min(lines.length, 10);
-  const rowH = Math.min(80, Math.floor(available / Math.max(maxLines,1)));
+  // Min 90, no max — rows expand to fill all available space
+  const rowH = Math.max(90, Math.floor(available / Math.max(maxLines,1)));
 
   const showLines = lines.slice(0, maxLines);
   const overflow = lines.length - showLines.length;
 
-  ctx.font = '700 32px "DM Sans",system-ui,sans-serif';
   showLines.forEach(line => {
     // Set count badge (red, like "3x" in Hevy)
     ctx.fillStyle = p.accent;
     ctx.textAlign = 'left';
-    ctx.font = '800 32px "DM Sans",system-ui,sans-serif';
+    ctx.font = '800 56px "DM Sans",system-ui,sans-serif';
     const setBadge = `${line.sets}x`;
     ctx.fillText(setBadge, PAD, y);
 
     // Exercise name
     ctx.fillStyle = p.fg;
-    ctx.font = '600 30px "DM Sans",system-ui,sans-serif';
+    ctx.font = '600 52px "DM Sans",system-ui,sans-serif';
     let nameTxt = line.name;
-    const nameStartX = PAD + 70;
-    const nameMaxW = W - PAD - nameStartX - 280; // leave room for summary on right
+    const nameStartX = PAD + 130;
+    const nameMaxW = W - PAD - nameStartX - 420; // leave room for bigger summary on right
     while(ctx.measureText(nameTxt).width > nameMaxW && nameTxt.length > 3){
       nameTxt = nameTxt.slice(0, -1);
     }
@@ -806,8 +806,8 @@ function drawExportCard(canvas, workout, session, theme){
     // Summary right-aligned
     ctx.fillStyle = p.sub;
     ctx.textAlign = 'right';
-    ctx.font = '700 26px "DM Sans",system-ui,sans-serif';
-    ctx.fillText(line.summary, W - PAD, y + 4);
+    ctx.font = '700 44px "DM Sans",system-ui,sans-serif';
+    ctx.fillText(line.summary, W - PAD, y + 8);
 
     y += rowH;
   });
@@ -815,7 +815,7 @@ function drawExportCard(canvas, workout, session, theme){
   if(overflow > 0){
     ctx.fillStyle = p.sub;
     ctx.textAlign = 'center';
-    ctx.font = '500 22px "DM Sans",system-ui,sans-serif';
+    ctx.font = '500 36px "DM Sans",system-ui,sans-serif';
     ctx.fillText('+ ' + overflow + ' more exercise' + (overflow>1?'s':''), W/2, y);
   }
 
@@ -825,13 +825,13 @@ function drawExportCard(canvas, workout, session, theme){
 
   // DEVFIT brand
   ctx.fillStyle = p.accent;
-  ctx.font = '900 38px "DM Sans",system-ui,sans-serif';
+  ctx.font = '900 60px "DM Sans",system-ui,sans-serif';
   ctx.textAlign = 'left';
   ctx.fillText('DEVFIT', PAD, fy);
 
   // @handle
   ctx.fillStyle = p.sub;
-  ctx.font = '600 26px "DM Sans",system-ui,sans-serif';
+  ctx.font = '600 40px "DM Sans",system-ui,sans-serif';
   ctx.textAlign = 'right';
   let handle = '@user';
   try {

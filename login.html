@@ -113,6 +113,8 @@
 
   <button id="install-btn" class="install-btn" type="button">Install DevFit App</button>
   <div class="footer">DevFit · Secure login powered by Google</div>
+  <button id="force-refresh-btn" type="button" style="margin-top:14px;background:transparent;border:1px solid #555;color:#aaa;padding:8px 16px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">↻ Force refresh app</button>
+  <div style="font-size:10px;color:#555;margin-top:6px">Having trouble logging in? Tap above to clear cache.</div>
 </div>
 
 <script>
@@ -214,11 +216,39 @@ if(saved){
   }catch(e){}
 }
 
-// Service worker
+// Service worker — always check for updates on login page load
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('sw.js').catch(()=>{});
+    navigator.serviceWorker.register('sw.js').then(reg=>{
+      if(reg) reg.update().catch(()=>{});
+    }).catch(()=>{});
   });
+}
+
+// FORCE REFRESH button — clears SW + caches + reloads, helps users locked out by stale cache
+async function forceRefresh(){
+  const btn = document.getElementById('force-refresh-btn');
+  if(btn){ btn.textContent = 'Refreshing…'; btn.disabled = true; }
+  try{
+    if('serviceWorker' in navigator){
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if('caches' in window){
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+  }catch(e){}
+  // Hard reload bypassing HTTP cache
+  window.location.href = 'login.html?_=' + Date.now();
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const b = document.getElementById('force-refresh-btn');
+  if(b) b.addEventListener('click', (e) => { e.preventDefault(); forceRefresh(); });
+});
+{
+  const b = document.getElementById('force-refresh-btn');
+  if(b) b.addEventListener('click', (e) => { e.preventDefault(); forceRefresh(); });
 }
 
 // PWA install prompt

@@ -230,26 +230,27 @@ function isPro(){ return getUserTier() === 'pro'; }
 
 function applyNutritionTierGates(){
   if(isPro()) return;
-  // Hide 7-day trend chart card
-  const trendCanvas = document.getElementById('trendChart');
-  if(trendCanvas){
-    const card = trendCanvas.closest('.card-light');
-    if(card) card.style.display = 'none';
+  // FREE TIER: keep weekly trend, BLOCK month view
+  const monthBtn = document.querySelector('#range-toggle .rng-btn[data-range="30"]');
+  if(monthBtn){
+    monthBtn.disabled = true;
+    monthBtn.style.opacity = '0.45';
+    monthBtn.style.cursor = 'not-allowed';
+    monthBtn.title = 'Pro only';
+    monthBtn.innerHTML = 'MONTH 🔒';
+    monthBtn.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+      const msg = encodeURIComponent('Hi, I\'d like to upgrade DevFit to Pro. My account: ' + (u.email||'(my email)'));
+      if(confirm('Monthly trend is a Pro feature. Open WhatsApp to upgrade?')){
+        window.open('https://wa.me/60183679177?text=' + msg, '_blank');
+      }
+    }, true);
   }
-  // Inject upgrade banner
-  const lastCard = document.querySelectorAll('.card');
-  if(lastCard.length && !document.getElementById('nutri-upgrade-banner')){
-    const banner = document.createElement('div');
-    banner.id = 'nutri-upgrade-banner';
-    banner.className = 'card';
-    banner.style.cssText = 'background:linear-gradient(135deg,#1a0000,#2a0000);border:1px solid #cc0000;text-align:center';
-    const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
-    const msg = encodeURIComponent('Hi, I\'d like to upgrade DevFit to Pro. My account: ' + (u.email||'(my email)'));
-    banner.innerHTML = `
-      <div style="font-size:11px;font-weight:800;letter-spacing:.08em;color:#ff8888;margin-bottom:6px">FREE PLAN</div>
-      <div style="font-size:13px;color:#fff;line-height:1.5;margin-bottom:12px">Unlock 7-day calorie trends and pattern analysis.</div>
-      <a href="https://wa.me/60183679177?text=${msg}" style="display:inline-block;background:#cc0000;color:#fff;text-decoration:none;padding:9px 20px;border-radius:20px;font-weight:700;font-size:13px">Upgrade to Pro</a>`;
-    document.querySelector('.page').appendChild(banner);
+  // Force range back to 7 if user previously set 30
+  if(typeof trendRange !== 'undefined' && trendRange !== 7){
+    trendRange = 7;
+    try { localStorage.setItem('devfit_trendRange','7'); } catch(e){}
   }
 }
 

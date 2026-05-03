@@ -6,7 +6,7 @@
    - Apps Script: network-only
 */
 
-const VERSION = 'devfit-v3.4.0';
+const VERSION = 'devfit-v3.5.0';
 const APP_SHELL = 'devfit-shell-' + VERSION;
 const RUNTIME = 'devfit-runtime-' + VERSION;
 

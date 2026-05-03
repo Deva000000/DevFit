@@ -675,14 +675,35 @@ function rerenderShareCard(){
   document.getElementById('share-preview-img').src=dataURL;
 }
 
-// Theme picker
+// Theme picker — gate "transparent" behind Pro
 document.querySelectorAll('.theme-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
+    if(btn.dataset.theme === 'transparent' && !isPro()){
+      const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+      const msg = encodeURIComponent('Hi, I\'d like to upgrade DevFit to Pro. My account: ' + (u.email||'(my email)'));
+      if(confirm('Transparent share card is a Pro feature. Open WhatsApp to upgrade?')){
+        window.open('https://wa.me/60183679177?text=' + msg, '_blank');
+      }
+      return;
+    }
     currentShareTheme = btn.dataset.theme;
     document.querySelectorAll('.theme-btn').forEach(b=>b.classList.toggle('active', b===btn));
     rerenderShareCard();
   });
 });
+
+// Visually mark transparent button as locked for free users
+(function lockTransparentForFree(){
+  if(isPro()) return;
+  const tBtn = document.querySelector('.theme-btn[data-theme="transparent"]');
+  if(tBtn){
+    tBtn.style.opacity = '0.5';
+    tBtn.innerHTML = 'Transparent 🔒';
+  }
+  // Hide compare-progress UI for free
+  const compareEls = document.querySelectorAll('[data-pro-compare], #progress-compare, .compare-progress');
+  compareEls.forEach(el => el.style.display = 'none');
+})();
 
 // MINIMAL HEVY-STYLE SHARE CARD
 // theme: 'light' (white card on transparent bg) | 'dark' (black card) | 'transparent' (no fill, just text)

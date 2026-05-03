@@ -681,53 +681,73 @@ function loadData(){
   }catch(e){}
 }
 
-// Hide Pro-only UI once DOM is ready
+// Inject lock-overlay styles once
+(function injectLockStyles(){
+  if(document.getElementById('devfit-lock-css')) return;
+  const s = document.createElement('style');
+  s.id = 'devfit-lock-css';
+  s.textContent = `
+    .devfit-locked{position:relative;overflow:hidden}
+    .devfit-locked > .devfit-lock-content{filter:blur(7px) saturate(0.85);pointer-events:none;user-select:none;transition:filter .3s}
+    .devfit-lock-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(10,10,12,0.55);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);z-index:10;cursor:pointer;text-align:center;padding:20px}
+    .devfit-lock-badge{font-size:10px;font-weight:800;letter-spacing:.12em;color:#fff;background:linear-gradient(135deg,#cc0000,#ff4444);padding:5px 12px;border-radius:20px;text-transform:uppercase;box-shadow:0 6px 18px rgba(204,0,0,0.45)}
+    .devfit-lock-title{font-size:14px;font-weight:800;color:#fff;line-height:1.3;max-width:80%}
+    .devfit-lock-cta{display:inline-flex;align-items:center;gap:6px;background:#fff;color:#cc0000;font-weight:800;font-size:12px;padding:9px 18px;border-radius:22px;text-decoration:none;box-shadow:0 6px 18px rgba(0,0,0,0.4)}
+    .devfit-lock-cta:active{transform:scale(0.96)}
+  `;
+  document.head.appendChild(s);
+})();
+
+function lockCard(card, title){
+  if(!card || card.classList.contains('devfit-locked')) return;
+  // Wrap existing children in a content holder we can blur
+  const wrap = document.createElement('div');
+  wrap.className = 'devfit-lock-content';
+  while(card.firstChild) wrap.appendChild(card.firstChild);
+  card.appendChild(wrap);
+  card.classList.add('devfit-locked');
+
+  const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+  const msg = encodeURIComponent('Hi, I\'d like to upgrade DevFit to Pro. My account: ' + (u.email||'(my email)'));
+  const overlay = document.createElement('div');
+  overlay.className = 'devfit-lock-overlay';
+  overlay.innerHTML = `
+    <div class="devfit-lock-badge">★ Pro</div>
+    <div class="devfit-lock-title">${title}</div>
+    <a class="devfit-lock-cta" href="https://wa.me/60183679177?text=${msg}" target="_blank" rel="noopener">Upgrade →</a>`;
+  card.appendChild(overlay);
+}
+
+// BLUR Pro-only UI for free tier (cards stay visible — users see what they're missing)
 function applyTierGates(){
   if(isPro()) return;
-  // Hide week tabs, add/remove buttons (single-week only)
+  // Hide week tabs (single-week only for free)
   const wtabsBox = document.getElementById('week-tabs');
   if(wtabsBox) wtabsBox.style.display = 'none';
-  // Hide trend chart cards (the two big white cards with canvases) and the "Weekly analysis" card
-  document.querySelectorAll('canvas').forEach(c => {
-    if(c.id === 'trendChart' || c.id === 'progressChart' || c.id === 'ring-overall') return;
-    // leave Chart.js charts; we hide their containers below
-  });
-  // Hide bodyweight chart card and progress chart card by selecting them via canvas IDs
+
+  // Lock bodyweight trend chart card
   const trendCanvas = document.getElementById('trendChart');
   if(trendCanvas){
     const card = trendCanvas.closest('div[style*="background:#ffffff"]');
-    if(card) card.style.display = 'none';
+    if(card) lockCard(card, 'Bodyweight trend chart');
   }
+  // Lock progress score chart card
   const progCanvas = document.getElementById('progressChart');
   if(progCanvas){
     const card = progCanvas.closest('div[style*="background:#ffffff"]');
-    if(card) card.style.display = 'none';
+    if(card) lockCard(card, 'Progress score chart');
   }
-  // Hide the True Progress Score card and the Weekly analysis card
+  // Lock True Progress Score card
   const scoreLegend = document.getElementById('score-legend');
   if(scoreLegend){
     const card = scoreLegend.closest('.card');
-    if(card) card.style.display = 'none';
+    if(card) lockCard(card, 'True progress score');
   }
+  // Lock weekly analysis card
   const feedbackBox = document.getElementById('feedback-box');
   if(feedbackBox){
     const card = feedbackBox.closest('.card');
-    if(card) card.style.display = 'none';
-  }
-  // Inject upgrade banner above the actions card
-  const actionsCard = document.querySelector('button[onclick="exportPDF()"]')?.closest('.card');
-  if(actionsCard && !document.getElementById('free-upgrade-banner')){
-    const banner = document.createElement('div');
-    banner.id = 'free-upgrade-banner';
-    banner.className = 'card';
-    banner.style.cssText = 'background:linear-gradient(135deg,#1a0000,#2a0000);border:1px solid #cc0000;text-align:center';
-    const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
-    const msg = encodeURIComponent('Hi, I\'d like to upgrade DevFit to Pro. My account: ' + (u.email||'(my email)'));
-    banner.innerHTML = `
-      <div style="font-size:11px;font-weight:800;letter-spacing:.08em;color:#ff8888;margin-bottom:6px">FREE PLAN — CURRENT WEEK ONLY</div>
-      <div style="font-size:13px;color:#fff;line-height:1.5;margin-bottom:12px">Unlock multi-week history, trend charts, and PDF reports.</div>
-      <a href="https://wa.me/60183679177?text=${msg}" style="display:inline-block;background:#cc0000;color:#fff;text-decoration:none;padding:9px 20px;border-radius:20px;font-weight:700;font-size:13px">Upgrade to Pro</a>`;
-    actionsCard.parentNode.insertBefore(banner, actionsCard);
+    if(card) lockCard(card, 'Weekly analysis');
   }
 }
 function save(){

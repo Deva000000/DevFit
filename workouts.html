@@ -435,13 +435,7 @@ document.getElementById('log-date').addEventListener('change',renderLog);
 document.getElementById('log-workout').addEventListener('change',renderLog);
 
 function renderLog(){
-  // FREE TIER GATE — no session logging
-  if(!isPro()){
-    document.getElementById('log-area').innerHTML = paywallHTML('Daily Session Logging');
-    document.querySelector('.log-bar').style.display = 'none';
-    document.getElementById('share-btn').style.display = 'none';
-    return;
-  }
+  // Log session + share (light/dark) are FREE; transparent theme is locked elsewhere
   const sel=document.getElementById('log-workout');
   const prevSel=sel.value;
   sel.innerHTML='<option value="">Pick a workout…</option>'+

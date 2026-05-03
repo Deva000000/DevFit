@@ -556,7 +556,7 @@ const SHEET_URL_AUTH = 'https://script.google.com/macros/s/AKfycbzHTJOANyp1JJ-k2
     }
     // Verify on every page load with cache-bust — sheet edits propagate within seconds (no 5-min cache)
     const url = SHEET_URL_AUTH+'?action=checkAccess&email='+encodeURIComponent(user.email)+'&_='+Date.now();
-    fetch(url, {cache:'no-store', headers:{'Cache-Control':'no-cache'}})
+    fetch(url, {cache:'no-store'})
       .then(r=>r.json())
       .then(data=>{
         if(data.approved){

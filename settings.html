@@ -380,7 +380,7 @@ async function reverifyAccess(){
     const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
     if(!user.email) return;
     const url = SHEET_URL + '?action=checkAccess&email=' + encodeURIComponent(user.email) + '&_=' + Date.now();
-    const res = await fetch(url, {cache:'no-store', headers:{'Cache-Control':'no-cache'}});
+    const res = await fetch(url, {cache:'no-store'});
     const data = await res.json();
     if(!data || !data.approved){
       // Lost access — kick to login

@@ -160,9 +160,9 @@ function signInWithGoogle(){
 
 async function checkApproval(email, name){
   try{
-    // Cache-bust + no-cache header — defeats Apps Script edge caching so tier changes are instant
+    // Cache-bust via URL only (no custom header → keeps it a simple CORS request, no preflight)
     const url = SHEET_URL+'?action=checkAccess&email='+encodeURIComponent(email)+'&_='+Date.now();
-    const res = await fetch(url, {cache:'no-store', headers:{'Cache-Control':'no-cache'}});
+    const res = await fetch(url, {cache:'no-store'});
     const data = await res.json();
     document.getElementById('spinner').style.display='none';
     hideAll();

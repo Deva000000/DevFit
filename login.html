@@ -117,7 +117,7 @@
 
 <script>
 const CLIENT_ID = '94871311791-ql8k9lo0q9e1uq3ri98ghnfr1m187chh.apps.googleusercontent.com';
-const SHEET_URL = 'https://script.google.com/macros/s/AKfycbyyYXw0ySPYZ51EQyOlyIN2u04n_gpeNiag1bx4mhGPicxx5A3OjTi997J_1IFF2Wcy/exec';
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbzHTJOANyp1JJ-k2PmRuMjxpTz03G30ThTyV1thlMJ4QMIOvS8HRN4xW3VsHbzI7YXc/exec';
 
 function show(id){ document.getElementById(id).style.display='block'; }
 function hide(id){ document.getElementById(id).style.display='none'; }
@@ -158,7 +158,9 @@ function signInWithGoogle(){
 
 async function checkApproval(email, name){
   try{
-    const res = await fetch(SHEET_URL+'?action=checkAccess&email='+encodeURIComponent(email));
+    // Cache-bust + no-cache header — defeats Apps Script edge caching so tier changes are instant
+    const url = SHEET_URL+'?action=checkAccess&email='+encodeURIComponent(email)+'&_='+Date.now();
+    const res = await fetch(url, {cache:'no-store', headers:{'Cache-Control':'no-cache'}});
     const data = await res.json();
     document.getElementById('spinner').style.display='none';
     hideAll();

@@ -111,6 +111,10 @@
   .share-btn:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(204,0,0,0.35)}
   .share-btn:disabled{background:#666;box-shadow:none;cursor:not-allowed;transform:none}
 
+  /* RESET HISTORY BUTTON */
+  .reset-btn{width:100%;background:transparent;border:1px solid rgba(255,255,255,0.14);color:rgba(255,255,255,0.5);border-radius:var(--radius);padding:9px;font-family:'DM Sans',system-ui,sans-serif;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;margin-top:8px;transition:all .15s}
+  .reset-btn:hover{border-color:#cc0000;color:#ff6b6b}
+
   /* PROGRESS TAB */
   .stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
   .stat-card{background:#fff;border:1px solid var(--bd);border-radius:var(--radius);padding:10px;text-align:center}
@@ -220,6 +224,7 @@
       </div>
       <div id="log-area"></div>
       <button class="share-btn" id="share-btn" disabled>Share Workout Card</button>
+      <button class="reset-btn" id="reset-history-btn">&#8634; Reset session history</button>
     </div>
   </div>
 
@@ -433,6 +438,19 @@ function totalSetsCount(sets){return sets.filter(s=>(Number(s.reps)||0)>0||(Numb
 document.getElementById('log-date').value=todayStr();
 document.getElementById('log-date').addEventListener('change',renderLog);
 document.getElementById('log-workout').addEventListener('change',renderLog);
+
+// Reset all logged sessions (clears test data) — keeps the workout plan
+document.getElementById('reset-history-btn').addEventListener('click',()=>{
+  const n=data.sessions.length;
+  if(!n){toast('No logged sessions to clear');return;}
+  if(!confirm('Delete ALL '+n+' logged session'+(n>1?'s':'')+'?\n\nYour workout plan stays. Progress history and "Last" comparisons will be cleared. This cannot be undone.')) return;
+  data.sessions=[];
+  currentSession=null;
+  save();
+  renderLog();
+  if(currentMode==='progress') renderProgressView();
+  toast('Session history cleared');
+});
 
 function renderLog(){
   // Log session + share (light/dark) are FREE; transparent theme is locked elsewhere
@@ -776,29 +794,17 @@ function drawExportCard(canvas, workout, session, theme){
     if(!validSets.length) return;
 
     const setCount = validSets.length;
-    const repsList = validSets.map(s => Number(s.reps)||0);
     const wtList   = validSets.map(s => Number(s.weight)||0);
-    const sameReps = repsList.every(r => r === repsList[0]);
-    const sameWt   = wtList.every(w => w === wtList[0]);
     const hasWeight = wtList.some(w => w > 0);
 
+    // Clean format: "3 sets · 40kg" (top working weight). Bodyweight → "3 sets".
+    const setTxt = `${setCount} ${setCount>1?'sets':'set'}`;
     let summary;
-    if(sameReps && sameWt){
-      summary = hasWeight
-        ? `${setCount}×${repsList[0]} @ ${wtList[0]}kg`
-        : `${setCount}×${repsList[0]}`;
+    if(hasWeight){
+      const topW = Math.max(...wtList);
+      summary = `${setTxt} · ${topW}kg`;
     } else {
-      const minR = Math.min(...repsList.filter(r=>r>0));
-      const maxR = Math.max(...repsList);
-      const repTxt = minR === maxR ? String(minR) : `${minR}–${maxR}`;
-      if(hasWeight){
-        const minW = Math.min(...wtList.filter(w=>w>0));
-        const maxW = Math.max(...wtList);
-        const wtTxt = minW === maxW ? String(minW) : `${minW}–${maxW}`;
-        summary = `${setCount}×${repTxt} @ ${wtTxt}kg`;
-      } else {
-        summary = `${setCount}×${repTxt}`;
-      }
+      summary = setTxt;
     }
     lines.push({name: ex.name || 'Exercise', summary, sets: setCount});
   });
@@ -814,30 +820,24 @@ function drawExportCard(canvas, workout, session, theme){
   const overflow = lines.length - showLines.length;
 
   showLines.forEach(line => {
-    // Set count badge (red, like "3x" in Hevy)
-    ctx.fillStyle = p.accent;
-    ctx.textAlign = 'left';
-    ctx.font = `${IT}${TW} 56px ${FACE}`;
-    const setBadge = `${line.sets}x`;
-    ctx.fillText(setBadge, PAD, y);
-
-    // Exercise name
+    // Exercise name (left, the focus)
     ctx.fillStyle = p.fg;
-    ctx.font = `${IT}${BW} 52px ${FACE}`;
+    ctx.textAlign = 'left';
+    ctx.font = `${IT}${TW} 58px ${FACE}`;
     let nameTxt = line.name;
-    const nameStartX = PAD + 130;
-    const nameMaxW = W - PAD - nameStartX - 420;
+    const nameStartX = PAD;
+    const nameMaxW = W - PAD - nameStartX - 360; // leave room for summary on the right
     while(ctx.measureText(nameTxt).width > nameMaxW && nameTxt.length > 3){
       nameTxt = nameTxt.slice(0, -1);
     }
     if(nameTxt !== line.name) nameTxt = nameTxt.slice(0, -1) + '…';
-    ctx.fillText(nameTxt, nameStartX, y + 2);
+    ctx.fillText(nameTxt, nameStartX, y);
 
-    // Summary right-aligned
+    // Summary right-aligned (e.g. "3 sets · 40kg")
     ctx.fillStyle = p.sub;
     ctx.textAlign = 'right';
-    ctx.font = `${IT}${BW} 44px ${FACE}`;
-    ctx.fillText(line.summary, W - PAD, y + 8);
+    ctx.font = `${IT}${BW} 46px ${FACE}`;
+    ctx.fillText(line.summary, W - PAD, y + 10);
 
     y += rowH;
   });

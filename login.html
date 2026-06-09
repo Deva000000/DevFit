@@ -16,28 +16,18 @@
       radial-gradient(700px 400px at 50% 110%, rgba(204,0,0,0.16), transparent 60%),
       linear-gradient(180deg,#080809 0%,#101012 60%,#0a0a0b 100%);
     background-attachment:fixed;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    padding:1rem;
-    overflow-x:hidden;
+    display:flex;align-items:center;justify-content:center;
+    padding:1rem;overflow-x:hidden;
   }
-  .card{backdrop-filter:saturate(140%) blur(8px);-webkit-backdrop-filter:saturate(140%) blur(8px)}
   .card{
-    background:#111111;
-    border:1px solid #2a2a2a;
-    border-top:3px solid #cc0000;
-    border-radius:16px;
-    padding:40px 28px;
-    width:100%;
-    max-width:400px;
-    text-align:center;
-    box-shadow:0 12px 40px rgba(0,0,0,0.4);
+    backdrop-filter:saturate(140%) blur(8px);-webkit-backdrop-filter:saturate(140%) blur(8px);
+    background:#111111;border:1px solid #2a2a2a;border-top:3px solid #cc0000;
+    border-radius:16px;padding:40px 28px;width:100%;max-width:400px;
+    text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.4);
   }
   .logo-wrap{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:20px}
   .logo-wrap img{width:60px;height:60px;border-radius:10px;object-fit:cover;background:#fff}
   .brand-text{text-align:left}
-  /* Brand wordmark — Inter Bold Italic, two-tone to match the DevFit logo */
   .brand-name{font-family:'Inter',system-ui,sans-serif;font-style:italic;font-weight:700;font-size:24px;line-height:1.05;letter-spacing:.005em}
   .brand-name .dev{color:#ffffff}
   .brand-name .fit{color:#cc0000}
@@ -46,10 +36,47 @@
   .welcome{font-size:20px;font-weight:800;color:#fff;margin-bottom:8px}
   .subtitle{font-size:13px;color:#888;margin-bottom:28px;line-height:1.6}
 
-  .google-btn{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;padding:13px 20px;background:#fff;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;color:#111;cursor:pointer;transition:all .2s;margin-bottom:14px}
-  .google-btn:hover{background:#f0f0f0;transform:translateY(-1px)}
-  .google-btn:active{transform:translateY(0)}
-  .google-btn svg{width:20px;height:20px;flex-shrink:0}
+  /* Email login */
+  .email-section{margin-bottom:14px}
+  .email-input{
+    width:100%;padding:13px 16px;background:#1a1a1a;border:1px solid #2a2a2a;
+    border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;color:#fff;
+    outline:none;transition:border .2s;margin-bottom:10px;
+  }
+  .email-input:focus{border-color:#cc0000}
+  .email-input::placeholder{color:#555}
+  .email-btn{
+    width:100%;padding:13px 20px;background:#cc0000;border:none;border-radius:10px;
+    font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;color:#fff;
+    cursor:pointer;transition:all .2s;
+  }
+  .email-btn:hover{background:#aa0000;transform:translateY(-1px)}
+  .email-btn:active{transform:translateY(0)}
+  .email-btn:disabled{background:#5a0000;cursor:not-allowed;transform:none}
+
+  .sent-msg{
+    display:none;padding:12px 16px;border-radius:10px;font-size:13px;font-weight:500;
+    margin-top:10px;line-height:1.5;background:#001a00;border:1px solid #22c55e;color:#4ade80;
+  }
+
+  /* OR divider */
+  .or-divider{
+    display:flex;align-items:center;gap:10px;
+    font-size:11px;color:#444;font-weight:600;letter-spacing:.06em;
+    margin:18px 0;
+  }
+  .or-divider::before,.or-divider::after{content:'';flex:1;height:1px;background:#2a2a2a}
+
+  /* Google button */
+  .google-btn{
+    display:flex;align-items:center;justify-content:center;gap:12px;
+    width:100%;padding:11px 20px;background:#1e1e1e;border:1px solid #333;
+    border-radius:10px;font-family:'DM Sans',sans-serif;font-size:14px;
+    font-weight:600;color:#ccc;cursor:pointer;transition:all .2s;margin-bottom:14px;
+  }
+  .google-btn:hover{background:#252525;border-color:#444;color:#fff}
+  .google-btn:active{transform:scale(0.98)}
+  .google-btn svg{width:18px;height:18px;flex-shrink:0}
 
   .status-box{display:none;padding:12px 16px;border-radius:10px;font-size:13px;font-weight:500;margin-top:14px;line-height:1.5}
   .status-pending{background:#1a1200;border:1px solid #f59e0b;color:#f59e0b}
@@ -62,8 +89,7 @@
   .contact-link:hover{background:#aa0000}
 
   .footer{margin-top:22px;font-size:11px;color:#444}
-
-  .spinner{display:none;width:22px;height:22px;border:2px solid #333;border-top-color:#cc0000;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto}
+  .spinner{display:none;width:22px;height:22px;border:2px solid #333;border-top-color:#cc0000;border-radius:50%;animation:spin .7s linear infinite;margin:10px auto}
   @keyframes spin{to{transform:rotate(360deg)}}
 
   .install-btn{margin-top:12px;background:transparent;border:1px solid #cc0000;color:#cc0000;padding:8px 16px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;display:none}
@@ -92,8 +118,22 @@
   <div class="divider"></div>
 
   <div class="welcome">Welcome back</div>
-  <p class="subtitle">Sign in with your Google account to access your personalised progress tracker.</p>
+  <p class="subtitle">Enter your email to receive a login link — no password needed.</p>
 
+  <!-- PRIMARY: Email magic link -->
+  <div class="email-section">
+    <input type="email" id="email-input" class="email-input" placeholder="your@email.com" autocomplete="email" inputmode="email">
+    <button class="email-btn" id="email-btn" type="button">Send Login Link</button>
+    <div class="sent-msg" id="sent-msg">
+      ✉️ Check your inbox!<br>
+      <span style="font-size:11px;color:#86efac">Click the link in the email to sign in. Check spam if it doesn't arrive within a minute.</span>
+    </div>
+  </div>
+
+  <!-- OR divider -->
+  <div class="or-divider">or</div>
+
+  <!-- SECONDARY: Google OAuth (for users on whitelisted domains) -->
   <button class="google-btn" id="google-signin-btn" type="button">
     <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
       <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -107,8 +147,8 @@
   <div class="spinner" id="spinner"></div>
 
   <div class="status-box status-checking" id="status-checking">Checking your access — please wait.</div>
-  <div class="status-box status-pending" id="status-pending">Your account is pending approval.<br>Please contact your trainer to activate access.</div>
-  <div class="status-box status-denied" id="status-denied">Access not found for this account.<br>Make sure you're using the correct Gmail or contact your trainer.</div>
+  <div class="status-box status-pending"  id="status-pending">Your account is pending approval.<br>Please contact your trainer to activate access.</div>
+  <div class="status-box status-denied"   id="status-denied">Access not found for this account.<br>Make sure you're using the correct email or contact your trainer.</div>
 
   <div class="contact-box">
     <p>Not subscribed yet? Contact your trainer to get access.</p>
@@ -116,22 +156,142 @@
   </div>
 
   <button id="install-btn" class="install-btn" type="button">Install DevFit App</button>
-  <div class="footer">DevFit · Secure login powered by Google</div>
+  <div class="footer">DevFit · Secure login · v3.8.0</div>
   <button id="force-refresh-btn" type="button" style="margin-top:14px;background:transparent;border:1px solid #555;color:#aaa;padding:8px 16px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">↻ Force refresh app</button>
-  <div style="font-size:10px;color:#555;margin-top:6px">Having trouble logging in? Tap above to clear cache.</div>
+  <div style="font-size:10px;color:#555;margin-top:6px">Having trouble? Tap above to clear cache.</div>
 </div>
 
 <script>
-const CLIENT_ID = '94871311791-ql8k9lo0q9e1uq3ri98ghnfr1m187chh.apps.googleusercontent.com';
-const SHEET_URL = 'https://script.google.com/macros/s/AKfycbzHTJOANyp1JJ-k2PmRuMjxpTz03G30ThTyV1thlMJ4QMIOvS8HRN4xW3VsHbzI7YXc/exec';
+'use strict';
+
+const CLIENT_ID  = '94871311791-ql8k9lo0q9e1uq3ri98ghnfr1m187chh.apps.googleusercontent.com';
+const SHEET_URL  = 'https://script.google.com/macros/s/AKfycbzHTJOANyp1JJ-k2PmRuMjxpTz03G30ThTyV1thlMJ4QMIOvS8HRN4xW3VsHbzI7YXc/exec';
+const SB_URL     = 'https://zngberygrzpkhiqrrzwj.supabase.co';
+const SB_KEY     = 'sb_publishable_oJSFEcVvsvbhPA_8mhUrGQ_JCrBddtn';
+
+let _sbClient = null;
+function sb(){ if(_sbClient) return _sbClient; if(!window.supabase) return null; _sbClient=window.supabase.createClient(SB_URL,SB_KEY); return _sbClient; }
 
 function show(id){ document.getElementById(id).style.display='block'; }
 function hide(id){ document.getElementById(id).style.display='none'; }
 function hideAll(){ ['status-checking','status-pending','status-denied'].forEach(hide); }
+function showSpinner(){ document.getElementById('spinner').style.display='block'; }
+function hideSpinner(){ document.getElementById('spinner').style.display='none'; }
 
+// ─── Shared approval check (used by both email + Google paths) ───────────────
+async function checkApproval(email, name){
+  showSpinner(); hideAll(); show('status-checking');
+  try{
+    const url = SHEET_URL+'?action=checkAccess&email='+encodeURIComponent(email)+'&_='+Date.now();
+    const res  = await fetch(url,{cache:'no-store'});
+    const data = await res.json();
+    hideSpinner(); hideAll();
+
+    if(data.approved){
+      localStorage.setItem('devfit_user', JSON.stringify({
+        email, name, approved:true,
+        plan:      data.plan||'',
+        expiry:    data.expiry||'',
+        startDate: data.startDate||'',
+        tier:      (data.tier||'pro').toLowerCase()
+      }));
+      localStorage.setItem('devfit_lastVerified', String(Date.now()));
+      window.location.href = 'index.html';
+    } else if(data.status==='pending'){
+      show('status-pending');
+    } else {
+      show('status-denied');
+    }
+  }catch(e){
+    hideSpinner(); hideAll(); show('status-denied');
+  }
+}
+
+// ─── Email magic link (Supabase Auth) ────────────────────────────────────────
+async function sendMagicLink(){
+  const emailEl = document.getElementById('email-input');
+  const btn     = document.getElementById('email-btn');
+  const email   = (emailEl.value||'').trim().toLowerCase();
+
+  if(!email || !email.includes('@')){
+    emailEl.style.borderColor='#cc0000';
+    emailEl.focus();
+    return;
+  }
+  emailEl.style.borderColor='';
+
+  const db = sb();
+  if(!db){ show('status-denied'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  hideAll();
+
+  try{
+    const redirectTo = window.location.origin + (window.location.pathname.includes('/')
+      ? window.location.pathname.replace(/[^/]*$/, '') : '/') + 'login.html';
+
+    const { error } = await db.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: redirectTo, shouldCreateUser: false }
+    });
+
+    if(error){
+      // shouldCreateUser:false throws if email not in Supabase auth — that's fine,
+      // just fall through and let them contact trainer
+      if(error.message && error.message.toLowerCase().includes('not found')){
+        // Email not registered in Supabase Auth — show pending/contact trainer
+        btn.disabled=false; btn.textContent='Send Login Link';
+        hideAll(); show('status-pending');
+        return;
+      }
+      throw error;
+    }
+
+    btn.textContent = '✓ Link sent';
+    document.getElementById('sent-msg').style.display='block';
+
+  }catch(e){
+    btn.disabled=false;
+    btn.textContent='Send Login Link';
+    hideAll();
+    show('status-denied');
+    console.warn('[DevFit Login] Magic link error:', e.message||e);
+  }
+}
+
+// ─── Handle Supabase magic link redirect (runs on page load) ─────────────────
+async function handleMagicLinkReturn(){
+  const db = sb();
+  if(!db) return;
+  // Supabase puts the session in the URL hash after magic link click
+  const hash = window.location.hash;
+  if(!hash.includes('access_token') && !hash.includes('type=magiclink') && !hash.includes('type=recovery')) return;
+
+  showSpinner(); hideAll(); show('status-checking');
+
+  // Give Supabase a moment to parse the hash
+  await new Promise(r=>setTimeout(r,500));
+
+  try{
+    const { data:{ session }, error } = await db.auth.getSession();
+    if(error || !session){
+      hideSpinner(); hideAll(); show('status-denied'); return;
+    }
+    const email = session.user.email;
+    const name  = session.user.user_metadata?.full_name || email.split('@')[0];
+    // Clear the hash so it doesn't stay in the URL bar
+    history.replaceState(null,'',window.location.pathname);
+    checkApproval(email, name);
+  }catch(e){
+    hideSpinner(); hideAll(); show('status-denied');
+  }
+}
+
+// ─── Google OAuth ────────────────────────────────────────────────────────────
 function signInWithGoogle(){
   if(!window.google || !google.accounts){
-    alert('Google sign-in is still loading — please try again in a moment.');
+    alert('Google sign-in is loading — try again in a moment.');
     return;
   }
   const client = google.accounts.oauth2.initTokenClient({
@@ -139,127 +299,63 @@ function signInWithGoogle(){
     scope: 'email profile',
     callback: async (response) => {
       if(response.error){ hideAll(); return; }
-      document.querySelector('.google-btn').style.display='none';
-      document.getElementById('spinner').style.display='block';
-      hideAll(); show('status-checking');
-
+      document.getElementById('google-signin-btn').style.display='none';
+      showSpinner(); hideAll(); show('status-checking');
       try{
         const userInfo = await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{
-          headers:{ Authorization: 'Bearer '+response.access_token }
+          headers:{ Authorization:'Bearer '+response.access_token }
         }).then(r=>r.json());
-
-        const email = userInfo.email;
-        const name = userInfo.name;
-        checkApproval(email, name);
+        checkApproval(userInfo.email, userInfo.name);
       }catch(e){
-        document.getElementById('spinner').style.display='none';
-        hideAll();
-        show('status-denied');
-        document.querySelector('.google-btn').style.display='flex';
+        hideSpinner(); hideAll(); show('status-denied');
+        document.getElementById('google-signin-btn').style.display='flex';
       }
     }
   });
   client.requestAccessToken();
 }
 
-async function checkApproval(email, name){
-  try{
-    // Cache-bust via URL only (no custom header → keeps it a simple CORS request, no preflight)
-    const url = SHEET_URL+'?action=checkAccess&email='+encodeURIComponent(email)+'&_='+Date.now();
-    const res = await fetch(url, {cache:'no-store'});
-    const data = await res.json();
-    document.getElementById('spinner').style.display='none';
-    hideAll();
-
-    if(data.approved){
-      localStorage.setItem('devfit_user', JSON.stringify({
-        email, name, approved:true,
-        plan: data.plan||'',
-        expiry: data.expiry||'',
-        startDate: data.startDate||'',
-        tier: (data.tier||'pro').toLowerCase()
-      }));
-      localStorage.setItem('devfit_lastVerified', String(Date.now()));
-      window.location.href = 'index.html';
-    } else if(data.status==='pending'){
-      show('status-pending');
-      document.querySelector('.google-btn').style.display='flex';
-    } else {
-      show('status-denied');
-      document.querySelector('.google-btn').style.display='flex';
-    }
-  } catch(e){
-    document.getElementById('spinner').style.display='none';
-    hideAll();
-    show('status-denied');
-    document.querySelector('.google-btn').style.display='flex';
-  }
-}
-
-// Wire up buttons (addEventListener — iOS PWA reliable)
+// ─── Boot ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  const g = document.getElementById('google-signin-btn');
-  if(g) g.addEventListener('click', (e)=>{ e.preventDefault(); signInWithGoogle(); });
-  const i = document.getElementById('install-btn');
-  if(i) i.addEventListener('click', (e)=>{ e.preventDefault(); installApp(); });
-});
-// Bind immediately too in case DOMContentLoaded already fired
-{
-  const g = document.getElementById('google-signin-btn');
-  if(g) g.addEventListener('click', (e)=>{ e.preventDefault(); signInWithGoogle(); });
-  const i = document.getElementById('install-btn');
-  if(i) i.addEventListener('click', (e)=>{ e.preventDefault(); installApp(); });
-}
-
-// Already logged in? Go straight to app
-const saved = localStorage.getItem('devfit_user');
-if(saved){
+  // Already logged in?
   try{
-    const user = JSON.parse(saved);
-    if(user.approved) window.location.href='index.html';
+    const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+    if(user.approved){ window.location.href='index.html'; return; }
   }catch(e){}
-}
 
-// Service worker — always check for updates on login page load
-if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('sw.js').then(reg=>{
-      if(reg) reg.update().catch(()=>{});
-    }).catch(()=>{});
-  });
-}
+  // Coming back from magic link?
+  handleMagicLinkReturn();
 
-// FORCE REFRESH button — clears SW + caches + reloads, helps users locked out by stale cache
+  // Wire buttons
+  document.getElementById('email-btn').addEventListener('click', sendMagicLink);
+  document.getElementById('email-input').addEventListener('keydown', e=>{ if(e.key==='Enter') sendMagicLink(); });
+  document.getElementById('google-signin-btn').addEventListener('click', e=>{ e.preventDefault(); signInWithGoogle(); });
+  document.getElementById('force-refresh-btn').addEventListener('click', forceRefresh);
+  const iBtn = document.getElementById('install-btn');
+  if(iBtn) iBtn.addEventListener('click', installApp);
+});
+
+// ─── Force refresh ─────────────────────────────────────────────────────────
 async function forceRefresh(){
   const btn = document.getElementById('force-refresh-btn');
-  if(btn){ btn.textContent = 'Refreshing…'; btn.disabled = true; }
+  if(btn){ btn.textContent='Refreshing…'; btn.disabled=true; }
   try{
     if('serviceWorker' in navigator){
       const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map(r => r.unregister()));
+      await Promise.all(regs.map(r=>r.unregister()));
     }
     if('caches' in window){
       const keys = await caches.keys();
-      await Promise.all(keys.map(k => caches.delete(k)));
+      await Promise.all(keys.map(k=>caches.delete(k)));
     }
   }catch(e){}
-  // Hard reload bypassing HTTP cache
-  window.location.href = 'login.html?_=' + Date.now();
-}
-document.addEventListener('DOMContentLoaded', () => {
-  const b = document.getElementById('force-refresh-btn');
-  if(b) b.addEventListener('click', (e) => { e.preventDefault(); forceRefresh(); });
-});
-{
-  const b = document.getElementById('force-refresh-btn');
-  if(b) b.addEventListener('click', (e) => { e.preventDefault(); forceRefresh(); });
+  window.location.href='login.html?_='+Date.now();
 }
 
-// PWA install prompt
+// ─── PWA install ────────────────────────────────────────────────────────────
 let deferredPrompt;
 window.addEventListener('beforeinstallprompt',(e)=>{
-  e.preventDefault();
-  deferredPrompt=e;
+  e.preventDefault(); deferredPrompt=e;
   const btn=document.getElementById('install-btn');
   if(btn) btn.style.display='inline-block';
 });
@@ -268,6 +364,16 @@ function installApp(){
   deferredPrompt.prompt();
   deferredPrompt.userChoice.then(()=>{ deferredPrompt=null; document.getElementById('install-btn').style.display='none'; });
 }
+
+// ─── Service worker ─────────────────────────────────────────────────────────
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').then(reg=>{ if(reg) reg.update().catch(()=>{}); }).catch(()=>{});
+  });
+}
 </script>
+
+<!-- Supabase JS (for magic link auth) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </body>
 </html>

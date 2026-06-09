@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>DevFit — Training</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:ital,wght@1,700;1,800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 
 <!-- PWA -->
@@ -663,6 +663,16 @@ let logoImg=null;
   im.src='icon-192.png';
 })();
 
+// Preload the Inter Bold Italic wordmark font so the share card draws it correctly on first open
+(function preloadBrandFont(){
+  try{
+    if(document.fonts && document.fonts.load){
+      document.fonts.load('italic 700 75px "Inter"');
+      document.fonts.load('italic 800 75px "Inter"');
+    }
+  }catch(e){}
+})();
+
 document.getElementById('share-btn').addEventListener('click',openShareModal);
 
 let currentShareTheme = 'light'; // light | dark | transparent
@@ -672,6 +682,8 @@ async function openShareModal(){
   const sess=currentSession.sess;
   const w=data.plan.workouts.find(x=>x.id===sess.workoutId);
   if(!w) return;
+  // Ensure the Inter wordmark font is ready before the first canvas draw
+  try{ await document.fonts.load('italic 700 75px "Inter"'); await document.fonts.ready; }catch(e){}
   rerenderShareCard();
   document.getElementById('share-overlay').classList.add('show');
 }
@@ -853,15 +865,24 @@ function drawExportCard(canvas, workout, session, theme){
   const fy = H - PAD - 30;
   ctx.textBaseline = 'alphabetic';
 
-  // DEVFIT brand
-  ctx.fillStyle = p.accent;
-  ctx.font = `${IT}900 60px ${FACE}`;
+  // DEVFIT brand — FIXED iconic wordmark (Inter Bold Italic, just like the logo),
+  // decoupled from the card's body font so it's always the same lockup.
+  // Size = 75px (15px larger than before). Two-tone on light/dark (DEV in fg, FIT in red);
+  // pure white on the transparent theme.
+  ctx.font = 'italic 700 75px "Inter", system-ui, sans-serif';
   ctx.textAlign = 'left';
-  ctx.fillText('DEVFIT', PAD, fy);
+  const devColor = (theme === 'transparent') ? '#ffffff' : p.fg;
+  const fitColor = (theme === 'transparent') ? '#ffffff' : p.accent;
+  const devW = ctx.measureText('DEV').width;
+  ctx.fillStyle = devColor;
+  ctx.fillText('DEV', PAD, fy);
+  ctx.fillStyle = fitColor;
+  ctx.fillText('FIT', PAD + devW, fy);
 
-  // @handle — uses Settings display name first, falls back to email prefix
+  // @handle — uses Settings display name first, falls back to email prefix.
+  // Size = 38px (5% smaller than before).
   ctx.fillStyle = p.sub;
-  ctx.font = `${IT}${BW} 40px ${FACE}`;
+  ctx.font = `${IT}${BW} 38px ${FACE}`;
   ctx.textAlign = 'right';
   let handle = '@user';
   try {

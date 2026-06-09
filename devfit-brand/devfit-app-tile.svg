@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="DevFit">
+  <rect x="0" y="0" width="120" height="120" rx="28" fill="#141414"/>
+  <g transform="translate(28 18) scale(0.92) skewX(-10)">
+    <path fill="#FFFFFF" fill-rule="evenodd"
+      d="M30 16 L58 16 C76 16 88 31 88 50 C88 69 76 84 58 84 L30 84 Z
+         M44 31 L57 31 C67 31 72 40 72 50 C72 60 67 69 57 69 L44 69 Z"/>
+    <path fill="none" stroke="#D7282F" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"
+      d="M47 58 L57.5 44 L68 58"/>
+  </g>
+</svg>

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>DevFit — Settings</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:ital,wght@1,700;1,800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
@@ -149,7 +149,7 @@
   <div class="header">
     <img src="icon-192.png" alt="DevFit" class="header-logo" onerror="this.style.display='none'">
     <div>
-      <div class="app-title">DevFit Settings</div>
+      <div class="app-title"><span style="font-family:'Inter',system-ui,sans-serif;font-style:italic;font-weight:700;letter-spacing:.005em;"><span style="color:#fff;">DEV</span><span style="color:#cc0000;">FIT</span></span> <span style="color:#fff;">Settings</span></div>
       <div class="app-sub">Account, reports &amp; data</div>
     </div>
   </div>
@@ -329,7 +329,7 @@
 
   <div class="footer">
     DevFit · Dominance Through Discipline<br>
-    <a href="https://wa.me/60183679177">Contact trainer</a> · v3.7.0
+    <a href="https://wa.me/60183679177">Contact trainer</a> · v3.7.1
   </div>
 
 
@@ -723,8 +723,14 @@ function exportWeekPDF(){
       const {overall, scores} = calcTrueScore(w);
 
       pdf.setFillColor(204,0,0); pdf.rect(0,0,210,12,'F');
-      pdf.setFont('helvetica','bold'); pdf.setFontSize(22); pdf.setTextColor(17,17,17);
-      pdf.text('DevFit · Week ' + (w+1) + ' Report', 14, 25);
+      // DEVFIT wordmark — two-tone bold italic to match the logo
+      pdf.setFontSize(22); pdf.setFont('helvetica','bolditalic');
+      pdf.setTextColor(17,17,17); pdf.text('DEV', 14, 25);
+      var _dw = pdf.getTextWidth('DEV');
+      pdf.setTextColor(204,0,0); pdf.text('FIT', 14+_dw, 25);
+      var _fw = pdf.getTextWidth('FIT');
+      pdf.setTextColor(17,17,17); pdf.setFont('helvetica','bold');
+      pdf.text(' · Week ' + (w+1) + ' Report', 14+_dw+_fw, 25);
       pdf.setFontSize(11); pdf.setFont('helvetica','normal'); pdf.setTextColor(100,100,100);
       pdf.text(appData.clientName || 'Client', 14, 32);
       const today = new Date().toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'});
@@ -781,8 +787,14 @@ function exportProgramPDF(){
     try{
       const pdf = new jsPDF('p','mm','a4');
       pdf.setFillColor(204,0,0); pdf.rect(0,0,210,12,'F');
-      pdf.setFont('helvetica','bold'); pdf.setFontSize(22); pdf.setTextColor(17,17,17);
-      pdf.text('DevFit · Program Report', 14, 25);
+      // DEVFIT wordmark — two-tone bold italic to match the logo
+      pdf.setFontSize(22); pdf.setFont('helvetica','bolditalic');
+      pdf.setTextColor(17,17,17); pdf.text('DEV', 14, 25);
+      var _dw = pdf.getTextWidth('DEV');
+      pdf.setTextColor(204,0,0); pdf.text('FIT', 14+_dw, 25);
+      var _fw = pdf.getTextWidth('FIT');
+      pdf.setTextColor(17,17,17); pdf.setFont('helvetica','bold');
+      pdf.text(' · Program Report', 14+_dw+_fw, 25);
       pdf.setFontSize(11); pdf.setFont('helvetica','normal'); pdf.setTextColor(100,100,100);
       pdf.text(appData.clientName || 'Client', 14, 32);
       const today = new Date().toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'});

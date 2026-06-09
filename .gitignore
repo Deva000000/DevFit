@@ -1,0 +1,4 @@
+# Local-only / stray files — not part of the deployed app
+*.zip
+files/
+WhatsApp Image*.jpeg

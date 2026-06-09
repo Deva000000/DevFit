@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>DevFit — Progress</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@400;500;600&family=Inter:ital,wght@1,700;1,800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
@@ -280,7 +280,7 @@
         style="height:80px;width:80px;object-fit:cover;border-radius:12px;background:#fff;flex-shrink:0;"
         onerror="this.style.display='none'">
       <div>
-        <div class="app-title" style="font-size:18px;line-height:1.2;">DevFit Progress Log</div>
+        <div class="app-title" style="font-size:18px;line-height:1.2;"><span style="font-family:'Inter',system-ui,sans-serif;font-style:italic;font-weight:700;letter-spacing:.005em;"><span style="color:#fff;">DEV</span><span style="color:#cc0000;">FIT</span></span> <span style="color:#fff;">Progress Log</span></div>
         <div class="app-sub" style="font-size:12px;margin-top:3px;">Dominance Through Discipline</div>
       </div>
     </div>
@@ -1347,8 +1347,15 @@ function exportPDF(){
 
   doc.setFillColor(17,17,17); doc.rect(0,0,W,30,'F');
   doc.setFillColor(204,0,0); doc.rect(0,0,3,30,'F');
-  doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(16);
-  doc.text('DEVFIT — Weekly Progress Report',margin,12);
+  doc.setFontSize(16);
+  // DEVFIT wordmark — two-tone bold italic to match the logo (DEV white, FIT red on dark header)
+  doc.setFont('helvetica','bolditalic');
+  doc.setTextColor(255,255,255); doc.text('DEV',margin,12);
+  var _dw=doc.getTextWidth('DEV');
+  doc.setTextColor(204,0,0); doc.text('FIT',margin+_dw,12);
+  var _fw=doc.getTextWidth('FIT');
+  doc.setTextColor(255,255,255); doc.setFont('helvetica','bold');
+  doc.text(' — Weekly Progress Report',margin+_dw+_fw,12);
   doc.setFontSize(9); doc.setFont('helvetica','normal');
   doc.text('Dominance Through Discipline',margin,20);
   const now=new Date();
@@ -1524,8 +1531,15 @@ function exportProgramPDF(){
 
     doc.setFillColor(17,17,17); doc.rect(0,0,W,32,'F');
     doc.setFillColor(204,0,0); doc.rect(0,0,3,32,'F'); doc.rect(0,29,W,3,'F');
-    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(18);
-    doc.text('DEVFIT — PROGRAM REPORT',margin,13);
+    doc.setFontSize(18);
+    // DEVFIT wordmark — two-tone bold italic to match the logo (DEV white, FIT red on dark header)
+    doc.setFont('helvetica','bolditalic');
+    doc.setTextColor(255,255,255); doc.text('DEV',margin,13);
+    var _dw2=doc.getTextWidth('DEV');
+    doc.setTextColor(204,0,0); doc.text('FIT',margin+_dw2,13);
+    var _fw2=doc.getTextWidth('FIT');
+    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold');
+    doc.text(' — PROGRAM REPORT',margin+_dw2+_fw2,13);
     doc.setFontSize(9); doc.setFont('helvetica','normal');
     doc.text('Dominance Through Discipline',margin,21);
     const now=new Date();

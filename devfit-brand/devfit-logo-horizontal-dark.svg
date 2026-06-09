@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 170" role="img" aria-label="DevFit - Dominance Through Discipline">
+  <rect x="0" y="0" width="560" height="170" rx="14" fill="#141414"/>
+  <g transform="translate(10 28) scale(1.12)">
+    <g transform="skewX(-10)">
+      <path fill="#FFFFFF" fill-rule="evenodd"
+        d="M30 16 L58 16 C76 16 88 31 88 50 C88 69 76 84 58 84 L30 84 Z
+           M44 31 L57 31 C67 31 72 40 72 50 C72 60 67 69 57 69 L44 69 Z"/>
+      <path fill="none" stroke="#D7282F" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"
+        d="M47 58 L57.5 44 L68 58"/>
+    </g>
+  </g>
+  <text x="150" y="98" font-family="'Arial Black','Helvetica Neue',Arial,sans-serif" font-weight="900" font-style="italic" font-size="74" letter-spacing="1">
+    <tspan fill="#FFFFFF">DEV</tspan><tspan fill="#D7282F">FIT</tspan>
+  </text>
+  <text x="152" y="128" font-family="'Arial','Helvetica Neue',sans-serif" font-weight="700" font-size="16.5" letter-spacing="4.2" fill="#B8B8B8">DOMINANCE THROUGH DISCIPLINE</text>
+</svg>

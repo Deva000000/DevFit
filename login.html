@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>DevFit — Login</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:ital,wght@1,700;1,800&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -37,8 +37,11 @@
   .logo-wrap{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:20px}
   .logo-wrap img{width:60px;height:60px;border-radius:10px;object-fit:cover;background:#fff}
   .brand-text{text-align:left}
-  .brand-name{font-size:22px;font-weight:800;color:#fff;line-height:1.1;letter-spacing:.02em}
-  .brand-tag{font-size:11px;color:#cc0000;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-top:3px}
+  /* Brand wordmark — Inter Bold Italic, two-tone to match the DevFit logo */
+  .brand-name{font-family:'Inter',system-ui,sans-serif;font-style:italic;font-weight:700;font-size:24px;line-height:1.05;letter-spacing:.005em}
+  .brand-name .dev{color:#ffffff}
+  .brand-name .fit{color:#cc0000}
+  .brand-tag{font-size:11px;color:#cc0000;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-top:4px}
   .divider{width:40px;height:2px;background:#cc0000;margin:0 auto 24px;border-radius:2px}
   .welcome{font-size:20px;font-weight:800;color:#fff;margin-bottom:8px}
   .subtitle{font-size:13px;color:#888;margin-bottom:28px;line-height:1.6}
@@ -73,6 +76,7 @@
 <meta name="apple-mobile-web-app-title" content="DevFit">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 </head>
 <body>
 
@@ -80,7 +84,7 @@
   <div class="logo-wrap">
     <img src="icon-192.png" alt="DevFit" onerror="this.style.display='none'">
     <div class="brand-text">
-      <div class="brand-name">DEVFIT</div>
+      <div class="brand-name"><span class="dev">DEV</span><span class="fit">FIT</span></div>
       <div class="brand-tag">Dominance Through Discipline</div>
     </div>
   </div>

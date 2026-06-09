@@ -233,20 +233,10 @@ async function sendMagicLink(){
 
     const { error } = await db.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: redirectTo, shouldCreateUser: false }
+      options: { emailRedirectTo: redirectTo, shouldCreateUser: true }
     });
 
-    if(error){
-      // shouldCreateUser:false throws if email not in Supabase auth — that's fine,
-      // just fall through and let them contact trainer
-      if(error.message && error.message.toLowerCase().includes('not found')){
-        // Email not registered in Supabase Auth — show pending/contact trainer
-        btn.disabled=false; btn.textContent='Send Login Link';
-        hideAll(); show('status-pending');
-        return;
-      }
-      throw error;
-    }
+    if(error) throw error;
 
     btn.textContent = '✓ Link sent';
     document.getElementById('sent-msg').style.display='block';

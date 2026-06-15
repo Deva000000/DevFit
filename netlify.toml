@@ -1,0 +1,9 @@
+[build]
+  command = "node _build.js"
+  publish = "."
+
+# sw.js must never be cached — browser must always fetch fresh copy to detect updates
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"

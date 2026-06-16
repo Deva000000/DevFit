@@ -196,6 +196,8 @@ async function checkApproval(email, name){
         tier:      (data.tier||'pro').toLowerCase()
       }));
       localStorage.setItem('devfit_lastVerified', String(Date.now()));
+      // Save email in cookie (365 days) so it pre-fills after PWA reinstall
+      document.cookie='devfit_email='+encodeURIComponent(email)+';max-age=31536000;path=/;SameSite=Lax';
       window.location.href = 'index.html';
     } else if(data.status==='pending'){
       show('status-pending');
@@ -306,12 +308,27 @@ function signInWithGoogle(){
 }
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
+function getCookie(name){
+  const m=document.cookie.match('(?:^|; )'+name+'=([^;]*)');
+  return m?decodeURIComponent(m[1]):'';
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   // Already logged in?
   try{
     const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
     if(user.approved){ window.location.href='index.html'; return; }
   }catch(e){}
+
+  // Pre-fill email from cookie (persists across PWA reinstalls on most devices)
+  const savedEmail = getCookie('devfit_email');
+  if(savedEmail){
+    const el = document.getElementById('email-input');
+    el.value = savedEmail;
+    // Show a subtle hint
+    const sub = document.querySelector('.subtitle');
+    if(sub) sub.textContent = 'Welcome back! Tap "Send Login Link" to sign in instantly.';
+  }
 
   // Coming back from magic link?
   handleMagicLinkReturn();

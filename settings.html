@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>DevFit — Settings</title>
+<title>DevFit â€” Settings</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:ital,wght@1,700;1,800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -99,7 +99,7 @@
   .toast.show{opacity:1}
   .toast.err{background:#cc0000}
 
-  /* HIDDEN CHARTS — for PDF export */
+  /* HIDDEN CHARTS â€” for PDF export */
   #export-charts{position:absolute;left:-9999px;top:-9999px;width:560px}
 
   @media(max-width:540px){
@@ -117,7 +117,7 @@
     .tier-name{font-size:14px}
     .tier-desc{font-size:10px}
   }
-  /* PREMIUM POLISH — glass cards, balanced gradient, safe motion */
+  /* PREMIUM POLISH â€” glass cards, balanced gradient, safe motion */
   .card{background:rgba(28,28,32,0.62)!important;border:1px solid rgba(255,255,255,0.08)!important;backdrop-filter:saturate(160%) blur(14px);-webkit-backdrop-filter:saturate(160%) blur(14px);box-shadow:0 12px 40px rgba(0,0,0,0.55),0 1px 0 rgba(255,255,255,0.06) inset}
   .card-light{background:rgba(255,255,255,0.96)!important;color:#111!important;border:1px solid rgba(0,0,0,0.06)!important;backdrop-filter:saturate(140%) blur(10px);-webkit-backdrop-filter:saturate(140%) blur(10px);box-shadow:0 12px 40px rgba(0,0,0,0.35)}
   .header{background:rgba(17,17,17,0.7)!important;backdrop-filter:saturate(150%) blur(12px);-webkit-backdrop-filter:saturate(150%) blur(12px);box-shadow:0 14px 40px rgba(204,0,0,0.22),0 1px 0 rgba(255,255,255,0.06) inset}
@@ -147,7 +147,7 @@
 
   <!-- HEADER -->
   <div class="header">
-    <img src="icon-192.png" alt="DevFit" class="header-logo" onerror="this.style.display='none'">
+    <img src="logo-header.png" alt="DevFit" class="header-logo" onerror="this.style.display='none'">
     <div>
       <div class="app-title"><span style="font-family:'Inter',system-ui,sans-serif;font-style:italic;font-weight:700;letter-spacing:.005em;"><span style="color:#fff;">DEV</span><span style="color:#cc0000;">FIT</span></span> <span style="color:#fff;">Settings</span></div>
       <div class="app-sub">Account, reports &amp; data</div>
@@ -168,26 +168,26 @@
     <div class="profile-row">
       <div class="profile-avatar" id="profile-avatar">DF</div>
       <div class="profile-info">
-        <div class="profile-name" id="profile-name">—</div>
-        <div class="profile-email" id="profile-email">—</div>
+        <div class="profile-name" id="profile-name">â€”</div>
+        <div class="profile-email" id="profile-email">â€”</div>
       </div>
     </div>
     <div class="info-grid">
       <div class="info-cell">
         <div class="info-lbl">Plan</div>
-        <div class="info-val" id="info-plan">—</div>
+        <div class="info-val" id="info-plan">â€”</div>
       </div>
       <div class="info-cell">
         <div class="info-lbl">Status</div>
-        <div class="info-val" id="info-status">—</div>
+        <div class="info-val" id="info-status">â€”</div>
       </div>
       <div class="info-cell">
         <div class="info-lbl">Started</div>
-        <div class="info-val" id="info-started">—</div>
+        <div class="info-val" id="info-started">â€”</div>
       </div>
       <div class="info-cell">
         <div class="info-lbl">Expires</div>
-        <div class="info-val" id="info-expires">—</div>
+        <div class="info-val" id="info-expires">â€”</div>
       </div>
     </div>
   </div>
@@ -202,7 +202,7 @@
         <div class="title">Week Report (PDF)</div>
         <div class="desc">Detailed PDF for the currently selected week</div>
       </div>
-      <div class="chev">›</div>
+      <div class="chev">â€º</div>
     </button>
 
     <button class="setting-btn" id="program-report-toggle-btn" type="button">
@@ -211,7 +211,7 @@
         <div class="title">Program Report (PDF)</div>
         <div class="desc">Multi-week summary across the whole program</div>
       </div>
-      <div class="chev">›</div>
+      <div class="chev">â€º</div>
     </button>
 
     <div id="range-row" class="range-row" style="display:none">
@@ -248,7 +248,7 @@
         <div class="title" id="sync-btn-title">Sync to Trainer</div>
         <div class="desc">Push this week's metrics to the trainer's dashboard</div>
       </div>
-      <div class="chev">›</div>
+      <div class="chev">â€º</div>
     </button>
     <div style="font-size:11px;color:#888;margin-top:8px;line-height:1.5">Sync sends bodyweight average, steps, sleep, overload, diet compliance, stress, and your weekly score to the trainer's Google Sheet.</div>
   </div>
@@ -260,12 +260,12 @@
       <div class="tier-badge" id="tier-badge">PRO</div>
       <div class="tier-info">
         <div class="tier-name" id="tier-name">DevFit Pro</div>
-        <div class="tier-desc" id="tier-desc">Full access · history, charts, share, reports, sync</div>
+        <div class="tier-desc" id="tier-desc">Full access Â· history, charts, share, reports, sync</div>
       </div>
     </div>
-    <a href="#" id="upgrade-btn" class="upgrade-btn" style="display:none">Upgrade to Pro — RM19/month</a>
+    <a href="#" id="upgrade-btn" class="upgrade-btn" style="display:none">Upgrade to Pro â€” RM19/month</a>
     <div id="upgrade-features" style="display:none;font-size:11px;color:#888;margin-top:10px;line-height:1.6">
-      Pro unlocks: multi-week history · trend charts · workout share card · session logging · training progress · 7-day nutrition trends · PDF reports · trainer sync
+      Pro unlocks: multi-week history Â· trend charts Â· workout share card Â· session logging Â· training progress Â· 7-day nutrition trends Â· PDF reports Â· trainer sync
     </div>
   </div>
 
@@ -274,30 +274,30 @@
     <div class="section-label">App</div>
 
     <button class="setting-btn" id="install-app-btn" type="button" style="display:none">
-      <div class="icon">↓</div>
+      <div class="icon">â†“</div>
       <div class="body">
         <div class="title">Install DevFit</div>
         <div class="desc">Add to your home screen for one-tap access</div>
       </div>
-      <div class="chev">›</div>
+      <div class="chev">â€º</div>
     </button>
 
     <button class="setting-btn" id="ios-install-hint-btn" type="button" style="display:none">
-      <div class="icon">↓</div>
+      <div class="icon">â†“</div>
       <div class="body">
         <div class="title">Install on iPhone</div>
         <div class="desc">Tap to see how to add to home screen</div>
       </div>
-      <div class="chev">›</div>
+      <div class="chev">â€º</div>
     </button>
 
     <button class="setting-btn" id="check-updates-btn" type="button">
-      <div class="icon">↻</div>
+      <div class="icon">â†»</div>
       <div class="body">
         <div class="title">Check for Updates</div>
-        <div class="desc">Pull the latest version — no need to wait for trainer</div>
+        <div class="desc">Pull the latest version â€” no need to wait for trainer</div>
       </div>
-      <div class="chev">›</div>
+      <div class="chev">â€º</div>
     </button>
   </div>
 
@@ -305,20 +305,20 @@
   <div class="card">
     <div class="section-label">Cloud Backup</div>
     <button class="setting-btn" id="cloud-sync-btn" type="button">
-      <div class="icon">☁</div>
+      <div class="icon">â˜</div>
       <div class="body">
         <div class="title">Sync Now</div>
         <div class="desc" id="cloud-sync-desc">Pull latest data from cloud across all devices</div>
       </div>
-      <div class="chev">›</div>
+      <div class="chev">â€º</div>
     </button>
     <button class="setting-btn" id="cloud-push-btn" type="button">
-      <div class="icon">↑</div>
+      <div class="icon">â†‘</div>
       <div class="body">
         <div class="title">Push Local to Cloud</div>
         <div class="desc">Upload this device's data to cloud (use if just started fresh)</div>
       </div>
-      <div class="chev">›</div>
+      <div class="chev">â€º</div>
     </button>
   </div>
 
@@ -329,9 +329,9 @@
       <div class="icon">!</div>
       <div class="body">
         <div class="title">Reset All Data</div>
-        <div class="desc">Clears all weekly metrics — cannot be undone</div>
+        <div class="desc">Clears all weekly metrics â€” cannot be undone</div>
       </div>
-      <div class="chev">›</div>
+      <div class="chev">â€º</div>
     </button>
   </div>
 
@@ -339,18 +339,18 @@
   <div class="card">
     <div class="section-label">Session</div>
     <button class="setting-btn danger" id="logout-btn" type="button">
-      <div class="icon">←</div>
+      <div class="icon">â†</div>
       <div class="body">
         <div class="title">Logout</div>
         <div class="desc">Sign out and return to the login screen</div>
       </div>
-      <div class="chev">›</div>
+      <div class="chev">â€º</div>
     </button>
   </div>
 
   <div class="footer">
-    DevFit · Dominance Through Discipline<br>
-    <a href="https://wa.me/60183679177">Contact trainer</a> · v3.8.0
+    DevFit Â· Dominance Through Discipline<br>
+    <a href="https://wa.me/60183679177">Contact trainer</a> Â· v3.8.0
   </div>
 
 
@@ -404,7 +404,7 @@ async function reverifyAccess(){
     const res = await fetch(url, {cache:'no-store'});
     const data = await res.json();
     if(!data || !data.approved){
-      // Lost access — kick to login
+      // Lost access â€” kick to login
       localStorage.removeItem('devfit_user');
       localStorage.removeItem('devfit_lastVerified');
       window.location.href = 'login.html';
@@ -425,10 +425,10 @@ async function reverifyAccess(){
     localStorage.setItem('devfit_user', JSON.stringify(fresh));
     localStorage.setItem('devfit_lastVerified', String(Date.now()));
     if(changed){
-      // Tier or expiry changed — reload to apply new gating
+      // Tier or expiry changed â€” reload to apply new gating
       setTimeout(()=>window.location.reload(), 50);
     }
-  }catch(e){ /* offline — keep using cached */ }
+  }catch(e){ /* offline â€” keep using cached */ }
 }
 // Run in background ~600ms after page settles, so UI paints first
 setTimeout(reverifyAccess, 600);
@@ -498,7 +498,7 @@ function toast(msg, err){
     const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
     const name = user.name || appData.clientName || 'Client';
     document.getElementById('profile-name').textContent = name;
-    document.getElementById('profile-email').textContent = user.email || '—';
+    document.getElementById('profile-email').textContent = user.email || 'â€”';
     document.getElementById('profile-avatar').textContent = (name[0]||'D').toUpperCase();
     document.getElementById('info-plan').textContent = user.plan ? user.plan + ' weeks' : (appData.programDuration||'8') + ' weeks';
 
@@ -522,12 +522,12 @@ function toast(msg, err){
       expEl.textContent = expiry.toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'});
     } else {
       document.getElementById('info-status').textContent = 'Active';
-      document.getElementById('info-expires').textContent = '—';
+      document.getElementById('info-expires').textContent = 'â€”';
     }
     if(user.startDate){
       document.getElementById('info-started').textContent = new Date(user.startDate).toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'});
     } else {
-      document.getElementById('info-started').textContent = '—';
+      document.getElementById('info-started').textContent = 'â€”';
     }
 
     // Populate program report range select
@@ -687,7 +687,7 @@ function manualSync(){
     .catch(()=>{
       titleEl.textContent = 'Sync failed';
       setTimeout(()=>{titleEl.textContent = orig;}, 2200);
-      toast('Sync failed — check connection', true);
+      toast('Sync failed â€” check connection', true);
     });
 }
 
@@ -728,7 +728,7 @@ function buildExportCharts(){
 
 // ---------- WEEK PDF ----------
 function exportWeekPDF(){
-  if(!window.jspdf){ toast('PDF library still loading…', true); return; }
+  if(!window.jspdf){ toast('PDF library still loadingâ€¦', true); return; }
   const { jsPDF } = window.jspdf;
   if(!jsPDF){ toast('PDF library failed to load', true); return; }
 
@@ -744,14 +744,14 @@ function exportWeekPDF(){
       const {overall, scores} = calcTrueScore(w);
 
       pdf.setFillColor(204,0,0); pdf.rect(0,0,210,12,'F');
-      // DEVFIT wordmark — two-tone bold italic to match the logo
+      // DEVFIT wordmark â€” two-tone bold italic to match the logo
       pdf.setFontSize(22); pdf.setFont('helvetica','bolditalic');
       pdf.setTextColor(17,17,17); pdf.text('DEV', 14, 25);
       var _dw = pdf.getTextWidth('DEV');
       pdf.setTextColor(204,0,0); pdf.text('FIT', 14+_dw, 25);
       var _fw = pdf.getTextWidth('FIT');
       pdf.setTextColor(17,17,17); pdf.setFont('helvetica','bold');
-      pdf.text(' · Week ' + (w+1) + ' Report', 14+_dw+_fw, 25);
+      pdf.text(' Â· Week ' + (w+1) + ' Report', 14+_dw+_fw, 25);
       pdf.setFontSize(11); pdf.setFont('helvetica','normal'); pdf.setTextColor(100,100,100);
       pdf.text(appData.clientName || 'Client', 14, 32);
       const today = new Date().toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'});
@@ -762,16 +762,16 @@ function exportWeekPDF(){
       pdf.line(14,y,196,y); y+=8;
 
       pdf.setFontSize(13); pdf.setFont('helvetica','bold'); pdf.setTextColor(17,17,17);
-      pdf.text('Overall Score: ' + (overall===null?'—':overall+'%'), 14, y); y+=8;
+      pdf.text('Overall Score: ' + (overall===null?'â€”':overall+'%'), 14, y); y+=8;
 
       pdf.setFontSize(10); pdf.setFont('helvetica','normal');
-      pdf.text('Bodyweight avg: ' + (bwAvg===null?'—':bwAvg.toFixed(1)+' kg'), 14, y); y+=6;
-      pdf.text('Steps avg: ' + (stepsAvg===null?'—':Math.round(stepsAvg).toLocaleString()), 14, y); y+=6;
-      pdf.text('Sleep avg: ' + (sleepAvg===null?'—':sleepAvg.toFixed(1)+' h'), 14, y); y+=6;
-      pdf.text('Overload: ' + (ci.overload||'—'), 14, y); y+=6;
-      pdf.text('Diet: ' + (ci.diet||'—'), 14, y); y+=6;
-      pdf.text('Stress: ' + (ci.stress||'—'), 14, y); y+=6;
-      pdf.text('Body fat: ' + (ci.bfDir||'—') + (ci.bf?(' ('+ci.bf+'%)'):''), 14, y); y+=10;
+      pdf.text('Bodyweight avg: ' + (bwAvg===null?'â€”':bwAvg.toFixed(1)+' kg'), 14, y); y+=6;
+      pdf.text('Steps avg: ' + (stepsAvg===null?'â€”':Math.round(stepsAvg).toLocaleString()), 14, y); y+=6;
+      pdf.text('Sleep avg: ' + (sleepAvg===null?'â€”':sleepAvg.toFixed(1)+' h'), 14, y); y+=6;
+      pdf.text('Overload: ' + (ci.overload||'â€”'), 14, y); y+=6;
+      pdf.text('Diet: ' + (ci.diet||'â€”'), 14, y); y+=6;
+      pdf.text('Stress: ' + (ci.stress||'â€”'), 14, y); y+=6;
+      pdf.text('Body fat: ' + (ci.bfDir||'â€”') + (ci.bf?(' ('+ci.bf+'%)'):''), 14, y); y+=10;
 
       // Add bodyweight chart
       const bwImg = document.getElementById('exp-bw').toDataURL('image/png');
@@ -786,7 +786,7 @@ function exportWeekPDF(){
 
       pdf.setFillColor(204,0,0); pdf.rect(0,287,210,10,'F');
       pdf.setTextColor(255,255,255); pdf.setFontSize(9);
-      pdf.text('DevFit · Dominance Through Discipline', 14, 293);
+      pdf.text('DevFit Â· Dominance Through Discipline', 14, 293);
 
       pdf.save('DevFit_Week'+(w+1)+'_Report.pdf');
       toast('Week report saved');
@@ -796,7 +796,7 @@ function exportWeekPDF(){
 
 // ---------- PROGRAM PDF ----------
 function exportProgramPDF(){
-  if(!window.jspdf){ toast('PDF library still loading…', true); return; }
+  if(!window.jspdf){ toast('PDF library still loadingâ€¦', true); return; }
   const { jsPDF } = window.jspdf;
   if(!jsPDF){ toast('PDF library failed to load', true); return; }
 
@@ -808,18 +808,18 @@ function exportProgramPDF(){
     try{
       const pdf = new jsPDF('p','mm','a4');
       pdf.setFillColor(204,0,0); pdf.rect(0,0,210,12,'F');
-      // DEVFIT wordmark — two-tone bold italic to match the logo
+      // DEVFIT wordmark â€” two-tone bold italic to match the logo
       pdf.setFontSize(22); pdf.setFont('helvetica','bolditalic');
       pdf.setTextColor(17,17,17); pdf.text('DEV', 14, 25);
       var _dw = pdf.getTextWidth('DEV');
       pdf.setTextColor(204,0,0); pdf.text('FIT', 14+_dw, 25);
       var _fw = pdf.getTextWidth('FIT');
       pdf.setTextColor(17,17,17); pdf.setFont('helvetica','bold');
-      pdf.text(' · Program Report', 14+_dw+_fw, 25);
+      pdf.text(' Â· Program Report', 14+_dw+_fw, 25);
       pdf.setFontSize(11); pdf.setFont('helvetica','normal'); pdf.setTextColor(100,100,100);
       pdf.text(appData.clientName || 'Client', 14, 32);
       const today = new Date().toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'});
-      pdf.text(today + ' · ' + weeksToInclude + ' weeks', 14, 37);
+      pdf.text(today + ' Â· ' + weeksToInclude + ' weeks', 14, 37);
 
       let y = 50;
       pdf.setDrawColor(204,0,0); pdf.setLineWidth(0.4);
@@ -844,12 +844,12 @@ function exportProgramPDF(){
         const slA = avg(appData.sleep[w]);
         const {overall} = calcTrueScore(w);
         pdf.text('W'+(w+1), 16, y);
-        pdf.text(bwA===null?'—':bwA.toFixed(1), 40, y);
-        pdf.text(stA===null?'—':Math.round(stA).toLocaleString(), 70, y);
-        pdf.text(slA===null?'—':slA.toFixed(1), 95, y);
-        pdf.text((ci.overload||'—').slice(0,10), 115, y);
-        pdf.text((ci.diet||'—').slice(0,10), 150, y);
-        pdf.text(overall===null?'—':overall+'%', 180, y);
+        pdf.text(bwA===null?'â€”':bwA.toFixed(1), 40, y);
+        pdf.text(stA===null?'â€”':Math.round(stA).toLocaleString(), 70, y);
+        pdf.text(slA===null?'â€”':slA.toFixed(1), 95, y);
+        pdf.text((ci.overload||'â€”').slice(0,10), 115, y);
+        pdf.text((ci.diet||'â€”').slice(0,10), 150, y);
+        pdf.text(overall===null?'â€”':overall+'%', 180, y);
         y+=6;
         if(y>270){ pdf.addPage(); y=20; }
       }
@@ -866,7 +866,7 @@ function exportProgramPDF(){
 
       pdf.setFillColor(204,0,0); pdf.rect(0,287,210,10,'F');
       pdf.setTextColor(255,255,255); pdf.setFontSize(9);
-      pdf.text('DevFit · Dominance Through Discipline', 14, 293);
+      pdf.text('DevFit Â· Dominance Through Discipline', 14, 293);
 
       pdf.save('DevFit_Program_Report.pdf');
       toast('Program report saved');
@@ -895,14 +895,14 @@ function isPro(){ return getUserTier() === 'pro'; }
     badge.textContent = 'PRO';
     badge.className = 'tier-badge pro';
     name.textContent = 'DevFit Pro';
-    desc.textContent = 'Full access — history, charts, share, reports, sync';
+    desc.textContent = 'Full access â€” history, charts, share, reports, sync';
     upgradeBtn.style.display = 'none';
     upgradeFeatures.style.display = 'none';
   } else {
     badge.textContent = 'FREE';
     badge.className = 'tier-badge free';
     name.textContent = 'DevFit Free';
-    desc.textContent = 'Current week only · plan view · basic logging';
+    desc.textContent = 'Current week only Â· plan view Â· basic logging';
     const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
     upgradeBtn.href = 'pricing.html';
     upgradeBtn.style.display = 'block';
@@ -926,7 +926,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
 function installApp(){
   if(!deferredInstallPrompt){
-    toast('Install prompt not available — your browser may have already installed it');
+    toast('Install prompt not available â€” your browser may have already installed it');
     return;
   }
   deferredInstallPrompt.prompt();
@@ -937,7 +937,7 @@ function installApp(){
   });
 }
 
-// iOS detection — Safari on iOS doesn't fire beforeinstallprompt
+// iOS detection â€” Safari on iOS doesn't fire beforeinstallprompt
 function isIOS(){
   return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 }
@@ -958,7 +958,7 @@ function showIosHint(){
 
 // ---------- CHECK FOR UPDATES ----------
 async function checkForUpdates(){
-  toast('Checking for updates…');
+  toast('Checking for updatesâ€¦');
   try {
     if('serviceWorker' in navigator){
       const reg = await navigator.serviceWorker.getRegistration();
@@ -1023,7 +1023,7 @@ function wireDirect(){
 wireDirect();
 // 2. Re-bind on DOM ready (in case any element was added after script ran)
 if(document.readyState !== 'complete') document.addEventListener('DOMContentLoaded', wireDirect);
-// 3. Global delegation — works even if direct bind failed for any reason
+// 3. Global delegation â€” works even if direct bind failed for any reason
 document.addEventListener('click', (ev) => {
   const target = ev.target.closest('[id]');
   if(!target) return;
@@ -1043,7 +1043,7 @@ if('serviceWorker' in navigator){
         nw.addEventListener('statechange', () => {
           if(nw.state === 'installed' && navigator.serviceWorker.controller){
             // A new version is ready
-            toast('New version available — tap "Check for Updates"');
+            toast('New version available â€” tap "Check for Updates"');
           }
         });
       });
@@ -1086,15 +1086,15 @@ body{padding-bottom:104px!important}
     syncBtn.addEventListener('click', async function(){
       if(typeof DevFitDB==='undefined'){toast('Cloud sync not available');return;}
       syncBtn.disabled=true;
-      syncDesc.textContent='Syncing…';
+      syncDesc.textContent='Syncingâ€¦';
       const result = await DevFitDB.forceSyncAll();
       syncBtn.disabled=false;
       if(result.ok){
-        syncDesc.textContent='Synced ' + result.updated + ' data type(s) — reload to see changes';
+        syncDesc.textContent='Synced ' + result.updated + ' data type(s) â€” reload to see changes';
         toast('Sync complete! Tap any tab to see latest data.');
       } else {
         syncDesc.textContent='Sync failed: ' + (result.reason||'unknown error');
-        toast('Sync failed — check your connection');
+        toast('Sync failed â€” check your connection');
       }
     });
   }
@@ -1103,10 +1103,10 @@ body{padding-bottom:104px!important}
     pushBtn.addEventListener('click', async function(){
       if(typeof DevFitDB==='undefined'){toast('Cloud sync not available');return;}
       pushBtn.disabled=true;
-      toast('Uploading local data…');
+      toast('Uploading local dataâ€¦');
       await DevFitDB.pushAllLocal();
       pushBtn.disabled=false;
-      toast('Local data pushed to cloud ✓');
+      toast('Local data pushed to cloud âœ“');
     });
   }
 })();

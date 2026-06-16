@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>DevFit — Training</title>
+<title>DevFit â€” Training</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:ital,wght@1,700;1,800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -168,7 +168,7 @@
     .sets-grid{grid-template-columns:22px minmax(0,1fr) minmax(0,1fr) minmax(0,0.7fr) 20px;gap:2px}
     .ex-row{grid-template-columns:1.3fr .5fr .5fr 22px;gap:2px}
   }
-  /* PREMIUM POLISH — glass cards, balanced gradient, safe motion */
+  /* PREMIUM POLISH â€” glass cards, balanced gradient, safe motion */
   .card{background:rgba(28,28,32,0.62)!important;border:1px solid rgba(255,255,255,0.08)!important;backdrop-filter:saturate(160%) blur(14px);-webkit-backdrop-filter:saturate(160%) blur(14px);box-shadow:0 12px 40px rgba(0,0,0,0.55),0 1px 0 rgba(255,255,255,0.06) inset}
   .card-light{background:rgba(255,255,255,0.96)!important;color:#111!important;border:1px solid rgba(0,0,0,0.06)!important;backdrop-filter:saturate(140%) blur(10px);-webkit-backdrop-filter:saturate(140%) blur(10px);box-shadow:0 12px 40px rgba(0,0,0,0.35)}
   .header{box-shadow:0 14px 40px rgba(204,0,0,0.22),0 1px 0 rgba(255,255,255,0.06) inset}
@@ -193,7 +193,7 @@
 
   <!-- HEADER -->
   <div class="header">
-    <img src="icon-192.png" alt="DevFit" class="header-logo" onerror="this.style.display='none'">
+    <img src="logo-header.png" alt="DevFit" class="header-logo" onerror="this.style.display='none'">
     <div>
       <div class="app-title">DevFit Training</div>
       <div class="app-sub">Plan, log, and progress</div>
@@ -221,7 +221,7 @@
       <div class="section-label">Today's session</div>
       <div class="log-bar">
         <input type="date" class="inp" id="log-date">
-        <select class="inp" id="log-workout"><option value="">Pick a workout…</option></select>
+        <select class="inp" id="log-workout"><option value="">Pick a workoutâ€¦</option></select>
       </div>
       <div id="log-area"></div>
       <button class="share-btn" id="share-btn" disabled>Share Workout Card</button>
@@ -244,8 +244,8 @@
     </div>
     <div class="card">
       <div class="section-label">Summary / coach notes</div>
-      <textarea id="plan-notes" class="inp" rows="3" placeholder="Add any guidance — warm-up, rest times, progression rules, cardio, diet reminders…" style="resize:vertical;min-height:70px;font-family:'DM Sans',system-ui,sans-serif"></textarea>
-      <button class="share-btn" id="share-plan-btn" style="margin-top:12px">⤓ Share Program PDF</button>
+      <textarea id="plan-notes" class="inp" rows="3" placeholder="Add any guidance â€” warm-up, rest times, progression rules, cardio, diet remindersâ€¦" style="resize:vertical;min-height:70px;font-family:'DM Sans',system-ui,sans-serif"></textarea>
+      <button class="share-btn" id="share-plan-btn" style="margin-top:12px">â¤“ Share Program PDF</button>
       <div style="font-size:11px;color:#aaa;margin-top:8px;line-height:1.4">Generates a branded DevFit PDF of the full routine to send to your client or friends.</div>
     </div>
   </div>
@@ -254,7 +254,7 @@
   <div id="view-progress" style="display:none">
     <div class="card">
       <div class="section-label">Exercise progression</div>
-      <select class="inp" id="prog-ex"><option value="">Pick an exercise…</option></select>
+      <select class="inp" id="prog-ex"><option value="">Pick an exerciseâ€¦</option></select>
       <div id="prog-content" style="margin-top:12px"></div>
     </div>
   </div>
@@ -285,7 +285,7 @@
 <script>
 'use strict';
 
-// LOGIN CHECK — redirect to login if no session
+// LOGIN CHECK â€” redirect to login if no session
 (function(){
   try{
     const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
@@ -357,7 +357,7 @@ function renderPlan(){
     card.innerHTML=`
       <div class="workout-head">
         <input type="text" placeholder="Workout name (e.g. Push Day)" value="${escapeHTML(w.name)}" data-w="${w.id}" data-f="name">
-        <button class="del-mini" data-del-w="${w.id}" aria-label="Delete workout">×</button>
+        <button class="del-mini" data-del-w="${w.id}" aria-label="Delete workout">Ã—</button>
       </div>
       <div class="ex-row"><div class="ex-head">Exercise</div><div class="ex-head">Sets</div><div class="ex-head">Reps</div><div></div></div>
       <div class="exercises" data-w="${w.id}"></div>
@@ -369,9 +369,9 @@ function renderPlan(){
       row.className='ex-row';
       row.innerHTML=`
         <input class="ex-name" type="text" placeholder="e.g. Bench Press" value="${escapeHTML(ex.name)}" data-w="${w.id}" data-ex="${ex.id}" data-f="name">
-        <input class="ex-num"  type="number" inputmode="numeric" placeholder="—" value="${ex.tSets??''}" data-w="${w.id}" data-ex="${ex.id}" data-f="tSets">
-        <input class="ex-num"  type="number" inputmode="numeric" placeholder="—" value="${ex.tReps??''}" data-w="${w.id}" data-ex="${ex.id}" data-f="tReps">
-        <button class="del-mini" data-del-ex="${w.id}|${ex.id}" aria-label="Delete exercise">×</button>`;
+        <input class="ex-num"  type="number" inputmode="numeric" placeholder="â€”" value="${ex.tSets??''}" data-w="${w.id}" data-ex="${ex.id}" data-f="tSets">
+        <input class="ex-num"  type="number" inputmode="numeric" placeholder="â€”" value="${ex.tReps??''}" data-w="${w.id}" data-ex="${ex.id}" data-f="tReps">
+        <button class="del-mini" data-del-ex="${w.id}|${ex.id}" aria-label="Delete exercise">Ã—</button>`;
       exDiv.appendChild(row);
     });
   });
@@ -498,7 +498,7 @@ function exportPlanPDF(){
   // summary stats
   const totalEx=workouts.reduce((s,w)=>s+w.exercises.filter(e=>e.name).length,0);
   doc.setFontSize(9.5); doc.setTextColor(...GREY);
-  doc.text(workouts.length+' workout'+(workouts.length>1?'s':'')+'  ·  '+totalEx+' exercises',M,y);
+  doc.text(workouts.length+' workout'+(workouts.length>1?'s':'')+'  Â·  '+totalEx+' exercises',M,y);
   y+=8;
 
   // ---- WORKOUT CARDS ----
@@ -536,11 +536,11 @@ function exportPlanPDF(){
       ensureSpace(8);
       if(i%2===1){ doc.setFillColor(250,250,250); doc.rect(M,y,W-M*2,8,'F'); }
       doc.setTextColor(...DARK);
-      const name=ex.name.length>52?ex.name.slice(0,50)+'…':ex.name;
+      const name=ex.name.length>52?ex.name.slice(0,50)+'â€¦':ex.name;
       doc.text(name,cName,y+5.4);
       doc.setTextColor(...RED); doc.setFont('helvetica','bold');
-      doc.text(String(ex.tSets||'—'),cSets,y+5.4);
-      doc.text(String(ex.tReps||'—'),cReps,y+5.4);
+      doc.text(String(ex.tSets||'â€”'),cSets,y+5.4);
+      doc.text(String(ex.tReps||'â€”'),cReps,y+5.4);
       doc.setFont('helvetica','normal');
       y+=8;
     });
@@ -569,7 +569,7 @@ function exportPlanPDF(){
     doc.setPage(p);
     doc.setDrawColor(230,230,230); doc.line(M,H-14,W-M,H-14);
     doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...GREY);
-    doc.text('Generated by DevFit · Dominance Through Discipline',M,H-9);
+    doc.text('Generated by DevFit Â· Dominance Through Discipline',M,H-9);
     doc.text('Page '+p+' of '+pages,W-M,H-9,{align:'right'});
   }
 
@@ -619,7 +619,7 @@ document.getElementById('log-date').value=todayStr();
 document.getElementById('log-date').addEventListener('change',renderLog);
 document.getElementById('log-workout').addEventListener('change',renderLog);
 
-// Reset all logged sessions (clears test data) — keeps the workout plan
+// Reset all logged sessions (clears test data) â€” keeps the workout plan
 document.getElementById('reset-history-btn').addEventListener('click',()=>{
   const n=data.sessions.length;
   if(!n){toast('No logged sessions to clear');return;}
@@ -636,7 +636,7 @@ function renderLog(){
   // Log session + share (light/dark) are FREE; transparent theme is locked elsewhere
   const sel=document.getElementById('log-workout');
   const prevSel=sel.value;
-  sel.innerHTML='<option value="">Pick a workout…</option>'+
+  sel.innerHTML='<option value="">Pick a workoutâ€¦</option>'+
     data.plan.workouts.map(w=>`<option value="${w.id}">${escapeHTML(w.name||'(unnamed)')}</option>`).join('');
   if(prevSel && data.plan.workouts.find(w=>w.id===prevSel)) sel.value=prevSel;
 
@@ -684,10 +684,10 @@ function renderLog(){
     const card=document.createElement('div');
     card.className='log-ex';
     let metaParts=[];
-    if(ex.tSets&&ex.tReps) metaParts.push(`<span class="log-ex-target">Target ${ex.tSets}×${ex.tReps}</span>`);
+    if(ex.tSets&&ex.tReps) metaParts.push(`<span class="log-ex-target">Target ${ex.tSets}Ã—${ex.tReps}</span>`);
     if(last){
       const lb=bestSet(last.log.sets);
-      if(lb) metaParts.push(`<span class="log-ex-last">Last: ${lb.r}×${lb.w}kg · ${last.session.date}</span>`);
+      if(lb) metaParts.push(`<span class="log-ex-last">Last: ${lb.r}Ã—${lb.w}kg Â· ${last.session.date}</span>`);
     }
     card.innerHTML=`
       <div class="log-ex-name">${escapeHTML(ex.name||'(unnamed)')}</div>
@@ -701,7 +701,7 @@ function renderLog(){
     const setsDiv=card.querySelector('.sets-list');
     log.sets.forEach((set,i)=>{
       const lastSet=last && last.log.sets[i] ? last.log.sets[i] : null;
-      const lastTxt=lastSet&&(lastSet.reps||lastSet.weight)?`${lastSet.reps||'-'}×${lastSet.weight||'-'}`:'—';
+      const lastTxt=lastSet&&(lastSet.reps||lastSet.weight)?`${lastSet.reps||'-'}Ã—${lastSet.weight||'-'}`:'â€”';
       const row=document.createElement('div');
       row.className='sets-grid';
       row.style.marginTop='4px';
@@ -710,7 +710,7 @@ function renderLog(){
         <input type="number" inputmode="decimal" step="0.5" placeholder="${ex.tReps||'reps'}" value="${set.reps??''}" data-ex="${ex.id}" data-i="${i}" data-f="reps">
         <input type="number" inputmode="decimal" step="0.5" placeholder="kg"   value="${set.weight??''}" data-ex="${ex.id}" data-i="${i}" data-f="weight">
         <div class="last-cell">${lastTxt}</div>
-        <button class="del-mini" data-del-set="${ex.id}|${i}" aria-label="Delete set">×</button>`;
+        <button class="del-mini" data-del-set="${ex.id}|${i}" aria-label="Delete set">Ã—</button>`;
       setsDiv.appendChild(row);
     });
     refreshPill(ex.id,log,last);
@@ -772,13 +772,13 @@ function refreshPill(exId,log,last){
   const wDiff=cur.w-lb.w, volDiff=curVol-lastVol;
   if(wDiff>0||(wDiff===0&&volDiff>0&&lb.w>0)){
     const pct=lastVol?Math.round((volDiff/lastVol)*100):0;
-    el.innerHTML=`<span class="progress-pill up">▲ Progressed ${wDiff>0?'+'+wDiff+'kg':'+'+pct+'% volume'}</span>`;
+    el.innerHTML=`<span class="progress-pill up">â–² Progressed ${wDiff>0?'+'+wDiff+'kg':'+'+pct+'% volume'}</span>`;
   } else if(wDiff===0&&volDiff===0){
-    el.innerHTML=`<span class="progress-pill flat">— Maintained</span>`;
+    el.innerHTML=`<span class="progress-pill flat">â€” Maintained</span>`;
   } else if(wDiff<0){
-    el.innerHTML=`<span class="progress-pill down">▼ Down ${Math.abs(wDiff)}kg</span>`;
+    el.innerHTML=`<span class="progress-pill down">â–¼ Down ${Math.abs(wDiff)}kg</span>`;
   } else {
-    el.innerHTML=`<span class="progress-pill flat">— ${volDiff>0?'+':''}${lastVol?Math.round((volDiff/lastVol)*100)+'%':'0%'}</span>`;
+    el.innerHTML=`<span class="progress-pill flat">â€” ${volDiff>0?'+':''}${lastVol?Math.round((volDiff/lastVol)*100)+'%':'0%'}</span>`;
   }
 }
 
@@ -795,8 +795,8 @@ function renderProgressView(){
   const prev=sel.value;
   const seen=new Map();
   data.plan.workouts.forEach(w=>w.exercises.forEach(ex=>{if(ex.name) seen.set(ex.id,{name:ex.name,workoutName:w.name});}));
-  sel.innerHTML='<option value="">Pick an exercise…</option>'+
-    [...seen.entries()].map(([id,v])=>`<option value="${id}">${escapeHTML(v.name)} · ${escapeHTML(v.workoutName||'')}</option>`).join('');
+  sel.innerHTML='<option value="">Pick an exerciseâ€¦</option>'+
+    [...seen.entries()].map(([id,v])=>`<option value="${id}">${escapeHTML(v.name)} Â· ${escapeHTML(v.workoutName||'')}</option>`).join('');
   if(prev && seen.has(prev)) sel.value=prev;
   sel.onchange=drawProgressChart;
   drawProgressChart();
@@ -819,7 +819,7 @@ function drawProgressChart(){
   const change=last.w-first.w;
   content.innerHTML=`
     <div class="stat-row">
-      <div class="stat-card"><div class="stat-lbl">PR</div><div class="stat-val">${pr.w}kg × ${pr.r}</div></div>
+      <div class="stat-card"><div class="stat-lbl">PR</div><div class="stat-val">${pr.w}kg Ã— ${pr.r}</div></div>
       <div class="stat-card"><div class="stat-lbl">Sessions</div><div class="stat-val">${points.length}</div></div>
       <div class="stat-card"><div class="stat-lbl">Change</div><div class="stat-val" style="color:${change>0?'#16a34a':change<0?'#ef4444':'#666'}">${change>0?'+':''}${change}kg</div></div>
     </div>
@@ -829,7 +829,7 @@ function drawProgressChart(){
   progChart=new Chart(document.getElementById('progChart'),{
     type:'line',
     data:{labels:points.map(p=>p.date.slice(5)),datasets:[{label:'Best set (kg)',data:points.map(p=>p.w),borderColor:'#cc0000',backgroundColor:'rgba(204,0,0,0.12)',fill:true,tension:0.25,pointRadius:4,pointBackgroundColor:'#cc0000'}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>points[c.dataIndex].w+'kg × '+points[c.dataIndex].r+' reps'}}},scales:{y:{beginAtZero:false,ticks:{font:{size:10}}},x:{ticks:{font:{size:10}},grid:{display:false}}}}
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>points[c.dataIndex].w+'kg Ã— '+points[c.dataIndex].r+' reps'}}},scales:{y:{beginAtZero:false,ticks:{font:{size:10}}},x:{ticks:{font:{size:10}},grid:{display:false}}}}
   });
 }
 
@@ -879,7 +879,7 @@ function rerenderShareCard(){
   document.getElementById('share-preview-img').src=dataURL;
 }
 
-// Theme picker — gate "transparent" behind Pro
+// Theme picker â€” gate "transparent" behind Pro
 document.querySelectorAll('.theme-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
     if(btn.dataset.theme === 'transparent' && !isPro()){
@@ -902,7 +902,7 @@ document.querySelectorAll('.theme-btn').forEach(btn=>{
   const tBtn = document.querySelector('.theme-btn[data-theme="transparent"]');
   if(tBtn){
     tBtn.style.opacity = '0.5';
-    tBtn.innerHTML = 'Transparent 🔒';
+    tBtn.innerHTML = 'Transparent ðŸ”’';
   }
   // Hide compare-progress UI for free
   const compareEls = document.querySelectorAll('[data-pro-compare], #progress-compare, .compare-progress');
@@ -916,7 +916,7 @@ function drawExportCard(canvas, workout, session, theme){
   const W = canvas.width, H = canvas.height;
   theme = theme || 'light';
 
-  // Theme palette — transparent now uses pure WHITE for readability over phone wallpapers
+  // Theme palette â€” transparent now uses pure WHITE for readability over phone wallpapers
   const palette = {
     light:       {bg:'#ffffff', fg:'#0a0a0a', sub:'#7a7a7a', accent:'#cc0000', divider:'rgba(0,0,0,0.08)'},
     dark:        {bg:'#0a0a0a', fg:'#ffffff', sub:'#dcdcdc', accent:'#ff3a3a', divider:'rgba(255,255,255,0.14)'},
@@ -977,7 +977,7 @@ function drawExportCard(canvas, workout, session, theme){
   y += 40;
 
   // ---- EXERCISE LIST ----
-  // Format: "Exercise Name              3×10 @ 60kg"
+  // Format: "Exercise Name              3Ã—10 @ 60kg"
   const lines = [];
   workout.exercises.forEach(ex => {
     const log = session.logs.find(l => l.exId === ex.id);
@@ -989,23 +989,23 @@ function drawExportCard(canvas, workout, session, theme){
     const wtList   = validSets.map(s => Number(s.weight)||0);
     const hasWeight = wtList.some(w => w > 0);
 
-    // Clean format: "3 sets · 40kg" (top working weight). Bodyweight → "3 sets".
+    // Clean format: "3 sets Â· 40kg" (top working weight). Bodyweight â†’ "3 sets".
     const setTxt = `${setCount} ${setCount>1?'sets':'set'}`;
     let summary;
     if(hasWeight){
       const topW = Math.max(...wtList);
-      summary = `${setTxt} · ${topW}kg`;
+      summary = `${setTxt} Â· ${topW}kg`;
     } else {
       summary = setTxt;
     }
     lines.push({name: ex.name || 'Exercise', summary, sets: setCount});
   });
 
-  // Calculate row height — NO upper cap, so few exercises fill the full canvas (kills empty middle gap)
+  // Calculate row height â€” NO upper cap, so few exercises fill the full canvas (kills empty middle gap)
   const footerY = H - PAD - 80;
   const available = footerY - y - 40;
   const maxLines = Math.min(lines.length, 10);
-  // Min 90, no max — rows expand to fill all available space
+  // Min 90, no max â€” rows expand to fill all available space
   const rowH = Math.max(90, Math.floor(available / Math.max(maxLines,1)));
 
   const showLines = lines.slice(0, maxLines);
@@ -1022,10 +1022,10 @@ function drawExportCard(canvas, workout, session, theme){
     while(ctx.measureText(nameTxt).width > nameMaxW && nameTxt.length > 3){
       nameTxt = nameTxt.slice(0, -1);
     }
-    if(nameTxt !== line.name) nameTxt = nameTxt.slice(0, -1) + '…';
+    if(nameTxt !== line.name) nameTxt = nameTxt.slice(0, -1) + 'â€¦';
     ctx.fillText(nameTxt, nameStartX, y);
 
-    // Summary right-aligned (e.g. "3 sets · 40kg")
+    // Summary right-aligned (e.g. "3 sets Â· 40kg")
     ctx.fillStyle = p.sub;
     ctx.textAlign = 'right';
     ctx.font = `${IT}${BW} 46px ${FACE}`;
@@ -1045,7 +1045,7 @@ function drawExportCard(canvas, workout, session, theme){
   const fy = H - PAD - 30;
   ctx.textBaseline = 'alphabetic';
 
-  // DEVFIT brand — FIXED iconic wordmark (Inter Bold Italic, just like the logo),
+  // DEVFIT brand â€” FIXED iconic wordmark (Inter Bold Italic, just like the logo),
   // decoupled from the card's body font so it's always the same lockup.
   // Size = 75px (15px larger than before). Two-tone on light/dark (DEV in fg, FIT in red);
   // pure white on the transparent theme.
@@ -1059,7 +1059,7 @@ function drawExportCard(canvas, workout, session, theme){
   ctx.fillStyle = fitColor;
   ctx.fillText('FIT', PAD + devW, fy);
 
-  // @handle — uses Settings display name first, falls back to email prefix.
+  // @handle â€” uses Settings display name first, falls back to email prefix.
   // Size = 38px (5% smaller than before).
   ctx.fillStyle = p.sub;
   ctx.font = `${IT}${BW} 38px ${FACE}`;
@@ -1122,7 +1122,7 @@ document.getElementById('btn-do-share').addEventListener('click',async()=>{
     const file=new File([blob],'DevFit_'+wName.replace(/\s+/g,'_')+'.png',{type:'image/png'});
     if(navigator.canShare && navigator.canShare({files:[file]})){
       try{
-        await navigator.share({files:[file],title:'DevFit · '+wName,text:'DevFit · Train with intention'});
+        await navigator.share({files:[file],title:'DevFit Â· '+wName,text:'DevFit Â· Train with intention'});
         toast('Shared!');
         return;
       }catch(e){if(e.name==='AbortError') return;}
@@ -1136,7 +1136,7 @@ document.getElementById('btn-do-share').addEventListener('click',async()=>{
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-    toast('Sharing not supported — downloaded instead');
+    toast('Sharing not supported â€” downloaded instead');
   },'image/png',0.95);
 });
 

@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>DevFit — Nutrition</title>
+<title>DevFit â€” Nutrition</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:ital,wght@1,700;1,800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 
@@ -51,7 +51,7 @@
   .section-label{font-family:'DM Sans',system-ui,sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;color:#e2e8f0;text-transform:uppercase;margin-bottom:10px}
   .section-label-dark{font-family:'DM Sans',system-ui,sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;color:#111;text-transform:uppercase;margin-bottom:10px}
 
-  /* TARGETS / DAILY INPUTS — same 4-column grid */
+  /* TARGETS / DAILY INPUTS â€” same 4-column grid */
   .four-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
   .input-cell{background:#fff;border:1px solid var(--bd);border-radius:var(--radius);padding:10px 6px;text-align:center}
   .input-cell .lbl{font-size:10px;color:#666;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
@@ -64,7 +64,7 @@
   .date-bar button{background:transparent;border:none;font-size:18px;color:#cc0000;cursor:pointer;padding:6px 12px;font-weight:800}
   .date-bar input{font-family:'DM Sans',system-ui,sans-serif;font-size:14px;font-weight:600;border:none;background:transparent;color:#111;text-align:center;outline:none;flex:1}
 
-  /* DELTA STRIP — vs target */
+  /* DELTA STRIP â€” vs target */
   .delta-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
   .delta-cell{background:#111;border-radius:var(--radius);padding:8px 6px;text-align:center;border:1px solid #2a2a2a}
   .delta-cell .lbl{font-size:9px;color:#aaa;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
@@ -107,7 +107,7 @@
     .input-cell input{font-size:14px}
     .delta-cell .val{font-size:9px}
   }
-  /* PREMIUM POLISH — glass cards, balanced gradient, safe motion */
+  /* PREMIUM POLISH â€” glass cards, balanced gradient, safe motion */
   .card{background:rgba(28,28,32,0.62)!important;border:1px solid rgba(255,255,255,0.08)!important;backdrop-filter:saturate(160%) blur(14px);-webkit-backdrop-filter:saturate(160%) blur(14px);box-shadow:0 12px 40px rgba(0,0,0,0.55),0 1px 0 rgba(255,255,255,0.06) inset}
   .card-light{background:rgba(255,255,255,0.96)!important;color:#111!important;border:1px solid rgba(0,0,0,0.06)!important;backdrop-filter:saturate(140%) blur(10px);-webkit-backdrop-filter:saturate(140%) blur(10px);box-shadow:0 12px 40px rgba(0,0,0,0.35)}
   .header{box-shadow:0 14px 40px rgba(204,0,0,0.22),0 1px 0 rgba(255,255,255,0.06) inset}
@@ -132,7 +132,7 @@
 
   <!-- HEADER -->
   <div class="header">
-    <img src="icon-192.png" alt="DevFit" class="header-logo" onerror="this.style.display='none'">
+    <img src="logo-header.png" alt="DevFit" class="header-logo" onerror="this.style.display='none'">
     <div>
       <div class="app-title"><span style="font-family:'Inter',system-ui,sans-serif;font-style:italic;font-weight:700;letter-spacing:.005em;"><span style="color:#fff;">DEV</span><span style="color:#cc0000;">FIT</span></span> <span style="color:#fff;">Nutrition</span></div>
       <div class="app-sub">Daily calories &amp; macros</div>
@@ -151,10 +151,10 @@
   <div class="card">
     <div class="section-label">Daily targets</div>
     <div class="four-grid">
-      <div class="input-cell"><div class="lbl">Calories</div><input id="t-cal" type="number" inputmode="numeric" placeholder="—"><div class="unit">kcal</div></div>
-      <div class="input-cell"><div class="lbl">Protein</div><input id="t-p"   type="number" inputmode="numeric" placeholder="—"><div class="unit">g</div></div>
-      <div class="input-cell"><div class="lbl">Carbs</div>  <input id="t-c"   type="number" inputmode="numeric" placeholder="—"><div class="unit">g</div></div>
-      <div class="input-cell"><div class="lbl">Fat</div>    <input id="t-f"   type="number" inputmode="numeric" placeholder="—"><div class="unit">g</div></div>
+      <div class="input-cell"><div class="lbl">Calories</div><input id="t-cal" type="number" inputmode="numeric" placeholder="â€”"><div class="unit">kcal</div></div>
+      <div class="input-cell"><div class="lbl">Protein</div><input id="t-p"   type="number" inputmode="numeric" placeholder="â€”"><div class="unit">g</div></div>
+      <div class="input-cell"><div class="lbl">Carbs</div>  <input id="t-c"   type="number" inputmode="numeric" placeholder="â€”"><div class="unit">g</div></div>
+      <div class="input-cell"><div class="lbl">Fat</div>    <input id="t-f"   type="number" inputmode="numeric" placeholder="â€”"><div class="unit">g</div></div>
     </div>
     <div style="font-size:11px;color:#aaa;margin-top:8px;line-height:1.4">Saved automatically. Leave blank to skip a target.</div>
   </div>
@@ -163,21 +163,21 @@
   <div class="card">
     <div class="section-label">Today's intake</div>
     <div class="date-bar">
-      <button id="prev-day" aria-label="Previous day">‹</button>
+      <button id="prev-day" aria-label="Previous day">â€¹</button>
       <input type="date" id="date-pick">
-      <button id="next-day" aria-label="Next day">›</button>
+      <button id="next-day" aria-label="Next day">â€º</button>
     </div>
     <div class="four-grid">
-      <div class="input-cell"><div class="lbl">Calories</div><input id="d-cal" type="number" inputmode="numeric" placeholder="—"><div class="unit">kcal</div></div>
-      <div class="input-cell"><div class="lbl">Protein</div><input id="d-p"   type="number" inputmode="numeric" placeholder="—"><div class="unit">g</div></div>
-      <div class="input-cell"><div class="lbl">Carbs</div>  <input id="d-c"   type="number" inputmode="numeric" placeholder="—"><div class="unit">g</div></div>
-      <div class="input-cell"><div class="lbl">Fat</div>    <input id="d-f"   type="number" inputmode="numeric" placeholder="—"><div class="unit">g</div></div>
+      <div class="input-cell"><div class="lbl">Calories</div><input id="d-cal" type="number" inputmode="numeric" placeholder="â€”"><div class="unit">kcal</div></div>
+      <div class="input-cell"><div class="lbl">Protein</div><input id="d-p"   type="number" inputmode="numeric" placeholder="â€”"><div class="unit">g</div></div>
+      <div class="input-cell"><div class="lbl">Carbs</div>  <input id="d-c"   type="number" inputmode="numeric" placeholder="â€”"><div class="unit">g</div></div>
+      <div class="input-cell"><div class="lbl">Fat</div>    <input id="d-f"   type="number" inputmode="numeric" placeholder="â€”"><div class="unit">g</div></div>
     </div>
     <div class="delta-strip">
-      <div class="delta-cell"><div class="lbl">Cal vs target</div><div class="val muted" id="dlt-cal">—</div></div>
-      <div class="delta-cell"><div class="lbl">Protein</div>      <div class="val muted" id="dlt-p">—</div></div>
-      <div class="delta-cell"><div class="lbl">Carbs</div>        <div class="val muted" id="dlt-c">—</div></div>
-      <div class="delta-cell"><div class="lbl">Fat</div>          <div class="val muted" id="dlt-f">—</div></div>
+      <div class="delta-cell"><div class="lbl">Cal vs target</div><div class="val muted" id="dlt-cal">â€”</div></div>
+      <div class="delta-cell"><div class="lbl">Protein</div>      <div class="val muted" id="dlt-p">â€”</div></div>
+      <div class="delta-cell"><div class="lbl">Carbs</div>        <div class="val muted" id="dlt-c">â€”</div></div>
+      <div class="delta-cell"><div class="lbl">Fat</div>          <div class="val muted" id="dlt-f">â€”</div></div>
     </div>
   </div>
 
@@ -193,7 +193,7 @@
     <div class="week-sum">
       <div class="week-card">
         <div class="week-lbl">Avg / day</div>
-        <div class="week-val" id="wk-avg">—</div>
+        <div class="week-val" id="wk-avg">â€”</div>
       </div>
       <div class="week-card">
         <div class="week-lbl" id="wk-days-lbl">Days logged</div>
@@ -209,7 +209,7 @@
 <script>
 'use strict';
 
-// LOGIN CHECK — redirect to login if no session
+// LOGIN CHECK â€” redirect to login if no session
 (function(){
   try{
     const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
@@ -237,7 +237,7 @@ function applyNutritionTierGates(){
     monthBtn.style.opacity = '0.45';
     monthBtn.style.cursor = 'not-allowed';
     monthBtn.title = 'Pro only';
-    monthBtn.innerHTML = 'MONTH 🔒';
+    monthBtn.innerHTML = 'MONTH ðŸ”’';
     monthBtn.addEventListener('click', (e) => {
       e.preventDefault(); e.stopPropagation();
       const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
@@ -299,7 +299,7 @@ let trendChart=null;
 
 document.getElementById('date-pick').value=currentDate;
 
-// Targets — bind 4 inputs
+// Targets â€” bind 4 inputs
 ['cal','p','c','f'].forEach(k=>{
   const el=document.getElementById('t-'+k);
   el.value=data.targets[k]||'';
@@ -311,7 +311,7 @@ document.getElementById('date-pick').value=currentDate;
   });
 });
 
-// Daily totals — bind 4 inputs
+// Daily totals â€” bind 4 inputs
 ['cal','p','c','f'].forEach(k=>{
   const el=document.getElementById('d-'+k);
   el.addEventListener('input',e=>{
@@ -355,8 +355,8 @@ function renderDeltas(){
     const el=document.getElementById('dlt-'+k);
     const t=data.targets[k];
     const v=day[k];
-    if(t===''||t===undefined||t===null||isNaN(Number(t))){ el.textContent='—'; el.className='val muted'; return; }
-    if(v===''||v===undefined||v===null||isNaN(Number(v))){ el.textContent='—'; el.className='val muted'; return; }
+    if(t===''||t===undefined||t===null||isNaN(Number(t))){ el.textContent='â€”'; el.className='val muted'; return; }
+    if(v===''||v===undefined||v===null||isNaN(Number(v))){ el.textContent='â€”'; el.className='val muted'; return; }
     const diff=Number(v)-Number(t);
     if(Math.abs(diff)<=tols[k]){ el.textContent='On target'; el.className='val ok'; }
     else if(diff>0){ el.textContent='+'+Math.round(diff)+' '+units[k]; el.className='val over'; }
@@ -384,7 +384,7 @@ function stdev(arr){
   return Math.sqrt(arr.reduce((a,b)=>a+(b-mean)**2,0)/arr.length);
 }
 
-let trendRange = 7; // 7 or 30 — controlled by Week/Month toggle
+let trendRange = 7; // 7 or 30 â€” controlled by Week/Month toggle
 function renderTrend(){
   const N = trendRange;
   const dates=lastNDates(N);
@@ -397,7 +397,7 @@ function renderTrend(){
   });
   const logged=vals.filter(v=>v!==null);
   const avg=logged.length?Math.round(logged.reduce((a,b)=>a+b,0)/logged.length):null;
-  document.getElementById('wk-avg').textContent=avg!==null?avg+' kcal':'—';
+  document.getElementById('wk-avg').textContent=avg!==null?avg+' kcal':'â€”';
   document.getElementById('wk-days').textContent=logged.length+' / '+N;
   const ttl=document.getElementById('trend-title');
   if(ttl) ttl.textContent = (N<=7?'7-day':'30-day')+' calorie trend';
@@ -409,14 +409,14 @@ function renderTrend(){
     note.textContent='Log at least '+minLog+' days to see your pattern.';
   } else {
     const sd=stdev(logged);
-    let msg='Avg '+avg+' kcal · variation ±'+Math.round(sd)+' kcal.';
+    let msg='Avg '+avg+' kcal Â· variation Â±'+Math.round(sd)+' kcal.';
     if(target){
       const diff=avg-target;
       if(Math.abs(diff)<=100) msg+=' On target overall.';
       else if(diff>0) msg+=' Running '+Math.round(diff)+' over target.';
       else msg+=' Running '+Math.round(Math.abs(diff))+' under target.';
     }
-    if(sd>400) msg+=' High day-to-day swing — consistency would help progress.';
+    if(sd>400) msg+=' High day-to-day swing â€” consistency would help progress.';
     note.textContent=msg;
   }
 

@@ -6,6 +6,7 @@
 <title>DevFit — Training</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:ital,wght@1,700;1,800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
@@ -231,10 +232,21 @@
   <!-- PLAN VIEW -->
   <div id="view-plan" style="display:none">
     <div class="card">
+      <div class="section-label">Program details</div>
+      <input type="text" class="inp" id="plan-name" placeholder="Program name (e.g. 8-Week Hypertrophy)" style="margin-bottom:8px">
+      <input type="text" class="inp" id="plan-client" placeholder="Client / athlete name (optional)">
+    </div>
+    <div class="card">
       <div class="section-label">Workout plan</div>
       <div id="plan-list"></div>
       <button class="add-btn" id="add-workout-btn">+ Add workout</button>
       <div style="font-size:11px;color:#aaa;margin-top:10px;line-height:1.4">Set up your routine. Update target sets/reps every few weeks as the client progresses.</div>
+    </div>
+    <div class="card">
+      <div class="section-label">Summary / coach notes</div>
+      <textarea id="plan-notes" class="inp" rows="3" placeholder="Add any guidance — warm-up, rest times, progression rules, cardio, diet reminders…" style="resize:vertical;min-height:70px;font-family:'DM Sans',system-ui,sans-serif"></textarea>
+      <button class="share-btn" id="share-plan-btn" style="margin-top:12px">⤓ Share Program PDF</button>
+      <div style="font-size:11px;color:#aaa;margin-top:8px;line-height:1.4">Generates a branded DevFit PDF of the full routine to send to your client or friends.</div>
     </div>
   </div>
 
@@ -327,7 +339,7 @@ document.querySelectorAll('.mode-btn').forEach(btn=>{
     document.getElementById('view-plan').style.display    = currentMode==='plan'?'':'none';
     document.getElementById('view-progress').style.display= currentMode==='progress'?'':'none';
     if(currentMode==='log')      renderLog();
-    if(currentMode==='plan')     renderPlan();
+    if(currentMode==='plan')   { renderPlan(); loadPlanMeta(); }
     if(currentMode==='progress') renderProgressView();
   });
 });
@@ -409,6 +421,174 @@ document.getElementById('add-workout-btn').addEventListener('click',()=>{
   data.plan.workouts.push({id:uid(),name:'',exercises:[]});
   save(); renderPlan();
 });
+
+// ---------- PROGRAM META (name / client / notes) ----------
+function loadPlanMeta(){
+  const n=document.getElementById('plan-name');
+  const c=document.getElementById('plan-client');
+  const t=document.getElementById('plan-notes');
+  if(n) n.value=data.plan.name||'';
+  if(t) t.value=data.plan.notes||'';
+  if(c){
+    let client=data.plan.client||'';
+    if(!client){ try{ client=JSON.parse(localStorage.getItem('progressLog2')||'{}').clientName||''; }catch(e){} }
+    c.value=client;
+  }
+}
+['plan-name','plan-client','plan-notes'].forEach(id=>{
+  const el=document.getElementById(id); if(!el) return;
+  el.addEventListener('input',()=>{
+    data.plan.name  =document.getElementById('plan-name').value;
+    data.plan.client=document.getElementById('plan-client').value;
+    data.plan.notes =document.getElementById('plan-notes').value;
+    save();
+  });
+});
+
+// ---------- SHARE PROGRAM PDF ----------
+document.getElementById('share-plan-btn').addEventListener('click',exportPlanPDF);
+
+function exportPlanPDF(){
+  const jsPDFlib = window.jspdf && window.jspdf.jsPDF;
+  if(!jsPDFlib){ alert('PDF library not loaded. Check your connection and try again.'); return; }
+  const workouts=(data.plan.workouts||[]).filter(w=>w.name || (w.exercises&&w.exercises.length));
+  if(!workouts.length){ toast('Add at least one workout first'); return; }
+
+  const doc=new jsPDFlib({orientation:'p',unit:'mm',format:'a4'});
+  const W=doc.internal.pageSize.getWidth();   // 210
+  const H=doc.internal.pageSize.getHeight();  // 297
+  const M=14;                                  // margin
+  const RED=[204,0,0], DARK=[17,17,17], GREY=[120,120,120], LIGHT=[245,245,247];
+  const progName=(data.plan.name||'Workout Program').trim();
+  const client=(document.getElementById('plan-client').value||'').trim();
+  const notes=(data.plan.notes||'').trim();
+  const dateStr=new Date().toLocaleDateString('en-MY',{day:'2-digit',month:'long',year:'numeric'});
+
+  // ---- HEADER BAR ----
+  function header(){
+    doc.setFillColor(...DARK); doc.rect(0,0,W,30,'F');
+    doc.setFillColor(...RED); doc.rect(0,30,W,1.6,'F');
+    // DEVFIT wordmark
+    doc.setFont('helvetica','bold'); doc.setFontSize(22);
+    doc.setTextColor(255,255,255); doc.text('DEV',M,19);
+    const devW=doc.getTextWidth('DEV');
+    doc.setTextColor(...RED); doc.text('FIT',M+devW,19);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7);
+    doc.setTextColor(180,180,180);
+    doc.text('DOMINANCE THROUGH DISCIPLINE',M,25);
+    // right side
+    doc.setFont('helvetica','bold'); doc.setFontSize(9);
+    doc.setTextColor(255,255,255);
+    doc.text('WORKOUT PROGRAM',W-M,17,{align:'right'});
+    doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+    doc.setTextColor(170,170,170);
+    doc.text(dateStr,W-M,23,{align:'right'});
+  }
+
+  header();
+  let y=44;
+
+  // ---- TITLE BLOCK ----
+  doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(...DARK);
+  doc.text(progName,M,y); y+=7;
+  if(client){
+    doc.setFont('helvetica','normal'); doc.setFontSize(11); doc.setTextColor(...GREY);
+    doc.text('Prepared for: '+client,M,y); y+=6;
+  }
+  // summary stats
+  const totalEx=workouts.reduce((s,w)=>s+w.exercises.filter(e=>e.name).length,0);
+  doc.setFontSize(9.5); doc.setTextColor(...GREY);
+  doc.text(workouts.length+' workout'+(workouts.length>1?'s':'')+'  ·  '+totalEx+' exercises',M,y);
+  y+=8;
+
+  // ---- WORKOUT CARDS ----
+  function ensureSpace(need){
+    if(y+need>H-22){ doc.addPage(); header(); y=44; }
+  }
+
+  workouts.forEach((w,wi)=>{
+    const exs=w.exercises.filter(e=>e.name);
+    ensureSpace(16+exs.length*8+10);
+
+    // workout title bar
+    doc.setFillColor(...DARK); doc.roundedRect(M,y,W-M*2,9,1.5,1.5,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(255,255,255);
+    doc.text((w.name||('Workout '+(wi+1))).toUpperCase(),M+4,y+6.2);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(200,200,200);
+    doc.text(exs.length+' exercises',W-M-4,y+6.2,{align:'right'});
+    y+=9;
+
+    // table header
+    const cName=M+4, cSets=W-M-46, cReps=W-M-22;
+    doc.setFillColor(...LIGHT); doc.rect(M,y,W-M*2,7,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...GREY);
+    doc.text('EXERCISE',cName,y+4.8);
+    doc.text('SETS',cSets,y+4.8);
+    doc.text('REPS',cReps,y+4.8);
+    y+=7;
+
+    // rows
+    doc.setFont('helvetica','normal'); doc.setFontSize(10);
+    if(!exs.length){
+      doc.setTextColor(...GREY); doc.text('No exercises added.',cName,y+5); y+=8;
+    }
+    exs.forEach((ex,i)=>{
+      ensureSpace(8);
+      if(i%2===1){ doc.setFillColor(250,250,250); doc.rect(M,y,W-M*2,8,'F'); }
+      doc.setTextColor(...DARK);
+      const name=ex.name.length>52?ex.name.slice(0,50)+'…':ex.name;
+      doc.text(name,cName,y+5.4);
+      doc.setTextColor(...RED); doc.setFont('helvetica','bold');
+      doc.text(String(ex.tSets||'—'),cSets,y+5.4);
+      doc.text(String(ex.tReps||'—'),cReps,y+5.4);
+      doc.setFont('helvetica','normal');
+      y+=8;
+    });
+    // bottom border
+    doc.setDrawColor(225,225,225); doc.line(M,y,W-M,y);
+    y+=8;
+  });
+
+  // ---- NOTES ----
+  if(notes){
+    const lines=doc.splitTextToSize(notes,W-M*2-8);
+    ensureSpace(14+lines.length*5);
+    doc.setFillColor(255,248,248); doc.setDrawColor(...RED);
+    const boxH=12+lines.length*5;
+    doc.roundedRect(M,y,W-M*2,boxH,2,2,'FD');
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...RED);
+    doc.text('COACH NOTES',M+4,y+6);
+    doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(60,60,60);
+    doc.text(lines,M+4,y+11);
+    y+=boxH+8;
+  }
+
+  // ---- FOOTER on every page ----
+  const pages=doc.internal.getNumberOfPages();
+  for(let p=1;p<=pages;p++){
+    doc.setPage(p);
+    doc.setDrawColor(230,230,230); doc.line(M,H-14,W-M,H-14);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...GREY);
+    doc.text('Generated by DevFit · Dominance Through Discipline',M,H-9);
+    doc.text('Page '+p+' of '+pages,W-M,H-9,{align:'right'});
+  }
+
+  const safe=progName.replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'').toLowerCase()||'program';
+  const fname='DevFit-'+safe+'.pdf';
+
+  // Try native share (mobile), fallback to download
+  try{
+    const blob=doc.output('blob');
+    const file=new File([blob],fname,{type:'application/pdf'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      navigator.share({files:[file],title:progName,text:'DevFit workout program'})
+        .catch(()=>doc.save(fname));
+      return;
+    }
+  }catch(e){}
+  doc.save(fname);
+  toast('PDF downloaded');
+}
 
 // ---------- LOG VIEW ----------
 let currentSession=null;

@@ -6,7 +6,7 @@
    - Apps Script: network-only
 */
 
-const VERSION = 'devfit-v4.4.0';
+const VERSION = 'devfit-v4.5.0';
 const APP_SHELL = 'devfit-shell-' + VERSION;
 const RUNTIME = 'devfit-runtime-' + VERSION;
 
@@ -19,7 +19,8 @@ const SHELL_FILES = [
   './favicon.svg',
   './favicon.ico',
   './devfit-db.js',
-  './pwa-update.js'
+  './pwa-update.js',
+  './foods-local.js'
 ];
 
 const CDN_HOSTS = ['cdnjs.cloudflare.com','fonts.googleapis.com','fonts.gstatic.com','cdn.jsdelivr.net','zngberygrzpkhiqrrzwj.supabase.co'];

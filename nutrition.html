@@ -6,6 +6,7 @@
 <title>DevFit — Nutrition</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:ital,wght@1,700;1,800&family=Lora:wght@400;500;600;700&family=Dancing+Script:wght@500;600;700&family=Anton&family=Poiret+One&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="foods-local.js"></script>
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
@@ -1087,6 +1088,7 @@ applyNutritionTierGates();
   .src-badge{font-size:9px;font-weight:800;letter-spacing:.04em;padding:2px 6px;border-radius:5px;vertical-align:middle;margin-left:7px}
   .src-usda{background:rgba(34,197,94,0.18);color:#4ade80}
   .src-off{background:rgba(59,130,246,0.18);color:#60a5fa}
+  .src-local{background:rgba(204,0,0,0.20);color:#ff6b6b}
   .food-loading,.food-empty{padding:28px 16px;text-align:center;font-family:'DM Sans',system-ui,sans-serif;font-size:13px;color:#555}
   .scanner-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.97);z-index:10100;display:none;align-items:center;justify-content:center;flex-direction:column;padding:1.2rem}
   .scanner-overlay.show{display:flex}
@@ -1281,13 +1283,31 @@ applyNutritionTierGates();
     return null;
   }
 
+  // Curated offline DB (Malaysia-first) — synchronous, always available
+  function localSearch(q){
+    const list=window.DEVFIT_LOCAL_FOODS||[];
+    const ql=q.toLowerCase().trim();
+    if(!ql) return [];
+    const toks=ql.split(/\s+/).filter(Boolean);
+    return list.filter(f=>{
+      const hay=(f.name+' '+(f.tags||'')+' '+(f.brand||'')).toLowerCase();
+      return toks.every(t=>hay.includes(t));
+    }).map(f=>({
+      name:f.name, brand:f.brand||'',
+      cal100:f.cal, p100:f.p, c100:f.c, f100:f.f,
+      sq:f.serving||100, serving_size:(f.serving||100)+'g', source:'LOCAL'
+    }));
+  }
+
   function renderResults(items){
     const el=document.getElementById('food-results');
     if(!items.length){el.innerHTML='<div class="food-empty">No results found. Try different keywords.</div>';return;}
     el.innerHTML=items.map((f,i)=>{
-      const badge=f.source==='USDA'
-        ? '<span class="src-badge src-usda">USDA</span>'
-        : '<span class="src-badge src-off">Branded</span>';
+      const badge=f.source==='LOCAL'
+        ? '<span class="src-badge src-local">DevFit</span>'
+        : f.source==='USDA'
+          ? '<span class="src-badge src-usda">USDA</span>'
+          : '<span class="src-badge src-off">Branded</span>';
       const brand=f.brand?('<span class="food-item-brand">'+esc(f.brand)+'</span> &middot; '):'';
       return '<div class="food-item" data-idx="'+i+'" tabindex="0">'+
         '<div class="food-item-name">'+esc(f.name)+badge+'</div>'+
@@ -1433,27 +1453,29 @@ applyNutritionTierGates();
     if(!q)return;
     const el=document.getElementById('food-results');
     el.innerHTML='<div class="food-loading">Searching food databases…</div>';
+    const local=localSearch(q);                  // instant, offline, curated
     const [usda,off]=await Promise.allSettled([usdaSearch(q),offSearch(q)]);
     const u=usda.status==='fulfilled'?usda.value:[];
     const o=off.status==='fulfilled'?off.value:[];
-    if(!u.length&&!o.length){
+    if(!local.length&&!u.length&&!o.length){
       if(usda.status==='rejected'&&off.status==='rejected')
         el.innerHTML='<div class="food-empty">Search failed. Check your connection and try again.</div>';
       else el.innerHTML='<div class="food-empty">No results found. Try different keywords.</div>';
       return;
     }
-    // Rank: exact/prefix name matches first; nudge generic (USDA) + complete-macro items up
+    // Rank: curated local first, then exact/prefix matches; nudge generic + complete-macro items up
     const ql=q.toLowerCase();
     function score(f){
       const n=f.name.toLowerCase();
       let s=0;
+      if(f.source==='LOCAL')s+=50;                 // curated/local always near top
       if(n===ql)s+=100; else if(n.startsWith(ql))s+=60; else if(n.includes(ql))s+=30;
       if(f.source==='USDA')s+=8;
       if(f.cal100>0&&(f.p100||f.c100||f.f100))s+=5;
       return s;
     }
     const seen=new Set();
-    const merged=u.concat(o).filter(f=>{
+    const merged=local.concat(u).concat(o).filter(f=>{
       const k=f.source+'|'+f.name.toLowerCase()+'|'+Math.round(f.cal100);
       if(seen.has(k))return false; seen.add(k); return true;
     }).sort((a,b)=>score(b)-score(a)).slice(0,60);

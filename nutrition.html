@@ -1291,6 +1291,7 @@ applyNutritionTierGates();
 <div class="serving-overlay" id="quick-overlay">
   <div class="serving-modal">
     <div class="serving-food-name">Quick Add</div>
+    <div id="qa-barcode-note" style="display:none;background:rgba(204,0,0,0.12);border:1px solid rgba(204,0,0,0.35);border-radius:8px;padding:8px 12px;font-size:12px;color:#ff6b6b;margin-bottom:10px;">Product found but has no nutritional data in the database. Enter the macros from the packaging below.</div>
     <div class="serving-per100">Type a name and the macros straight off a label or recipe.</div>
     <input type="text" id="qa-name" class="qa-name-input" placeholder="Food name" autocomplete="off">
     <div class="qa-grid">
@@ -1570,6 +1571,8 @@ applyNutritionTierGates();
     document.getElementById('qa-c').value=item?item.c:'';
     document.getElementById('qa-f').value=item?item.f:'';
     document.getElementById('qa-add').textContent=_editRef?'Save changes':('Add to '+targetMealName());
+    const note=document.getElementById('qa-barcode-note');
+    if(note) note.style.display='none';
     document.getElementById('quick-overlay').classList.add('show');
     setTimeout(()=>document.getElementById('qa-name').focus(),120);
   }
@@ -1682,8 +1685,29 @@ applyNutritionTierGates();
     el.innerHTML='<div class="food-loading">Looking up barcode '+esc(code)+'…</div>';
     try{
       const p=await offBarcode(code);
-      if(p)renderResults([p]);
-      else el.innerHTML='<div class="food-empty">Product not found for barcode <strong style="color:#ccc">'+esc(code)+'</strong>.<br>Try searching by name.</div>';
+      if(p){
+        // Product found but has no nutritional data (common in crowdsourced DB)
+        const hasData=p.cal100>0||p.p100>0||p.c100>0||p.f100>0;
+        if(!hasData){
+          // Pre-fill Quick Add with the product name so user can enter macros manually
+          document.getElementById('food-overlay').classList.remove('show');
+          const nameEl=document.getElementById('qa-name');
+          if(nameEl) nameEl.value=(p.brand?p.brand+' ':'')+p.name;
+          document.getElementById('quick-overlay').classList.add('show');
+          document.getElementById('qa-cal').value='';
+          document.getElementById('qa-p').value='';
+          document.getElementById('qa-c').value='';
+          document.getElementById('qa-f').value='';
+          document.getElementById('qa-cal').focus();
+          // Show a note inside the modal
+          const note=document.getElementById('qa-barcode-note');
+          if(note) note.style.display='block';
+        } else {
+          renderResults([p]);
+        }
+      } else {
+        el.innerHTML='<div class="food-empty">Product not found for barcode <strong style="color:#ccc">'+esc(code)+'</strong>.<br>Try searching by name.</div>';
+      }
     }catch(e){
       el.innerHTML='<div class="food-empty">Lookup failed. Check your connection.</div>';
     }

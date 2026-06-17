@@ -1203,19 +1203,31 @@ applyNutritionTierGates();
   .scanner-frame video{width:100%;display:block}
   .scanner-line{position:absolute;left:8%;right:8%;top:50%;height:2px;background:rgba(204,0,0,0.9);box-shadow:0 0 12px rgba(204,0,0,0.7)}
   .scanner-hint{font-family:'DM Sans',system-ui,sans-serif;font-size:12px;color:#555;text-align:center;margin-top:12px}
-  .serving-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:10200;display:none;align-items:center;justify-content:center;padding:1rem}
+  .serving-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:10200;display:none;align-items:flex-end;justify-content:center;padding:0}
   .serving-overlay.show{display:flex}
-  .serving-modal{background:#111;border:1px solid #2a2a2a;border-top:3px solid #16a34a;border-radius:16px;padding:22px 20px;width:100%;max-width:400px}
-  .serving-food-name{font-family:'DM Sans',system-ui,sans-serif;font-size:16px;font-weight:800;color:#fff;margin-bottom:5px}
-  .serving-per100{font-family:'DM Sans',system-ui,sans-serif;font-size:12px;color:#666;margin-bottom:16px;line-height:1.5}
-  .serving-input-row{display:flex;align-items:center;justify-content:space-between;background:#1a1a1a;border:1px solid #333;border-radius:10px;padding:10px 14px;margin-bottom:12px}
-  .serving-input-row label{font-family:'DM Sans',system-ui,sans-serif;font-size:13px;color:#aaa;font-weight:600}
-  .serving-input-row input{background:transparent;border:none;color:#fff;font-family:'DM Sans',system-ui,sans-serif;font-size:22px;font-weight:800;width:80px;text-align:right;outline:none}
-  .serving-g-unit{font-family:'DM Sans',system-ui,sans-serif;font-size:13px;color:#555;font-weight:600;margin-left:4px}
-  .serving-preview{background:#0e1f0e;border:1px solid #1a3a1a;border-radius:10px;padding:11px 14px;font-family:'DM Sans',system-ui,sans-serif;font-size:13px;color:#4ade80;font-weight:700;margin-bottom:18px;text-align:center;line-height:1.5}
+  .serving-modal{background:#111;border:1px solid #2a2a2a;border-top:3px solid #16a34a;border-radius:20px 20px 0 0;padding:22px 20px 36px;width:100%;max-width:480px;max-height:92vh;overflow-y:auto}
+  .serving-food-name{font-family:'DM Sans',system-ui,sans-serif;font-size:16px;font-weight:800;color:#fff;margin-bottom:4px}
+  .serving-per100{font-family:'DM Sans',system-ui,sans-serif;font-size:12px;color:#555;margin-bottom:14px;line-height:1.5}
+  .sv-size-lbl{font-family:'DM Sans',sans-serif;font-size:10px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+  .sv-chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px}
+  .sv-chip{padding:8px 13px;background:#1a1a1a;border:1px solid #2e2e2e;border-radius:30px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;color:#888;cursor:pointer;transition:all .15s;white-space:nowrap}
+  .sv-chip.active{background:rgba(22,163,74,0.18);border-color:#16a34a;color:#4ade80}
+  .sv-qty-row{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .sv-qty-lbl{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0;min-width:30px}
+  .sv-qty-btn{width:38px;height:38px;background:#1a1a1a;border:1px solid #2e2e2e;border-radius:50%;color:#ccc;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .12s;padding:0;line-height:1}
+  .sv-qty-btn:hover,.sv-qty-btn:active{background:#2a2a2a;color:#fff}
+  #sv-qty{width:56px;text-align:center;background:#1a1a1a;border:1px solid #2e2e2e;border-radius:10px;color:#fff;font-family:'DM Sans',sans-serif;font-size:18px;font-weight:800;padding:7px 4px;outline:none;-moz-appearance:textfield}
+  #sv-qty::-webkit-outer-spin-button,#sv-qty::-webkit-inner-spin-button{-webkit-appearance:none}
+  .sv-grams-row{display:flex;align-items:center;gap:8px;background:#151515;border:1px solid #252525;border-radius:10px;padding:9px 14px;margin-bottom:12px}
+  .sv-grams-eq{font-family:'DM Sans',sans-serif;font-size:12px;color:#444;flex-shrink:0}
+  #serving-grams{background:transparent;border:none;color:#888;font-family:'DM Sans',sans-serif;font-size:18px;font-weight:800;width:72px;text-align:right;outline:none;-moz-appearance:textfield}
+  #serving-grams::-webkit-outer-spin-button,#serving-grams::-webkit-inner-spin-button{-webkit-appearance:none}
+  #serving-grams:focus{color:#fff}
+  .serving-g-unit{font-family:'DM Sans',sans-serif;font-size:13px;color:#444;font-weight:600}
+  .serving-preview{background:#0e1f0e;border:1px solid #1a3a1a;border-radius:10px;padding:12px 14px;font-family:'DM Sans',system-ui,sans-serif;font-size:13px;color:#4ade80;font-weight:700;margin-bottom:18px;text-align:center;line-height:1.6}
   .serving-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .serving-btns button{padding:13px;border:none;border-radius:10px;font-family:'DM Sans',system-ui,sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:.04em;transition:background .12s}
-  #serving-cancel{background:#1e1e1e;color:#777;border:1px solid #2a2a2a}
+  .serving-btns button{padding:14px;border:none;border-radius:10px;font-family:'DM Sans',system-ui,sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:.04em;transition:background .12s}
+  #serving-cancel{background:#1e1e1e;color:#666;border:1px solid #2a2a2a}
   #serving-cancel:hover{color:#fff;background:#252525}
   #serving-add{background:#16a34a;color:#fff}
   #serving-add:hover{background:#15803d}
@@ -1273,12 +1285,18 @@ applyNutritionTierGates();
   <div class="serving-modal">
     <div class="serving-food-name" id="serving-name"></div>
     <div class="serving-per100" id="serving-per100"></div>
-    <div class="serving-input-row">
-      <label for="serving-grams">Amount</label>
-      <div style="display:flex;align-items:center">
-        <input type="number" id="serving-grams" value="100" min="1" max="5000" inputmode="numeric">
-        <span class="serving-g-unit">g</span>
-      </div>
+    <div class="sv-size-lbl">Serving size</div>
+    <div class="sv-chips" id="sv-chips"></div>
+    <div class="sv-qty-row">
+      <span class="sv-qty-lbl">Qty</span>
+      <button class="sv-qty-btn" id="sv-minus" type="button">−</button>
+      <input type="number" id="sv-qty" value="1" min="0.25" step="0.25" inputmode="decimal">
+      <button class="sv-qty-btn" id="sv-plus" type="button">+</button>
+    </div>
+    <div class="sv-grams-row">
+      <span class="sv-grams-eq">= </span>
+      <input type="number" id="serving-grams" value="100" min="1" max="5000" inputmode="numeric" placeholder="g">
+      <span class="serving-g-unit">g</span>
     </div>
     <div class="serving-preview" id="serving-preview"></div>
     <div class="serving-btns">
@@ -1433,14 +1451,51 @@ applyNutritionTierGates();
     });
   }
 
+  let _svChips=[];
+
+  function buildDefaultServings(food){
+    const arr=[];
+    const sq=food.sq||100;
+    if(food.serving_size&&food.serving_size.trim()){
+      arr.push({n:food.serving_size.trim(),g:sq});
+    } else if(sq!==100){
+      arr.push({n:'1 serving',g:sq});
+    }
+    if(!arr.find(s=>s.g===100)) arr.push({n:'100g',g:100});
+    if(sq>=200&&!arr.find(s=>s.g===Math.round(sq/2))) arr.push({n:'½ serving',g:Math.round(sq/2)});
+    if(!arr.find(s=>s.g===50)&&sq>80) arr.push({n:'50g',g:50});
+    return arr.sort((a,b)=>a.g-b.g);
+  }
+
+  function renderChips(chips, activeIdx){
+    const el=document.getElementById('sv-chips');
+    el.innerHTML=chips.map((s,i)=>
+      '<button class="sv-chip'+(i===activeIdx?' active':'')+'" data-idx="'+i+'" type="button">'+esc(s.n)+'</button>'
+    ).join('');
+    el.querySelectorAll('.sv-chip').forEach(btn=>btn.addEventListener('click',function(){
+      el.querySelectorAll('.sv-chip').forEach(b=>b.classList.remove('active'));
+      this.classList.add('active');
+      const s=_svChips[parseInt(this.dataset.idx)];
+      const qty=Math.max(0.25,parseFloat(document.getElementById('sv-qty').value)||1);
+      document.getElementById('serving-grams').value=Math.round(s.g*qty);
+      calcPreview();
+    }));
+  }
+
   function openServing(food, editRef, grams){
     _sel=food; _editRef=editRef||null;
     document.getElementById('food-overlay').classList.remove('show');
-    document.getElementById('serving-name').textContent=food.name;
+    document.getElementById('serving-name').textContent=food.name+(food.brand?' · '+food.brand:'');
     document.getElementById('serving-per100').textContent=
-      'Per 100g — '+Math.round(food.cal100)+' kcal · Protein '+Math.round(food.p100)+'g · Carbs '+Math.round(food.c100)+'g · Fat '+Math.round(food.f100)+'g'
-      +(food.serving_size?' (serving: '+food.serving_size+')':'');
-    document.getElementById('serving-grams').value=grams||food.sq||100;
+      Math.round(food.cal100)+' kcal · P '+Math.round(food.p100)+'g · C '+Math.round(food.c100)+'g · F '+Math.round(food.f100)+'g  (per 100g)';
+
+    _svChips=(food.servings&&food.servings.length)?food.servings:buildDefaultServings(food);
+
+    const initG=grams||food.sq||_svChips[0].g;
+    const matchIdx=_svChips.findIndex(s=>s.g===initG);
+    renderChips(_svChips, matchIdx>=0?matchIdx:0);
+    document.getElementById('sv-qty').value='1';
+    document.getElementById('serving-grams').value=matchIdx>=0?initG:_svChips[0].g;
     document.getElementById('serving-add').textContent=_editRef?'Save changes':('Add to '+targetMealName());
     calcPreview();
     document.getElementById('serving-overlay').classList.add('show');
@@ -1451,10 +1506,40 @@ applyNutritionTierGates();
     const g=Math.max(1,Number(document.getElementById('serving-grams').value)||100);
     const r=g/100;
     const cal=Math.round(_sel.cal100*r),p=Math.round(_sel.p100*r),c=Math.round(_sel.c100*r),f=Math.round(_sel.f100*r);
-    document.getElementById('serving-preview').textContent=g+'g  →  '+cal+' kcal  ·  P:'+p+'g  ·  C:'+c+'g  ·  F:'+f+'g';
+    document.getElementById('serving-preview').innerHTML=
+      '<strong style="font-size:15px">'+g+'g</strong>  &rarr;  <span style="color:#86efac;font-size:16px">'+cal+' kcal</span>  ·  P:'+p+'g  ·  C:'+c+'g  ·  F:'+f+'g';
   }
 
-  document.getElementById('serving-grams').addEventListener('input',calcPreview);
+  document.getElementById('serving-grams').addEventListener('input',function(){
+    document.getElementById('sv-chips').querySelectorAll('.sv-chip').forEach(b=>b.classList.remove('active'));
+    document.getElementById('sv-qty').value='1';
+    calcPreview();
+  });
+  document.getElementById('sv-minus').addEventListener('click',function(){
+    const active=document.getElementById('sv-chips').querySelector('.sv-chip.active');
+    const chipG=active?_svChips[parseInt(active.dataset.idx)].g:100;
+    const qEl=document.getElementById('sv-qty');
+    const q=Math.max(0.25,parseFloat(qEl.value||1)-0.5);
+    qEl.value=q%1===0?q:q.toFixed(1);
+    document.getElementById('serving-grams').value=Math.round(chipG*q);
+    calcPreview();
+  });
+  document.getElementById('sv-plus').addEventListener('click',function(){
+    const active=document.getElementById('sv-chips').querySelector('.sv-chip.active');
+    const chipG=active?_svChips[parseInt(active.dataset.idx)].g:100;
+    const qEl=document.getElementById('sv-qty');
+    const q=parseFloat(qEl.value||1)+0.5;
+    qEl.value=q%1===0?q:q.toFixed(1);
+    document.getElementById('serving-grams').value=Math.round(chipG*q);
+    calcPreview();
+  });
+  document.getElementById('sv-qty').addEventListener('input',function(){
+    const active=document.getElementById('sv-chips').querySelector('.sv-chip.active');
+    const chipG=active?_svChips[parseInt(active.dataset.idx)].g:100;
+    const q=Math.max(0.25,parseFloat(this.value)||1);
+    document.getElementById('serving-grams').value=Math.round(chipG*q);
+    calcPreview();
+  });
 
   function toast(msg){
     const t=document.createElement('div');

@@ -28,4 +28,24 @@
   window.addEventListener('storage', function(e){ if(e.key === KEY) apply(get()); });
 
   window.DevFitTheme = { get:get, set:set, toggle:toggle, apply:apply };
+
+  // ---------- iOS-style page-exit fade on in-app navigation ----------
+  (function(){
+    if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var APP_PAGES = /(^|\/)(index|nutrition|workouts|settings|login|pricing)\.html(\?|#|$)/i;
+    document.addEventListener('click', function(e){
+      if(e.defaultPrevented || e.button!==0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      var a = e.target.closest && e.target.closest('a[href]');
+      if(!a) return;
+      var href = a.getAttribute('href');
+      if(!href || a.target==='_blank' || href[0]==='#' || /^(mailto:|tel:|https?:|wa\.me)/i.test(href)) return;
+      if(!APP_PAGES.test(href)) return;            // only fade between our own pages
+      if(a.classList.contains('active')) return;   // already here
+      e.preventDefault();
+      document.documentElement.classList.add('df-leaving');
+      setTimeout(function(){ window.location.href = href; }, 150);
+    }, true);
+    // If restored from bfcache (back/forward), clear the leaving state
+    window.addEventListener('pageshow', function(){ document.documentElement.classList.remove('df-leaving'); });
+  })();
 })();

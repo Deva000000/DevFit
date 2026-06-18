@@ -550,6 +550,7 @@ html.nosplash #devfit-splash{display:none!important}
     </div>
     <div style="margin-top:12px;font-size:11px;color:#e2e8f0;line-height:1.6;" id="score-legend">
       Score weighted across 7 signals — Overload 22% · Diet 23% · Bodyweight 17% · Body fat 10% · Sleep 10% · Steps 10% · Stress 8%. Untracked signals are skipped and the rest re-normalise automatically. Recomp credit applies if body-fat drops while weight stalls.
+      <div style="margin-top:8px;opacity:.85;">Bodyweight is scored on weekly rate of change: <b>loss 0.5–1%/wk</b> (lean-mass sparing — Helms 2014), <b>lean gain 0.25–0.5%/wk</b> (Aragon &amp; Schoenfeld 2013), <b>maintain ±0.5%/wk</b>. Steps target 8–10k/day (Paluch 2022, Lancet); sleep 7–9h (AASM/NSF).</div>
     </div>
     <button class="wk-share-btn" id="wk-share-btn" type="button">Share Weekly Card</button>
   </div>
@@ -624,10 +625,9 @@ html.nosplash #devfit-splash{display:none!important}
   <!-- ACTIONS -->
   <div class="card">
     <div class="action-row">
-      <button class="pdf-btn" id="week-export-btn" onclick="exportPDF()">Export This Week (PDF)</button>
       <button class="btn danger" onclick="clearWeek()">Clear this week</button>
     </div>
-    <div style="font-size:11px;color:#aaa;margin-top:10px;line-height:1.5">More options — Logout, Reports, Sync, Reset — are in the <a href="settings.html" style="color:#cc0000;text-decoration:none;font-weight:700">Settings tab</a>.</div>
+    <div style="font-size:11px;color:#aaa;margin-top:10px;line-height:1.5">Reports, Logout, Sync &amp; Reset are in the <a href="settings.html" style="color:#cc0000;text-decoration:none;font-weight:700">Settings tab</a>. Generate a full week report (habits + workouts + nutrition) there.</div>
   </div>
 
 </div>
@@ -903,11 +903,13 @@ function avg(arr){
 }
 
 // ---------- DevFit scoring v2 (balanced, 7-signal, recomp credit) ----------
+// Steps: mortality/health benefit rises to ~8,000–10,000/day then plateaus
+// (Paluch et al. 2022, Lancet Public Health; Saint-Maurice 2020 JAMA).
 function stepsScore(s){
   if(s===null) return null;
-  if(s>=10000) return 100;
-  if(s>=7500)  return 80;
-  if(s>=5000)  return 55;
+  if(s>=8000)  return 100; // benefit plateau reached
+  if(s>=7000)  return 85;
+  if(s>=5000)  return 60;
   if(s>=3000)  return 35;
   return 20;
 }
@@ -985,6 +987,12 @@ function bfScore(dir){
 function dietScore(d){ if(d==='met') return 100; if(d==='missed_few') return 70; if(d==='binge') return 25; return null; }
 function stressScore(s){ if(s==='low') return 100; if(s==='moderate') return 55; if(s==='high') return 30; return null; }
 
+// Bodyweight rate-of-change scoring, based on published guidance:
+//  • Loss: 0.5–1.0 %BW/week preserves lean mass; >1% risks muscle loss
+//    (Helms et al. 2014, JISSN; Garthe et al. 2011). <0.5% is safe but slow.
+//  • Lean gain: ~0.25–0.5 %BW/week (trained), faster mostly adds fat
+//    (Aragon & Schoenfeld 2013; Garthe 2013). Novices tolerate up to ~1%.
+//  • Maintain: within ±0.5 %BW/week = stable.
 function bwScore(bwAvg, prevBwAvg, goalType, weekIndex){
   if(weekIndex===0) return null; // Week 1 is baseline — no score yet
   if(bwAvg===null || prevBwAvg===null) return null;
@@ -997,23 +1005,25 @@ function bwScore(bwAvg, prevBwAvg, goalType, weekIndex){
     if(goalType==='maintain'&&Math.abs(bwAvg-tw)<=0.25) return 100;
   }
   if(goalType==='loss'){
-    if(pct<=-0.25&&pct>=-1) return 100; // ideal: 0.25–1% drop/week
-    if(pct<-1)              return 75;  // dropping too fast
-    if(pct<0)               return 75;  // dropping < 0.25% — still positive
-    if(pct<=0.25)           return 50;  // flat
-    return 20;                          // gaining
+    if(pct<=-0.5 && pct>=-1.0) return 100; // ideal 0.5–1%/wk (lean-mass sparing)
+    if(pct<-1.0)               return 65;  // too aggressive — muscle-loss risk
+    if(pct<-0.25)              return 88;  // 0.25–0.5%/wk — safe, slightly slow
+    if(pct<0)                  return 72;  // <0.25%/wk — losing but very slow
+    if(pct<=0.25)              return 45;  // essentially flat
+    return 20;                             // gaining (wrong direction)
   }
   if(goalType==='gain'){
-    if(pct>=0.25&&pct<=1)   return 100; // ideal lean gain
-    if(pct>1)               return 75;  // gaining too fast
-    if(pct>0)               return 75;  // gaining < 0.25%
-    if(pct>=-0.25)          return 50;  // flat
-    return 20;                          // losing
+    if(pct>=0.25 && pct<=0.5)  return 100; // ideal lean gain 0.25–0.5%/wk
+    if(pct>0.5 && pct<=1.0)    return 80;  // acceptable (more fat for non-novices)
+    if(pct>1.0)                return 55;  // too fast — excess fat gain
+    if(pct>0)                  return 70;  // <0.25%/wk — gaining slowly
+    if(pct>=-0.25)             return 45;  // essentially flat
+    return 20;                             // losing (wrong direction)
   }
-  // maintain
-  if(Math.abs(pct)<=0.25)  return 100;
-  if(Math.abs(pct)<=0.5)   return 75;
-  if(Math.abs(pct)<=1)     return 50;
+  // maintain — stability around current weight
+  if(Math.abs(pct)<=0.5)   return 100; // within ±0.5%/wk = stable
+  if(Math.abs(pct)<=1.0)   return 70;
+  if(Math.abs(pct)<=1.5)   return 45;
   return 25;
 }
 

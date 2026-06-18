@@ -646,49 +646,59 @@ function avg(arr){
   const n = arr.filter(v=>v!=='').map(Number).filter(n=>!isNaN(n)&&n>0);
   return n.length ? n.reduce((a,b)=>a+b,0)/n.length : null;
 }
-function stepsScore(s){if(s===null)return null;if(s>=10000)return 100;if(s>=7500)return 80;if(s>=5000)return 55;if(s>=3000)return 35;return 15;}
-function sleepScore(h){if(h===null)return null;if(h>=7&&h<=9)return 100;if(h>=6&&h<10)return 75;if(h>=5)return 45;return 20;}
+// NOTE: kept identical to index.html so app score === report score (see [[scoring-duplicated-divergent]]).
+function stepsScore(s){if(s===null)return null;if(s>=8000)return 100;if(s>=7000)return 85;if(s>=5000)return 60;if(s>=3000)return 35;return 20;}
+function sleepScore(h){if(h===null)return null;if(h>=7&&h<=9)return 100;if(h>=9&&h<10)return 75;if(h>=6&&h<7)return 75;if(h>=10)return 50;if(h>=5&&h<6)return 45;return 20;}
 function overloadScore(ol){if(ol==='improved')return 100;if(ol==='form')return 75;if(ol==='same')return 60;if(ol==='regressed')return 30;return null;}
 function bfScore(dir){if(dir==='drop_clear')return 100;if(dir==='drop_slight')return 85;if(dir==='same')return 60;if(dir==='rise_slight')return 35;if(dir==='rise_clear')return 10;return null;}
 function dietScore(d){if(d==='met')return 100;if(d==='missed_few')return 70;if(d==='binge')return 25;return null;}
 function stressScore(s){if(s==='low')return 100;if(s==='moderate')return 55;if(s==='high')return 30;return null;}
 
-function bwScore(bwAvg, prevBwAvg, goalType){
-  if(bwAvg===null) return null;
-  const sw = appData.startWeight ? parseFloat(appData.startWeight) : null;
+// Mirror of index.html bwScore — science-based %BW/week bands.
+// Loss 0.5–1%/wk (lean-mass sparing; Helms 2014), gain 0.25–0.5%/wk
+// (Aragon & Schoenfeld 2013), maintain ±0.5%/wk.
+function bwScore(bwAvg, prevBwAvg, goalType, weekIndex){
+  if(weekIndex===0) return null;
+  if(bwAvg===null || prevBwAvg===null) return null;
+  const pct=(bwAvg-prevBwAvg)/prevBwAvg*100;
   const tw = appData.goal ? parseFloat(appData.goal) : null;
   if(tw!==null){
     if(goalType==='loss'&&bwAvg<=tw) return 100;
     if(goalType==='gain'&&bwAvg>=tw) return 100;
-    if(goalType==='maintain'&&Math.abs(bwAvg-tw)<=0.5) return 100;
+    if(goalType==='maintain'&&Math.abs(bwAvg-tw)<=0.25) return 100;
   }
-  if(prevBwAvg===null){
-    if(sw===null||tw===null) return null;
-    const totalGap = Math.abs(tw-sw);
-    if(totalGap===0) return 100;
-    const done = Math.abs(bwAvg-sw);
-    return Math.min(100, Math.round((done/totalGap)*100));
-  }
-  const diff = bwAvg-prevBwAvg;
   if(goalType==='loss'){
-    if(diff<-0.5) return 100; if(diff<-0.2) return 90; if(diff<0) return 75; if(diff<0.3) return 50; return 20;
-  } else if(goalType==='gain'){
-    if(diff>0.5) return 100; if(diff>0.2) return 90; if(diff>0) return 75; if(diff>-0.3) return 50; return 20;
+    if(pct<=-0.5 && pct>=-1.0) return 100;
+    if(pct<-1.0)               return 65;
+    if(pct<-0.25)              return 88;
+    if(pct<0)                  return 72;
+    if(pct<=0.25)              return 45;
+    return 20;
   }
-  if(Math.abs(diff)<=0.3) return 100;
-  if(Math.abs(diff)<=0.7) return 65;
-  return 30;
+  if(goalType==='gain'){
+    if(pct>=0.25 && pct<=0.5)  return 100;
+    if(pct>0.5 && pct<=1.0)    return 80;
+    if(pct>1.0)                return 55;
+    if(pct>0)                  return 70;
+    if(pct>=-0.25)             return 45;
+    return 20;
+  }
+  if(Math.abs(pct)<=0.5)   return 100;
+  if(Math.abs(pct)<=1.0)   return 70;
+  if(Math.abs(pct)<=1.5)   return 45;
+  return 25;
 }
 
 function calcTrueScore(w){
   const ci = appData.weeklyCheckin[w] || freshCheckin();
   const bwAvg = avg(appData.bw[w]);
-  const prevBwAvg = w>0 ? avg(appData.bw[w-1]) : null;
+  let prevBwAvg = null;
+  for(let pw=w-1;pw>=0;pw--){ const pa=avg(appData.bw[pw]); if(pa!==null){prevBwAvg=pa;break;} }
   const stepsAvg = avg(appData.steps[w]);
   const sleepAvg = avg(appData.sleep[w]);
   const gt = appData.goalType||'loss';
   const tw = appData.goal ? parseFloat(appData.goal) : null;
-  let bwVal = bwScore(bwAvg, prevBwAvg, gt);
+  let bwVal = bwScore(bwAvg, prevBwAvg, gt, w);
   let bfVal = bfScore(ci.bfDir);
   const bfDropping=(ci.bfDir==='drop_clear'||ci.bfDir==='drop_slight');
   if(bfDropping && bwVal!==null && bwVal<75) bwVal=75;
@@ -826,6 +836,38 @@ function buildExportCharts(){
   });
 }
 
+// ---------- REPORT DATA HELPERS ----------
+// Resolve the best display name (no generic "Client" fallback).
+function reportName(){
+  try{
+    if(appData.clientName && appData.clientName.trim()) return appData.clientName.trim();
+    const u=JSON.parse(localStorage.getItem('devfit_user')||'{}');
+    if(u.name && String(u.name).trim()) return String(u.name).trim();
+    if(u.email) return u.email.split('@')[0];
+  }catch(e){}
+  return 'Athlete';
+}
+function ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+// Map a 0-indexed program week to its 7 calendar date strings (Mon→Sun), based on user.startDate.
+function weekDateStrings(w){
+  let start=null;
+  try{ const u=JSON.parse(localStorage.getItem('devfit_user')||'{}'); if(u.startDate) start=new Date(u.startDate); }catch(e){}
+  if(!start||isNaN(start)) return null; // no anchor → can't map calendar data
+  start.setHours(0,0,0,0);
+  const out=[];
+  for(let i=0;i<7;i++){ const d=new Date(start); d.setDate(start.getDate()+w*7+i); out.push(ymd(d)); }
+  return out;
+}
+function loadNutrition(){ try{ return JSON.parse(localStorage.getItem('devfitNutritionV2')||'null')||{targets:{},days:{}}; }catch(e){ return {targets:{},days:{}}; } }
+function loadTraining(){ try{ return JSON.parse(localStorage.getItem('devfitTrainingV1')||'null')||{plan:{workouts:[]},sessions:[]}; }catch(e){ return {plan:{workouts:[]},sessions:[]}; } }
+function dayMacros(day){
+  if(!day) return null;
+  let cal=0,p=0,c=0,f=0,n=0;
+  (day.meals||[]).forEach(m=>(m.items||[]).forEach(it=>{ cal+=Number(it.cal)||0; p+=Number(it.p)||0; c+=Number(it.c)||0; f+=Number(it.f)||0; n++; }));
+  if(n===0) return null;
+  return {cal:Math.round(cal),p:Math.round(p),c:Math.round(c),f:Math.round(f),items:n};
+}
+
 // ---------- WEEK PDF ----------
 function exportWeekPDF(){
   if(!window.jspdf){ toast('PDF library still loading…', true); return; }
@@ -859,7 +901,7 @@ function exportWeekPDF(){
       pdf.setTextColor(60,60,60); pdf.setFont('helvetica','bold'); pdf.setFontSize(12);
       pdf.text(' · Week '+(w+1)+' Report', M+dw+fw, 27);
       pdf.setFont('helvetica','normal'); pdf.setFontSize(9.5); pdf.setTextColor(110,110,110);
-      pdf.text((appData.clientName||'Client').toUpperCase(), M, 34);
+      pdf.text(reportName().toUpperCase(), M, 34);
       pdf.text(today, M, 40);
       if(pdfLogoImg) pdf.addImage(pdfLogoImg,'PNG',189,15,15,15);
       pdf.setDrawColor(204,0,0); pdf.setLineWidth(0.5); pdf.line(M,44,PW-M,44);
@@ -956,24 +998,132 @@ function exportWeekPDF(){
 
       // ── TRAINER NOTES ──
       if(ci.notes&&ci.notes.trim()){
-        if(y>258){ pdf.addPage(); y=20; }
+        if(y>250){ pdf.addPage(); y=20; }
         slab('TRAINER NOTES',y); y+=4;
         const lines=pdf.splitTextToSize(ci.notes,CW-8);
         const nh=lines.length*5+10;
         pdf.setFillColor(250,248,244); pdf.roundedRect(M,y,CW,nh,2,2,'F');
         pdf.setDrawColor(230,220,210); pdf.setLineWidth(0.3); pdf.roundedRect(M,y,CW,nh,2,2,'S');
         pdf.setFontSize(9); pdf.setFont('helvetica','normal'); pdf.setTextColor(50,50,50);
-        pdf.text(lines,M+4,y+7);
+        pdf.text(lines,M+4,y+7); y+=nh+4;
       }
 
-      // ── FOOTER ──
-      pdf.setFillColor(204,0,0); pdf.rect(0,287,PW,10,'F');
-      pdf.setFontSize(8); pdf.setFont('helvetica','normal'); pdf.setTextColor(255,255,255);
-      pdf.text('DevFit · Dominance Through Discipline',M,293);
-      pdf.setTextColor(255,200,200);
-      pdf.text('devfitportal.vercel.app',PW-M,293,{align:'right'});
+      // page-break helper
+      function ensure(need){ if(y+need>278){ pdf.addPage(); y=20; } }
 
-      pdf.save('DevFit_Week'+(w+1)+'_Report.pdf');
+      // ── DAILY LOG (Mon–Sun habits) ──
+      ensure(20);
+      slab('DAILY LOG',y); y+=4;
+      const DLABELS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+      pdf.setFillColor(30,30,35); pdf.rect(M,y,CW,7,'F');
+      pdf.setFontSize(7.5); pdf.setFont('helvetica','bold'); pdf.setTextColor(255,255,255);
+      pdf.text('Day',M+2,y+5); pdf.text('Weight (kg)',M+34,y+5); pdf.text('Steps',M+82,y+5); pdf.text('Sleep (hrs)',M+126,y+5);
+      y+=7;
+      for(let d=0;d<7;d++){
+        const bwv=appData.bw[w]&&appData.bw[w][d]!==''?appData.bw[w][d]:null;
+        const stv=appData.steps[w]&&appData.steps[w][d]!==''?appData.steps[w][d]:null;
+        const slv=appData.sleep[w]&&appData.sleep[w][d]!==''?appData.sleep[w][d]:null;
+        if(d%2===0){ pdf.setFillColor(248,248,250); pdf.rect(M,y,CW,6.5,'F'); }
+        pdf.setFontSize(8); pdf.setFont('helvetica','bold'); pdf.setTextColor(40,40,40); pdf.text(DLABELS[d],M+2,y+4.4);
+        pdf.setFont('helvetica','normal'); pdf.setTextColor(60,60,60);
+        pdf.text(bwv===null?'—':String(bwv),M+34,y+4.4);
+        pdf.text(stv===null?'—':Number(stv).toLocaleString(),M+82,y+4.4);
+        pdf.text(slv===null?'—':String(slv),M+126,y+4.4);
+        y+=6.5;
+      }
+      y+=6;
+
+      // ── WORKOUTS THIS WEEK ──
+      const train=loadTraining();
+      const wkDates=weekDateStrings(w);
+      const planMap={}; (train.plan&&train.plan.workouts||[]).forEach(wo=>{ planMap[wo.id]={name:wo.name||'Workout',ex:{}}; (wo.exercises||[]).forEach(ex=>{ planMap[wo.id].ex[ex.id]=ex.name||'Exercise'; }); });
+      let sessions=[];
+      if(wkDates){ sessions=(train.sessions||[]).filter(s=>wkDates.indexOf(s.date)>=0).sort((a,b)=>a.date.localeCompare(b.date)); }
+      ensure(16);
+      slab('WORKOUTS THIS WEEK'+(wkDates?'':' (no program start date set)'),y); y+=5;
+      if(sessions.length===0){
+        pdf.setFontSize(9); pdf.setFont('helvetica','italic'); pdf.setTextColor(150,150,150);
+        pdf.text(wkDates?'No sessions logged this week.':'Set a program start date to link training sessions.',M,y); y+=8;
+      } else {
+        sessions.forEach(s=>{
+          const pm=planMap[s.workoutId]||{name:'Workout',ex:{}};
+          ensure(12);
+          pdf.setFillColor(244,238,238); pdf.roundedRect(M,y,CW,7,1.5,1.5,'F');
+          pdf.setFontSize(8.5); pdf.setFont('helvetica','bold'); pdf.setTextColor(150,0,0);
+          pdf.text(pm.name,M+3,y+4.8);
+          pdf.setFont('helvetica','normal'); pdf.setTextColor(110,110,110); pdf.setFontSize(7.5);
+          pdf.text(s.date,PW-M-3,y+4.8,{align:'right'});
+          y+=8.5;
+          (s.logs||[]).forEach(lg=>{
+            const done=(lg.sets||[]).filter(st=>st.reps!==''&&st.reps!=null);
+            if(done.length===0) return;
+            const setStr=done.map(st=>(st.reps||'?')+'×'+(st.weight!==''&&st.weight!=null?st.weight+'kg':'BW')).join('  ·  ');
+            ensure(6);
+            pdf.setFontSize(8); pdf.setFont('helvetica','bold'); pdf.setTextColor(45,45,45);
+            const exName=pm.ex[lg.exId]||'Exercise';
+            pdf.text(exName,M+5,y+3.6);
+            pdf.setFont('helvetica','normal'); pdf.setTextColor(80,80,80);
+            const lines=pdf.splitTextToSize(setStr,CW-58);
+            pdf.text(lines,M+56,y+3.6);
+            y+=Math.max(5.5,lines.length*4.5+1.5);
+          });
+          y+=3;
+        });
+      }
+      y+=4;
+
+      // ── NUTRITION THIS WEEK ──
+      const nut=loadNutrition();
+      const tgt=nut.targets||{};
+      ensure(20);
+      slab('NUTRITION THIS WEEK'+(wkDates?'':' (no program start date set)'),y); y+=5;
+      if(!wkDates){
+        pdf.setFontSize(9); pdf.setFont('helvetica','italic'); pdf.setTextColor(150,150,150);
+        pdf.text('Set a program start date to link nutrition logs.',M,y); y+=8;
+      } else {
+        pdf.setFillColor(30,30,35); pdf.rect(M,y,CW,7,'F');
+        pdf.setFontSize(7.5); pdf.setFont('helvetica','bold'); pdf.setTextColor(255,255,255);
+        pdf.text('Day',M+2,y+5); pdf.text('Calories',M+30,y+5); pdf.text('Protein',M+70,y+5); pdf.text('Carbs',M+105,y+5); pdf.text('Fat',M+140,y+5);
+        y+=7;
+        let logged=0,calSum=0,pSum=0;
+        for(let d=0;d<7;d++){
+          const mac=dayMacros(nut.days&&nut.days[wkDates[d]]);
+          if(d%2===0){ pdf.setFillColor(248,248,250); pdf.rect(M,y,CW,6.5,'F'); }
+          pdf.setFontSize(8); pdf.setFont('helvetica','bold'); pdf.setTextColor(40,40,40); pdf.text(DLABELS[d],M+2,y+4.4);
+          pdf.setFont('helvetica','normal'); pdf.setTextColor(60,60,60);
+          if(mac){
+            logged++; calSum+=mac.cal; pSum+=mac.p;
+            pdf.text(mac.cal.toLocaleString()+(tgt.cal?(' / '+tgt.cal):''),M+30,y+4.4);
+            pdf.text(mac.p+'g',M+70,y+4.4); pdf.text(mac.c+'g',M+105,y+4.4); pdf.text(mac.f+'g',M+140,y+4.4);
+          } else {
+            pdf.setTextColor(170,170,170);
+            pdf.text('—',M+30,y+4.4); pdf.text('—',M+70,y+4.4); pdf.text('—',M+105,y+4.4); pdf.text('—',M+140,y+4.4);
+          }
+          y+=6.5;
+        }
+        y+=2;
+        pdf.setFontSize(8); pdf.setFont('helvetica','bold'); pdf.setTextColor(80,80,80);
+        if(logged>0){
+          pdf.text('Logged '+logged+'/7 days · avg '+Math.round(calSum/logged).toLocaleString()+' kcal · avg '+Math.round(pSum/logged)+'g protein',M,y);
+        } else {
+          pdf.setFont('helvetica','italic'); pdf.setTextColor(150,150,150);
+          pdf.text('No nutrition logged this week.',M,y);
+        }
+        y+=6;
+      }
+
+      // ── PER-PAGE FOOTER ──
+      const pages=pdf.getNumberOfPages();
+      for(let pn=1;pn<=pages;pn++){
+        pdf.setPage(pn);
+        pdf.setFillColor(204,0,0); pdf.rect(0,287,PW,10,'F');
+        pdf.setFontSize(8); pdf.setFont('helvetica','normal'); pdf.setTextColor(255,255,255);
+        pdf.text('DevFit · Dominance Through Discipline',M,293);
+        pdf.setTextColor(255,200,200);
+        pdf.text('Page '+pn+'/'+pages+'  ·  devfitportal.vercel.app',PW-M,293,{align:'right'});
+      }
+
+      pdf.save('DevFit_Week'+(w+1)+'_'+reportName().replace(/[^a-z0-9]/gi,'')+'.pdf');
       toast('Week report saved');
     }catch(e){ console.error(e); toast('Export failed', true); }
   }, 300);
@@ -1010,7 +1160,7 @@ function exportProgramPDF(){
       function miniHeader(label){
         pdf.setFillColor(204,0,0); pdf.rect(0,0,PW,10,'F');
         pdf.setFontSize(9); pdf.setFont('helvetica','bold'); pdf.setTextColor(255,255,255);
-        pdf.text('DevFit · '+(appData.clientName||'Client')+' · '+label,M,7);
+        pdf.text('DevFit · '+reportName()+' · '+label,M,7);
       }
       function tableHeader(y){
         pdf.setFillColor(30,30,35); pdf.rect(M,y,CW,8,'F');
@@ -1031,7 +1181,7 @@ function exportProgramPDF(){
       pdf.setTextColor(60,60,60); pdf.setFont('helvetica','bold'); pdf.setFontSize(12);
       pdf.text(' · Program Report',M+dw+fw,27);
       pdf.setFont('helvetica','normal'); pdf.setFontSize(9.5); pdf.setTextColor(110,110,110);
-      pdf.text((appData.clientName||'Client').toUpperCase(),M,34);
+      pdf.text(reportName().toUpperCase(),M,34);
       pdf.text(today+' · '+weeksToInclude+' weeks',M,40);
       if(pdfLogoImg) pdf.addImage(pdfLogoImg,'PNG',189,15,15,15);
       pdf.setDrawColor(204,0,0); pdf.setLineWidth(0.5); pdf.line(M,44,PW-M,44);

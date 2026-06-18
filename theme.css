@@ -9,6 +9,13 @@
   --df-accent2:#ff4444;
 }
 
+/* ---------- PAGE TRANSITIONS (iOS-style fade; opacity only to keep fixed nav intact) ---------- */
+@media (prefers-reduced-motion: no-preference){
+  body{animation:df-page-in .24s cubic-bezier(.22,.61,.36,1);will-change:opacity}
+  @keyframes df-page-in{from{opacity:0}to{opacity:1}}
+  html.df-leaving body{opacity:0;transition:opacity .15s cubic-bezier(.4,0,1,1)}
+}
+
 /* ---------- LIGHT THEME ---------- */
 html[data-theme="light"]{
   color-scheme:light;
@@ -56,6 +63,12 @@ html[data-theme="light"] nav.devfit-tabnav a.active{color:#fff !important;}
 html[data-theme="light"] nav.prog-subnav button{color:#6b6258 !important;}
 html[data-theme="light"] nav.prog-subnav button:hover{color:#14110e !important;}
 html[data-theme="light"] nav.prog-subnav button.active{color:#fff !important;}
+
+/* Week tabs: inactive pill text is white (for dark bg) — flip to dark in light mode */
+html[data-theme="light"] .wtab{color:#7a2020 !important;border-color:rgba(204,0,0,0.45) !important;}
+html[data-theme="light"] .wtab.active{color:#fff !important;}
+html[data-theme="light"] .wtab-action{color:#a33 !important;border-color:rgba(204,0,0,0.45) !important;}
+html[data-theme="light"] .wtab-action.danger{color:#cc0000 !important;border-color:rgba(204,0,0,0.5) !important;}
 
 /* Dark inline-surface panels → light */
 html[data-theme="light"] .stats-banner,

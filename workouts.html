@@ -60,6 +60,10 @@
   .inp{font-family:'DM Sans',system-ui,sans-serif;font-size:13px;padding:8px 12px;border:1px solid var(--bd);border-radius:var(--radius);background:#fff;color:#111;outline:none;width:100%}
   .inp:focus{border-color:#cc0000}
   select.inp{cursor:pointer}
+  input.log-date{-webkit-appearance:none;appearance:none;min-width:0;margin-bottom:10px}
+  .wk-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+  .wk-chip{font-family:'DM Sans',system-ui,sans-serif;font-size:13px;font-weight:700;padding:9px 16px;border-radius:22px;border:1.5px solid var(--bd);background:#fff;color:#333;cursor:pointer;transition:all .15s;white-space:nowrap}
+  .wk-chip.active{background:#cc0000;border-color:#cc0000;color:#fff;box-shadow:0 4px 12px rgba(204,0,0,0.3)}
 
   /* PLAN MODE */
   .workout-card{background:#fff;border:1px solid var(--bd);border-radius:var(--radius);padding:12px;margin-bottom:10px}
@@ -242,10 +246,8 @@ html.nosplash #devfit-splash{display:none!important}
   <div id="view-log">
     <div class="card">
       <div class="section-label">Today's session</div>
-      <div class="log-bar">
-        <input type="date" class="inp" id="log-date">
-        <select class="inp" id="log-workout"><option value="">Pick a workout…</option></select>
-      </div>
+      <input type="date" class="inp log-date" id="log-date">
+      <div id="log-workout-chips" class="wk-chips"></div>
       <div id="log-area"></div>
       <button class="share-btn" id="share-btn" disabled>Share Workout Card</button>
       <button class="reset-btn" id="reset-history-btn">&#8634; Reset session history</button>
@@ -641,7 +643,23 @@ function totalSetsCount(sets){return sets.filter(s=>(Number(s.reps)||0)>0||(Numb
 
 document.getElementById('log-date').value=todayStr();
 document.getElementById('log-date').addEventListener('change',renderLog);
-document.getElementById('log-workout').addEventListener('change',renderLog);
+
+// Which workout is loaded in the log view (replaces the old dropdown).
+let selectedWorkoutId='';
+// Auto-pick the workout to log: resume one already logged on this date, else the
+// least-recently trained (simple rotation), else the first in plan order.
+function autoPickWorkout(date){
+  const ws=data.plan.workouts;
+  if(!ws.length) return '';
+  const existing=data.sessions.find(s=>s.date===date && ws.find(w=>w.id===s.workoutId));
+  if(existing) return existing.workoutId;
+  let best=ws[0].id, bestKey=null;
+  ws.forEach(w=>{
+    const last=data.sessions.filter(s=>s.workoutId===w.id).map(s=>s.date).sort().pop()||'';
+    if(bestKey===null || last<bestKey){ best=w.id; bestKey=last; }
+  });
+  return best;
+}
 
 // Reset all logged sessions (clears test data) — keeps the workout plan
 document.getElementById('reset-history-btn').addEventListener('click',()=>{
@@ -658,27 +676,30 @@ document.getElementById('reset-history-btn').addEventListener('click',()=>{
 
 function renderLog(){
   // Log session + share (light/dark) are FREE; transparent theme is locked elsewhere
-  const sel=document.getElementById('log-workout');
-  const prevSel=sel.value;
-  sel.innerHTML='<option value="">Pick a workout…</option>'+
-    data.plan.workouts.map(w=>`<option value="${w.id}">${escapeHTML(w.name||'(unnamed)')}</option>`).join('');
-  if(prevSel && data.plan.workouts.find(w=>w.id===prevSel)) sel.value=prevSel;
-
+  const chips=document.getElementById('log-workout-chips');
   const date=document.getElementById('log-date').value||todayStr();
-  const wId=sel.value;
   const area=document.getElementById('log-area');
   const shareBtn=document.getElementById('share-btn');
   shareBtn.disabled=true;
   shareBtn.style.display='none';
 
   if(!data.plan.workouts.length){
+    chips.innerHTML='';
     area.innerHTML='<div class="session-empty">No workouts in your plan yet.<br><br>Switch to <strong>Edit Plan</strong> to create one.</div>';
     return;
   }
-  if(!wId){
-    area.innerHTML='<div class="session-empty">Pick a workout above to start logging.</div>';
-    return;
+
+  // Auto-select if nothing chosen yet (or the chosen one was deleted)
+  if(!selectedWorkoutId || !data.plan.workouts.find(w=>w.id===selectedWorkoutId)){
+    selectedWorkoutId=autoPickWorkout(date);
   }
+  const wId=selectedWorkoutId;
+
+  // Render workout chips (tap to switch — no dropdown)
+  chips.innerHTML=data.plan.workouts.map(w=>
+    `<button type="button" class="wk-chip${w.id===wId?' active':''}" data-wid="${w.id}">${escapeHTML(w.name||'(unnamed)')}</button>`
+  ).join('');
+  chips.querySelectorAll('.wk-chip').forEach(b=>b.addEventListener('click',()=>{ selectedWorkoutId=b.dataset.wid; renderLog(); }));
 
   const w=data.plan.workouts.find(x=>x.id===wId);
   if(!w){area.innerHTML='';return;}

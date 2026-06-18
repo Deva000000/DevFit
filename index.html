@@ -2081,6 +2081,18 @@ document.addEventListener('visibilitychange',function(){
 
   let wsTheme='light';
 
+  // Preload the DevFit silhouette (no wording) for the share-card brand mark.
+  let wsSilhouette=null, wsSilhouetteReady=null;
+  wsSilhouetteReady=new Promise(function(res){ const im=new Image(); im.onload=function(){wsSilhouette=im;res();}; im.onerror=function(){res();}; im.src='icon-512.png'; });
+  // Recolour the silhouette to any flat colour via source-in compositing.
+  function tintedSilhouette(color,size){
+    const c=document.createElement('canvas'); c.width=size; c.height=size;
+    const x=c.getContext('2d');
+    if(wsSilhouette) x.drawImage(wsSilhouette,0,0,size,size);
+    x.globalCompositeOperation='source-in'; x.fillStyle=color; x.fillRect(0,0,size,size);
+    return c;
+  }
+
   // Shared share-card font catalogue (matches Settings)
   function getShareFont(){
     let pref='dmsans';
@@ -2094,7 +2106,7 @@ document.addEventListener('visibilitychange',function(){
     };
     const d=defs[pref]||defs.dmsans;
     function wt(n){ let best=d.weights[0],bd=Infinity; d.weights.forEach(w=>{const df=Math.abs(w-n); if(df<bd){bd=df;best=w;}}); return best; }
-    return {face:d.face, scale:d.scale, wt:wt, key:pref};
+    return {face:d.face, scale:d.scale, wt:wt, key:pref, style:d.style||''};
   }
   async function loadShareFont(sf){
     const pfx=sf.style?sf.style+' ':'';
@@ -2114,7 +2126,7 @@ document.addEventListener('visibilitychange',function(){
   function drawWeekCard(){
     const canvas=document.getElementById('ws-canvas');
     const ctx=canvas.getContext('2d');
-    const W=canvas.width,H=canvas.height;
+    const W=canvas.width,H=canvas.height; // 1080 x 1350 (IG 4:5)
     const w=currentWeek;
     const {overall}=calcTrueScore(w);
     const bwAvg=avg(appData.bw[w]);
@@ -2123,100 +2135,102 @@ document.addEventListener('visibilitychange',function(){
     const recovery=calcRecoveryScore(w);
     const sessions=calcTrainingStreak();
 
-    const zoneCol = overall===null?null : overall>=75?'#16a34a':overall>=50?'#f59e0b':'#ef4444';
-    const zoneTxt = overall===null?'' : overall>=75?'GREAT WEEK':overall>=50?'SOLID WEEK':'KEEP PUSHING';
+    const zoneCol = overall===null?null : overall>=75?'#1f9d57':overall>=50?'#e08a00':'#e03131';
+    const zoneTxt = overall===null?'LOG YOUR WEEK' : overall>=75?'GREAT WEEK':overall>=50?'SOLID WEEK':'KEEP PUSHING';
 
     const palette={
-      light:      {bg:'#ffffff',fg:'#000000',sub:'#6b6b6b',accent:'#cc0000',divider:'rgba(0,0,0,0.08)'},
-      dark:       {bg:'#0a0a0a',fg:'#ffffff',sub:'#cfcfcf',accent:'#ff3a3a',divider:'rgba(255,255,255,0.14)'},
-      transparent:{bg:null,     fg:'#ffffff',sub:'#ffffff',accent:'#ff3a3a',divider:'rgba(255,255,255,0.20)'}
+      light:      {bg:'#faf8f5',fg:'#100f0d',sub:'#7c766d',accent:'#cc0000',hair:'rgba(16,15,13,0.10)',mark:'#100f0d'},
+      dark:       {bg:'#0b0b0c',fg:'#ffffff',sub:'#a7a4a0',accent:'#ff3b3b',hair:'rgba(255,255,255,0.13)',mark:'#ffffff'},
+      transparent:{bg:null,     fg:'#ffffff',sub:'#ededed',accent:'#ff5252',hair:'rgba(255,255,255,0.22)',mark:'#ffffff'}
     };
     const pal=palette[wsTheme]||palette.light;
     const sf=getShareFont();
-    const F=(w2,px)=>(sf.style?sf.style+' ':'')+sf.wt(w2)+' '+Math.round(px*sf.scale)+'px '+sf.face;
+    const F=(weight,px)=>(sf.style?sf.style+' ':'')+sf.wt(weight)+' '+Math.round(px*sf.scale)+'px '+sf.face;
+    function LS(px){ try{ctx.letterSpacing=px+'px';}catch(e){} }
+    function noLS(){ try{ctx.letterSpacing='0px';}catch(e){} }
+    // metric-aware measure so every font sits on the grid without clashing
+    function meas(str,px){ const m=ctx.measureText(str); let a=m.actualBoundingBoxAscent,d=m.actualBoundingBoxDescent; if(!a||!isFinite(a)) a=px*0.72; if(!d||!isFinite(d)) d=px*0.12; return {w:m.width,a:a,d:d}; }
 
     ctx.clearRect(0,0,W,H);
     if(pal.bg){ ctx.fillStyle=pal.bg; ctx.fillRect(0,0,W,H); }
 
-    const PAD=90;
-    let y=PAD+20;
+    const M=92;
+    ctx.textAlign='left'; ctx.textBaseline='alphabetic';
 
-    // Eyebrow
-    ctx.textAlign='left'; ctx.textBaseline='top';
-    ctx.fillStyle=pal.accent;
-    ctx.font=F(800,34);
-    ctx.fillText('WEEK '+(w+1)+' PROGRESS',PAD,y);
-    y+=52;
-    // Date
-    ctx.fillStyle=pal.sub;
-    ctx.font=F(500,40);
-    ctx.fillText(new Date().toLocaleDateString(undefined,{day:'numeric',month:'long',year:'numeric'}),PAD,y);
-    y+=104;
+    // ── Editorial accent spine ──
+    let y=M+8;
+    ctx.fillStyle=pal.accent; ctx.fillRect(M,y,66,10);
+    y+=10+62;
 
-    // Score hero label
-    ctx.fillStyle=pal.sub;
-    ctx.font=F(700,30);
-    ctx.fillText('OVERALL SCORE',PAD,y);
-    y+=46;
-    // Hero number
-    const scoreStr = overall===null?'—':overall+'';
-    ctx.fillStyle = (wsTheme==='transparent') ? '#ffffff' : (zoneCol||pal.fg);
-    ctx.font=F(800,230);
-    ctx.fillText(scoreStr,PAD,y);
+    // ── Eyebrow ──
+    ctx.fillStyle=pal.accent; ctx.font=F(800,30); LS(7);
+    ctx.fillText('WEEK '+(w+1)+'   PROGRESS', M, y); noLS();
+    y+=66;
+
+    // ── Hero ──
+    ctx.fillStyle=pal.sub; ctx.font=F(700,29); LS(6);
+    ctx.fillText('OVERALL SCORE', M, y); noLS();
+    y+=34;
+
+    const scoreStr=overall===null?'—':String(overall);
+    ctx.font=F(800,290);
+    const hm=meas(scoreStr,290);
+    const numBase=y+hm.a;
+    ctx.fillStyle=zoneCol||pal.fg;
+    ctx.fillText(scoreStr,M,numBase);
     if(overall!==null){
-      const sW=ctx.measureText(scoreStr).width;
-      ctx.font=F(800,80);
-      ctx.fillText('%',PAD+sW+8,y+138);
+      ctx.font=F(800,92);
+      ctx.fillStyle=pal.accent;
+      ctx.fillText('%', M+hm.w+20, numBase);
     }
-    y+=250;
-    // Zone word
-    if(zoneTxt){
-      ctx.fillStyle = (wsTheme==='transparent') ? '#ffffff' : (zoneCol||pal.sub);
-      ctx.font=F(800,44);
-      ctx.fillText(zoneTxt,PAD,y);
-      y+=80;
-    } else { y+=20; }
+    y=numBase+hm.d+50;
 
-    // Divider
-    ctx.fillStyle=pal.divider;
-    ctx.fillRect(PAD,y,W-PAD*2,2);
-    y+=54;
+    // ── Zone word + accent underline ──
+    ctx.font=F(800,50); LS(3);
+    const zm=meas(zoneTxt,50);
+    ctx.fillStyle=pal.fg;
+    ctx.fillText(zoneTxt, M, y+zm.a); noLS();
+    ctx.fillStyle=zoneCol||pal.accent;
+    ctx.fillRect(M, y+zm.a+zm.d+16, Math.min(zm.w, W-M*2), 7);
+    y=y+zm.a+zm.d+16+7+58;
 
-    // Stat rows
+    // ── Stat rows with hairline separators ──
     const rows=[
-      {label:'Bodyweight', val: bwAvg===null?'—':bwAvg.toFixed(1)+' kg'},
-      {label:'Steps / day',val: stepsAvg===null?'—':Math.round(stepsAvg).toLocaleString()},
-      {label:'Sleep / night',val: sleepAvg===null?'—':sleepAvg.toFixed(1)+' h'},
-      {label:'Workouts',   val: sessions+' '+(sessions===1?'session':'sessions')},
-      {label:'Recovery',   val: recovery===null?'—':recovery+'%'}
+      {label:'Bodyweight',    val: bwAvg===null?'—':bwAvg.toFixed(1)+' kg'},
+      {label:'Steps / day',   val: stepsAvg===null?'—':Math.round(stepsAvg).toLocaleString()},
+      {label:'Sleep / night', val: sleepAvg===null?'—':sleepAvg.toFixed(1)+' h'},
+      {label:'Workouts',      val: sessions+' '+(sessions===1?'session':'sessions')},
+      {label:'Recovery',      val: recovery===null?'—':recovery+'%'}
     ];
-    const rowH=98;
-    rows.forEach(r=>{
-      ctx.fillStyle=pal.sub;
-      ctx.textAlign='left';
-      ctx.font=F(600,46);
-      ctx.fillText(r.label,PAD,y+6);
-      ctx.fillStyle=pal.fg;
-      ctx.textAlign='right';
-      ctx.font=F(800,52);
-      ctx.fillText(r.val,W-PAD,y);
+    const footTop=H-M-72;                 // reserve footer band
+    ctx.fillStyle=pal.hair; ctx.fillRect(M,y,W-M*2,2); y+=2;
+    const rowH=Math.min(102,(footTop-y)/rows.length);
+    rows.forEach(function(r){
+      const cy=y+rowH/2;
+      ctx.textBaseline='middle';
+      ctx.textAlign='left';  ctx.fillStyle=pal.sub; ctx.font=F(600,40);
+      ctx.fillText(r.label,M,cy);
+      ctx.textAlign='right'; ctx.fillStyle=pal.fg;  ctx.font=F(700,48);
+      ctx.fillText(r.val,W-M,cy);
       y+=rowH;
+      ctx.fillStyle=pal.hair; ctx.fillRect(M,y,W-M*2,1.5);
     });
-
-    // Footer
-    const fy=H-PAD;
     ctx.textBaseline='alphabetic';
-    ctx.font='italic 700 70px "Inter",system-ui,sans-serif';
+
+    // ── Footer: silhouette mark + DEVFIT wordmark (left), handle (right) ──
+    const fy=H-M;
+    const mark=64;
+    if(wsSilhouette){
+      ctx.drawImage(tintedSilhouette(pal.mark,mark), M, fy-mark+8, mark, mark);
+    }
+    const wx=M+(wsSilhouette?mark+20:0);
     ctx.textAlign='left';
-    const devCol=(wsTheme==='transparent')?'#ffffff':pal.fg;
-    const fitCol=(wsTheme==='transparent')?'#ffffff':pal.accent;
+    ctx.font='italic 800 60px "Inter",system-ui,sans-serif';
     const dW=ctx.measureText('DEV').width;
-    ctx.fillStyle=devCol; ctx.fillText('DEV',PAD,fy);
-    ctx.fillStyle=fitCol; ctx.fillText('FIT',PAD+dW,fy);
-    ctx.fillStyle=pal.sub;
-    ctx.font=F(600,36);
-    ctx.textAlign='right';
-    ctx.fillText(getHandle(),W-PAD,fy);
+    ctx.fillStyle=pal.fg;     ctx.fillText('DEV',wx,fy);
+    ctx.fillStyle=pal.accent; ctx.fillText('FIT',wx+dW,fy);
+    ctx.textAlign='right'; ctx.fillStyle=pal.sub; ctx.font=F(600,34);
+    ctx.fillText(getHandle(),W-M,fy);
   }
 
   function rerender(){
@@ -2226,6 +2240,7 @@ document.addEventListener('visibilitychange',function(){
 
   async function openModal(){
     try{ await document.fonts.load('italic 700 70px "Inter"'); }catch(e){}
+    try{ await wsSilhouetteReady; }catch(e){}
     await loadShareFont(getShareFont());
     rerender();
     document.getElementById('ws-overlay').classList.add('show');

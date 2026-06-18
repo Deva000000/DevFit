@@ -985,10 +985,7 @@ applyNutritionTierGates();
     ctx.font=F(800,34);
     ctx.fillText('DAILY NUTRITION',PAD,y);
     y+=52;
-    // Date
-    ctx.fillStyle=pal.sub;
-    ctx.font=F(500,40);
-    ctx.fillText(fmtDateLong(currentDate),PAD,y);
+    // (date removed — keep rhythm so nothing else shifts)
     y+=96;
 
     // Calories hero
@@ -1008,17 +1005,8 @@ applyNutritionTierGates();
     ctx.font=F(600,50);
     ctx.fillText(' kcal',PAD+calW+10,y+118);
     y+=210;
-    // Target subline
-    if(target){
-      const diff=cal-target;
-      const txt = Math.abs(diff)<=100 ? 'On target ('+target.toLocaleString()+' kcal)'
-                : diff>0 ? '+'+Math.round(diff).toLocaleString()+' over '+target.toLocaleString()+' target'
-                : Math.round(Math.abs(diff)).toLocaleString()+' under '+target.toLocaleString()+' target';
-      ctx.fillStyle=pal.sub;
-      ctx.font=F(500,38);
-      ctx.fillText(txt,PAD,y);
-      y+=72;
-    } else { y+=18; }
+    // (calorie-vs-target subline removed for a cleaner, minimal card)
+    y+=18;
 
     // Macro split bar — clip to a rounded pill, then fill crisp segments
     if(macroTotal>0){
@@ -1050,7 +1038,7 @@ applyNutritionTierGates();
       {label:'Carbs',  g:c,kcal:cCal,col:MACRO_COL.c},
       {label:'Fat',    g:f,kcal:fCal,col:MACRO_COL.f}
     ];
-    const rowH=128;
+    const rowH=104;
     rows.forEach(r=>{
       // color dot
       ctx.fillStyle=r.col;
@@ -1066,12 +1054,7 @@ applyNutritionTierGates();
       ctx.font=F(800,56);
       const gTxt=r.g+'g';
       ctx.fillText(gTxt,W-PAD,y);
-      // percent under value
-      if(macroTotal>0){
-        ctx.fillStyle=pal.sub;
-        ctx.font=F(500,34);
-        ctx.fillText(Math.round(r.kcal/macroTotal*100)+'% of kcal',W-PAD,y+62);
-      }
+      // (% of kcal removed for a cleaner, minimal card)
       y+=rowH;
     });
 

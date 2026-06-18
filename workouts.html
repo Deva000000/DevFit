@@ -493,63 +493,39 @@ function exportPlanPDF(){
   const INK=[21,21,26], SLATE=[74,101,114], GOLD=[198,144,47];
   const MUTE=[148,148,158], LINE=[228,228,232], CARD=[247,247,249];
 
-  // ---- HERO / RUNNING HEADER ----
+  // ---- HEADER ----
   function header(first){
-    const HH=first?54:22;
+    const HH=first?38:20;
     doc.setFillColor(...INK); doc.rect(0,0,W,HH,'F');
     doc.setFillColor(...RED); doc.rect(0,HH,W,1.4,'F');
-    // DEVFIT wordmark — EXACT logo lockup (bold ITALIC, DEV white / FIT crimson)
-    doc.setFont('helvetica','bolditalic'); doc.setFontSize(first?19:15);
-    const wy=first?15:14;
+    // DEVFIT wordmark — EXACT logo lockup (bold ITALIC), +20% size
+    doc.setFont('helvetica','bolditalic'); doc.setFontSize(first?23:16);
+    const wy=first?14:13;
     doc.setTextColor(255,255,255); doc.text('DEV',M,wy);
     const dW=doc.getTextWidth('DEV');
     doc.setTextColor(...RED); doc.text('FIT',M+dW,wy);
-    // kicker top-right
-    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...MUTE);
-    doc.text('WORKOUT PROGRAM',W-M,first?13:13,{align:'right',charSpace:0.6});
     if(first){
-      doc.setFont('helvetica','normal'); doc.setFontSize(6.3); doc.setTextColor(120,120,132);
-      doc.text('DOMINANCE THROUGH DISCIPLINE',M,20,{charSpace:0.5});
-      // big program title
-      doc.setFont('helvetica','bold'); doc.setFontSize(24); doc.setTextColor(255,255,255);
-      const title=progName.length>32?progName.slice(0,31)+'…':progName;
-      doc.text(title,M,39);
-      // meta line: prepared-for + date
-      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(170,170,180);
-      const meta=(client?('Prepared for '+client+'      '):'')+dateStr;
-      doc.text(meta,M,47);
+      doc.setFont('helvetica','normal'); doc.setFontSize(6.2); doc.setTextColor(120,120,132);
+      doc.text('DOMINANCE THROUGH DISCIPLINE',M,19,{charSpace:0.5});
+      // WORKOUT PROGRAM = the document title (readable)
+      doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(255,255,255);
+      doc.text('WORKOUT PROGRAM',W-M,16,{align:'right',charSpace:0.3});
+      // program name kept SMALL as a subtitle (no date)
+      doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(165,165,178);
+      const sub=progName+(client?('   ·   '+client):'');
+      doc.text(sub,W-M,23,{align:'right'});
+    } else {
+      doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...MUTE);
+      doc.text('WORKOUT PROGRAM',W-M,13,{align:'right',charSpace:0.6});
     }
   }
 
   header(true);
-  let y=64;
-
-  // ---- KPI STAT STRIP (dashboard cards) ----
-  const totalEx=workouts.reduce((s,w)=>s+w.exercises.filter(e=>e.name).length,0);
-  const totalSets=workouts.reduce((s,w)=>s+w.exercises.filter(e=>e.name)
-                    .reduce((a,e)=>a+(parseInt(e.tSets)||0),0),0);
-  const stats=[
-    {label:'WORKOUTS',   val:String(workouts.length), col:RED},
-    {label:'EXERCISES',  val:String(totalEx),         col:SLATE},
-    {label:'TOTAL SETS', val:String(totalSets),       col:GOLD}
-  ];
-  (function(){
-    const gap=5, n=stats.length, cw=(W-M*2-gap*(n-1))/n, ch=23;
-    stats.forEach((s,i)=>{
-      const x=M+i*(cw+gap);
-      doc.setFillColor(...CARD); doc.roundedRect(x,y,cw,ch,2.5,2.5,'F');
-      doc.setFont('helvetica','bold'); doc.setFontSize(22); doc.setTextColor(...s.col);
-      doc.text(s.val,x+6,y+13);
-      doc.setFillColor(...s.col); doc.rect(x+6,y+15.5,7,0.9,'F');   // accent underline
-      doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(...MUTE);
-      doc.text(s.label,x+6,y+20,{charSpace:0.5});
-    });
-    y+=ch+11;
-  })();
+  let y=50;
 
   // ---- DAY CARDS ----
   function ensureSpace(need){
-    if(y+need>H-20){ doc.addPage(); header(false); y=32; }
+    if(y+need>H-20){ doc.addPage(); header(false); y=30; }
   }
 
   workouts.forEach((w,wi)=>{

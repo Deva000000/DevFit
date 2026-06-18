@@ -39,6 +39,18 @@
   .wtab-action:hover{background:rgba(255,255,255,0.15)}
   .wtab-action.danger{border-color:rgba(255,150,150,0.5);color:rgba(255,180,180,0.9)}
   .wtab-action.danger:hover{background:rgba(255,100,100,0.15)}
+  /* Week tabs scroll horizontally instead of wrapping — keeps header one row tall */
+  #week-tabs{flex-wrap:nowrap !important;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;max-width:100%;padding-bottom:2px;mask-image:linear-gradient(90deg,#000 0,#000 92%,transparent);-webkit-mask-image:linear-gradient(90deg,#000 0,#000 92%,transparent)}
+  #week-tabs::-webkit-scrollbar{display:none}
+  #week-tabs .wtab,#week-tabs .wtab-action{flex-shrink:0}
+
+  /* PROGRESS SUB-TAB NAV (Daily / Weekly / Analytics) */
+  nav.prog-subnav{display:flex;gap:6px;background:rgba(17,17,17,0.55);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:5px;margin-bottom:14px;backdrop-filter:saturate(150%) blur(10px);-webkit-backdrop-filter:saturate(150%) blur(10px)}
+  nav.prog-subnav button{flex:1 1 0;min-width:0;padding:10px 6px;border:none;border-radius:8px;background:transparent;color:rgba(255,255,255,0.65);font-family:'DM Sans',system-ui,sans-serif;font-size:12px;font-weight:700;letter-spacing:.03em;cursor:pointer;transition:all .18s cubic-bezier(.2,.8,.2,1);white-space:nowrap}
+  nav.prog-subnav button:hover{color:#fff}
+  nav.prog-subnav button.active{background:#cc0000;color:#fff;box-shadow:0 6px 16px rgba(204,0,0,0.4)}
+  .prog-section{display:none}
+  .prog-section.active{display:block;animation:devfit-rise .35s cubic-bezier(.2,.8,.2,1) both}
 
   /* SHARED TAB NAV — Progress / Nutrition / Training */
   nav.devfit-tabnav{display:flex !important;background:#111;border-radius:14px;padding:6px;margin-bottom:14px;gap:4px;border:1px solid #2a2a2a;width:100%;box-sizing:border-box}
@@ -287,6 +299,10 @@ html.nosplash #devfit-splash{display:none!important}
 @media(prefers-reduced-motion:reduce){#devfit-splash .si,#devfit-splash .bar i{animation:none}}
 </style>
 <script>try{if(sessionStorage.getItem('devfit_splash_shown'))document.documentElement.className+=' nosplash';}catch(e){}</script>
+<!-- Shared theme: early-apply (no flash) + override stylesheet + controller -->
+<script>try{if(localStorage.getItem('devfit_theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
+<link rel="stylesheet" href="theme.css">
+<script defer src="theme.js"></script>
 </head>
 <body>
 <div id="devfit-splash"><div class="si"><img src="icon-192.png" alt="DevFit"><div class="w">DEV<b>FIT</b></div><div class="t">DOMINANCE THROUGH DISCIPLINE</div><div class="bar"><i></i></div></div></div>
@@ -371,6 +387,16 @@ html.nosplash #devfit-splash{display:none!important}
     </div>
   </div>
 
+  <!-- PROGRESS SUB-TAB NAV -->
+  <nav class="prog-subnav" id="prog-subnav">
+    <button type="button" data-sec="daily" class="active" onclick="showProgSection('daily')">Daily</button>
+    <button type="button" data-sec="weekly" onclick="showProgSection('weekly')">Weekly</button>
+    <button type="button" data-sec="analytics" onclick="showProgSection('analytics')">Analytics</button>
+  </nav>
+
+  <!-- ===== DAILY SECTION ===== -->
+  <div class="prog-section active" id="sec-daily">
+
   <!-- BODYWEIGHT GRID -->
   <div class="card">
     <div class="section-label">Bodyweight (kg) — log daily</div>
@@ -388,6 +414,11 @@ html.nosplash #devfit-splash{display:none!important}
     <div class="section-label">Sleep (hours)</div>
     <div class="metric-grid" id="sleep-grid"></div>
   </div>
+
+  </div><!-- ===== /DAILY SECTION ===== -->
+
+  <!-- ===== WEEKLY SECTION ===== -->
+  <div class="prog-section" id="sec-weekly">
 
   <!-- WEEKLY CHECK-IN -->
   <div class="card">
@@ -497,6 +528,11 @@ html.nosplash #devfit-splash{display:none!important}
     </div>
   </div>
 
+  </div><!-- ===== /WEEKLY SECTION ===== -->
+
+  <!-- ===== ANALYTICS SECTION ===== -->
+  <div class="prog-section" id="sec-analytics">
+
   <!-- PRO UPGRADE BANNER (shown to free users) -->
   <div class="pro-locked card" style="text-align:center;padding:28px 16px;background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid #334155;">
     <div style="font-size:22px;margin-bottom:8px;">🔒</div>
@@ -585,6 +621,8 @@ html.nosplash #devfit-splash{display:none!important}
     <div id="progress-summary" style="font-size:12px;color:#666666;margin-bottom:10px;min-height:16px;"></div>
     <div style="position:relative;height:200px;"><canvas id="progressChart"></canvas></div>
   </div>
+
+  </div><!-- ===== /ANALYTICS SECTION ===== -->
 
   <!-- ACTIONS -->
   <div class="card">
@@ -1181,6 +1219,18 @@ function renderScoreSection(){
       '<div style="font-size:10px;color:#999;margin:-4px 0 6px 0;padding-left:94px;">'+zone+'</div>';
   });
   document.getElementById('score-breakdown').innerHTML=html;
+}
+
+function showProgSection(sec){
+  document.querySelectorAll('.prog-section').forEach(s=>s.classList.remove('active'));
+  const target=document.getElementById('sec-'+sec);
+  if(target) target.classList.add('active');
+  document.querySelectorAll('#prog-subnav button').forEach(b=>{
+    b.classList.toggle('active', b.dataset.sec===sec);
+  });
+  try{ localStorage.setItem('devfit_progSection', sec); }catch(e){}
+  // Charts live in the Analytics section — Chart.js needs a visible container to size correctly
+  if(sec==='analytics') setTimeout(updateChart, 30);
 }
 
 function render(){
@@ -1958,6 +2008,7 @@ loadData();
 renderTabs();
 render();
 applyTierGates();
+try{ showProgSection(localStorage.getItem('devfit_progSection')||'daily'); }catch(e){ showProgSection('daily'); }
 showCountdown();
 showWelcomeScreen();
 scheduleAccessCheck();
@@ -2024,7 +2075,7 @@ if(typeof DevFitDB!=='undefined'){
     const defs={
       dmsans:    {face:'"DM Sans",system-ui,sans-serif', weights:[400,500,600,700,800], scale:1.0},
       literature:{face:'"Lora",Georgia,serif',           weights:[400,500,600,700],     scale:0.98},
-      elegant:   {face:'"Playfair Display",Georgia,serif',weights:[600,700,800,900],     scale:1.0},
+      elegant:   {face:'"Playfair Display",Georgia,serif',weights:[600,700],             scale:1.0},
       strong:    {face:'"Anton",Impact,sans-serif',      weights:[400],                 scale:0.86},
       deco:      {face:'"Righteous",system-ui,sans-serif',weights:[400],                scale:0.92}
     };

@@ -204,6 +204,10 @@ html.nosplash #devfit-splash{display:none!important}
 @media(prefers-reduced-motion:reduce){#devfit-splash .si,#devfit-splash .bar i{animation:none}}
 </style>
 <script>try{if(sessionStorage.getItem('devfit_splash_shown'))document.documentElement.className+=' nosplash';}catch(e){}</script>
+<!-- Shared theme: early-apply (no flash) + override stylesheet + controller -->
+<script>try{if(localStorage.getItem('devfit_theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
+<link rel="stylesheet" href="theme.css">
+<script defer src="theme.js"></script>
 </head>
 <body>
 <div id="devfit-splash"><div class="si"><img src="icon-192.png" alt="DevFit"><div class="w">DEV<b>FIT</b></div><div class="t">DOMINANCE THROUGH DISCIPLINE</div><div class="bar"><i></i></div></div></div>
@@ -958,7 +962,7 @@ function drawExportCard(canvas, workout, session, theme){
   const fontMap = {
     'dmsans':     {face:'"DM Sans",system-ui,sans-serif', bodyW:'600', titleW:'800', italic:''},
     'literature': {face:'"Lora",Georgia,serif',           bodyW:'500', titleW:'700', italic:''},
-    'elegant':    {face:'"Playfair Display",Georgia,serif',bodyW:'600', titleW:'800', italic:''},
+    'elegant':    {face:'"Playfair Display",Georgia,serif',bodyW:'600', titleW:'700', italic:''},
     'strong':     {face:'"Anton",Impact,sans-serif',      bodyW:'400', titleW:'400', italic:''},
     'deco':       {face:'"Righteous",system-ui,sans-serif',bodyW:'400', titleW:'400', italic:''}
   };

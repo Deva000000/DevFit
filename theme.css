@@ -1,0 +1,172 @@
+/* ===========================================================
+   DevFit — shared theme tokens + light-mode overrides
+   Loaded AFTER each page's own <style> so these rules win.
+   Dark is the default (no attribute). Light = html[data-theme="light"].
+   =========================================================== */
+
+:root{
+  --df-accent:#cc0000;
+  --df-accent2:#ff4444;
+}
+
+/* ---------- LIGHT THEME ---------- */
+html[data-theme="light"]{
+  color-scheme:light;
+}
+
+/* Page background — warm off-white, subtle crimson tint (premium, not flat white) */
+html[data-theme="light"] body{
+  color:#3a352f !important;
+  background:
+    radial-gradient(700px 500px at 15% -5%, rgba(204,0,0,0.06), transparent 60%),
+    radial-gradient(700px 500px at 85% -5%, rgba(204,0,0,0.06), transparent 60%),
+    radial-gradient(900px 600px at 50% 110%, rgba(204,0,0,0.05), transparent 60%),
+    linear-gradient(180deg,#f7f4f0 0%,#ece7e1 60%,#f2eee8 100%) !important;
+  background-attachment:fixed !important;
+}
+html[data-theme="light"] body::before{
+  background:radial-gradient(900px 400px at 50% 50%,rgba(204,0,0,0.03),transparent 60%) !important;
+}
+
+/* Dark glass cards → light elevated surfaces */
+html[data-theme="light"] .card{
+  background:rgba(255,255,255,0.94) !important;
+  border:1px solid rgba(20,15,10,0.08) !important;
+  box-shadow:0 10px 30px rgba(60,40,30,0.10),0 1px 0 rgba(255,255,255,0.7) inset !important;
+}
+html[data-theme="light"] .card-light{
+  background:#ffffff !important;
+  border:1px solid rgba(20,15,10,0.08) !important;
+  box-shadow:0 10px 30px rgba(60,40,30,0.10) !important;
+}
+
+/* Header + nav */
+html[data-theme="light"] .header{
+  background:#ffffff !important;
+  box-shadow:0 12px 34px rgba(204,0,0,0.12),0 1px 0 rgba(255,255,255,0.7) inset !important;
+}
+html[data-theme="light"] nav.devfit-tabnav,
+html[data-theme="light"] nav.prog-subnav{
+  background:#ffffff !important;
+  border:1px solid rgba(20,15,10,0.08) !important;
+}
+html[data-theme="light"] nav.devfit-tabnav a{color:#6b6258 !important;}
+html[data-theme="light"] nav.devfit-tabnav a:hover{color:#14110e !important;}
+html[data-theme="light"] nav.devfit-tabnav a.active{color:#fff !important;}
+html[data-theme="light"] nav.prog-subnav button{color:#6b6258 !important;}
+html[data-theme="light"] nav.prog-subnav button:hover{color:#14110e !important;}
+html[data-theme="light"] nav.prog-subnav button.active{color:#fff !important;}
+
+/* Dark inline-surface panels → light */
+html[data-theme="light"] .stats-banner,
+html[data-theme="light"] .countdown-wrap,
+html[data-theme="light"] .info-cell,
+html[data-theme="light"] .setting-btn{
+  background:#faf7f3 !important;
+  border:1px solid rgba(20,15,10,0.10) !important;
+}
+html[data-theme="light"] .setting-btn:hover{
+  background:#f3ede6 !important;
+  border-color:rgba(204,0,0,0.40) !important;
+}
+
+/* Section labels / muted greys that were tuned for dark bg */
+html[data-theme="light"] .section-label{color:#5a514a !important;}
+html[data-theme="light"] .score-bar-label{color:#3a352f !important;}
+html[data-theme="light"] .score-bar-track{background:#e4ded7 !important;}
+html[data-theme="light"] .score-bar-pct{color:#14110e !important;}
+html[data-theme="light"] .footer{color:#8a8178 !important;}
+
+/* ---------- Inline-style colour remap (the app hardcodes colours inline) ----------
+   Substring match on the style attr. Neutral white/grey text was meant to be
+   light-on-dark; flip it to dark-on-light. Accent reds/greens/ambers are left alone. */
+html[data-theme="light"] .page [style*="color:#fff"],
+html[data-theme="light"] .page [style*="color:#ffffff"],
+html[data-theme="light"] .page [style*="color:#e2e8f0"],
+html[data-theme="light"] .page [style*="color:#f1f5f9"],
+html[data-theme="light"] .page [style*="color:#cccccc"]{color:#1a1714 !important;}
+
+html[data-theme="light"] .page [style*="color:#aaa"],
+html[data-theme="light"] .page [style*="color:#aaaaaa"],
+html[data-theme="light"] .page [style*="color:#888"],
+html[data-theme="light"] .page [style*="color:#888888"],
+html[data-theme="light"] .page [style*="color:#999"],
+html[data-theme="light"] .page [style*="color:#94a3b8"],
+html[data-theme="light"] .page [style*="color:#666"]{color:#8a8178 !important;}
+
+/* Dark inline backgrounds → light surface */
+html[data-theme="light"] .page [style*="background:#1a1a1a"],
+html[data-theme="light"] .page [style*="background:#111"],
+html[data-theme="light"] .page [style*="background:#0f0f0f"]{
+  background:#faf7f3 !important;
+  border-color:rgba(20,15,10,0.10) !important;
+}
+
+/* Inputs keep their white field look in both themes; just firm up borders in light */
+html[data-theme="light"] .text-input,
+html[data-theme="light"] .client-row input{
+  border-color:rgba(20,15,10,0.18) !important;
+}
+
+/* ---------- Class-based text colours (tuned for dark bg) → light ----------
+   These come from per-page <style> rules, not inline styles, so they need
+   explicit overrides. Accent variants (.warn/.danger) are preserved. */
+html[data-theme="light"] .app-title,
+html[data-theme="light"] .profile-name,
+html[data-theme="light"] .stat-val,
+html[data-theme="light"] .countdown-title,
+html[data-theme="light"] .tier-name,
+html[data-theme="light"] .setting-btn,
+html[data-theme="light"] .setting-btn .title,
+html[data-theme="light"] .info-val:not(.warn):not(.danger){
+  color:#14110e !important;
+}
+html[data-theme="light"] .app-sub,
+html[data-theme="light"] .profile-email,
+html[data-theme="light"] .info-lbl,
+html[data-theme="light"] .stat-lbl,
+html[data-theme="light"] .stat-sub,
+html[data-theme="light"] .countdown-sub,
+html[data-theme="light"] .tier-desc,
+html[data-theme="light"] .day-lbl,
+html[data-theme="light"] .setting-btn .desc{
+  color:#8a8178 !important;
+}
+html[data-theme="light"] .setting-btn .chev{color:#b8ada1 !important;}
+/* DEVFIT wordmark: "DEV"/page-name spans use inline #fff — remapped to dark by the
+   inline-style layer above; the red "FIT" span keeps its colour. */
+
+/* ---------- Nutrition + Workouts page-specific surfaces ---------- */
+html[data-theme="light"] .food-modal,
+html[data-theme="light"] .serving-modal,
+html[data-theme="light"] .ds-modal,
+html[data-theme="light"] .share-modal{
+  background:#ffffff !important;
+  border:1px solid rgba(20,15,10,0.10) !important;
+  color:#3a352f !important;
+}
+html[data-theme="light"] .qa-cell,
+html[data-theme="light"] .delta-cell,
+html[data-theme="light"] .sv-chip,
+html[data-theme="light"] .sv-qty-btn,
+html[data-theme="light"] .mode-switch,
+html[data-theme="light"] .qa-name-input{
+  background:#faf7f3 !important;
+  border-color:rgba(20,15,10,0.12) !important;
+}
+html[data-theme="light"] .qa-name-input{color:#14110e !important;}
+/* Text-on-surface (white in dark mode) → dark in light mode */
+html[data-theme="light"] .food-item-name,
+html[data-theme="light"] .food-modal-title,
+html[data-theme="light"] .serving-food-name,
+html[data-theme="light"] .smeal-name{
+  color:#14110e !important;
+}
+
+/* ---------- THEME TOGGLE CONTROL (used on Settings) ---------- */
+.df-theme-toggle{display:flex;gap:8px;background:rgba(20,20,24,0.55);border:1px solid rgba(255,255,255,0.10);border-radius:12px;padding:5px}
+html[data-theme="light"] .df-theme-toggle{background:#faf7f3;border-color:rgba(20,15,10,0.10)}
+.df-theme-opt{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 8px;border:none;border-radius:9px;background:transparent;color:rgba(255,255,255,0.7);font-family:'DM Sans',system-ui,sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all .18s cubic-bezier(.2,.8,.2,1)}
+html[data-theme="light"] .df-theme-opt{color:#6b6258}
+.df-theme-opt .ic{font-size:16px;line-height:1}
+.df-theme-opt.active{background:linear-gradient(135deg,#cc0000,#ff4444);color:#fff;box-shadow:0 6px 16px rgba(204,0,0,0.35)}

@@ -192,6 +192,10 @@ html.nosplash #devfit-splash{display:none!important}
 @media(prefers-reduced-motion:reduce){#devfit-splash .si,#devfit-splash .bar i{animation:none}}
 </style>
 <script>try{if(sessionStorage.getItem('devfit_splash_shown'))document.documentElement.className+=' nosplash';}catch(e){}</script>
+<!-- Shared theme: early-apply (no flash) + override stylesheet + controller -->
+<script>try{if(localStorage.getItem('devfit_theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
+<link rel="stylesheet" href="theme.css">
+<script defer src="theme.js"></script>
 </head>
 <body>
 <div id="devfit-splash"><div class="si"><img src="icon-192.png" alt="DevFit"><div class="w">DEV<b>FIT</b></div><div class="t">DOMINANCE THROUGH DISCIPLINE</div><div class="bar"><i></i></div></div></div>
@@ -915,7 +919,7 @@ applyNutritionTierGates();
     const defs={
       dmsans:    {face:'"DM Sans",system-ui,sans-serif', weights:[400,500,600,700,800], scale:1.0},
       literature:{face:'"Lora",Georgia,serif',           weights:[400,500,600,700],     scale:0.98},
-      elegant:   {face:'"Playfair Display",Georgia,serif',weights:[600,700,800,900],     scale:1.0},
+      elegant:   {face:'"Playfair Display",Georgia,serif',weights:[600,700],             scale:1.0},
       strong:    {face:'"Anton",Impact,sans-serif',      weights:[400],                 scale:0.86},
       deco:      {face:'"Righteous",system-ui,sans-serif',weights:[400],                scale:0.92}
     };

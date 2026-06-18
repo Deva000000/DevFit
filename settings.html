@@ -158,6 +158,10 @@ html.nosplash #devfit-splash{display:none!important}
 @media(prefers-reduced-motion:reduce){#devfit-splash .si,#devfit-splash .bar i{animation:none}}
 </style>
 <script>try{if(sessionStorage.getItem('devfit_splash_shown'))document.documentElement.className+=' nosplash';}catch(e){}</script>
+<!-- Shared theme: early-apply (no flash) + override stylesheet + controller -->
+<script>try{if(localStorage.getItem('devfit_theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
+<link rel="stylesheet" href="theme.css">
+<script defer src="theme.js"></script>
 </head>
 <body>
 <div id="devfit-splash"><div class="si"><img src="icon-192.png" alt="DevFit"><div class="w">DEV<b>FIT</b></div><div class="t">DOMINANCE THROUGH DISCIPLINE</div><div class="bar"><i></i></div></div></div>
@@ -209,6 +213,16 @@ html.nosplash #devfit-splash{display:none!important}
         <div class="info-val" id="info-expires">—</div>
       </div>
     </div>
+  </div>
+
+  <!-- APPEARANCE -->
+  <div class="card">
+    <div class="section-label">Appearance</div>
+    <div class="df-theme-toggle" id="df-theme-toggle">
+      <button type="button" class="df-theme-opt" data-theme="dark" onclick="DevFitTheme.set('dark');paintThemeToggle()"><span class="ic">●</span> Dark</button>
+      <button type="button" class="df-theme-opt" data-theme="light" onclick="DevFitTheme.set('light');paintThemeToggle()"><span class="ic">○</span> Light</button>
+    </div>
+    <div style="font-size:11px;color:#888;margin-top:10px;line-height:1.5">Applies across the whole app and is remembered on this device.</div>
   </div>
 
   <!-- REPORTS -->
@@ -464,8 +478,8 @@ setTimeout(reverifyAccess, 600);
     // Font catalogue — value, label, CSS font for the live preview chip
     const FONTS = [
       {v:'dmsans',     label:'Default',    css:"'DM Sans',sans-serif",       weight:'700'},
-      {v:'literature', label:'Literature', css:"'Lora',serif",               weight:'600'},
-      {v:'elegant',    label:'Elegant',    css:"'Playfair Display',serif",   weight:'800'},
+      {v:'literature', label:'Literature', css:"'Lora',serif",               weight:'700'},
+      {v:'elegant',    label:'Elegant',    css:"'Playfair Display',serif",   weight:'700'},
       {v:'strong',     label:'Strong',     css:"'Anton',sans-serif",         weight:'400'},
       {v:'deco',       label:'Deco',       css:"'Righteous',sans-serif",     weight:'400'}
     ];
@@ -487,12 +501,13 @@ setTimeout(reverifyAccess, 600);
       const cur = localStorage.getItem('devfit_shareFont') || 'dmsans';
       previewRow.innerHTML = FONTS.map(f=>{
         const active = f.v===cur;
+        // Chips preview the font in BLACK on WHITE — exactly how it renders on the IG share card
         return '<button type="button" data-font="'+f.v+'" '+
-          'style="flex:1 1 auto;min-width:84px;cursor:pointer;border-radius:10px;padding:12px 8px;'+
-          'font-family:'+f.css+';font-weight:'+f.weight+';font-size:22px;line-height:1;'+
+          'style="flex:1 1 auto;min-width:84px;cursor:pointer;border-radius:10px;padding:14px 8px;'+
+          'font-family:'+f.css+';font-weight:'+f.weight+';font-size:23px;line-height:1;background:#ffffff;color:#111111;'+
           (active
-            ? 'background:#cc0000;color:#fff;border:1px solid #cc0000;'
-            : 'background:rgba(20,20,24,0.55);color:rgba(255,255,255,0.85);border:1px solid rgba(255,255,255,0.12);')+
+            ? 'border:2px solid #cc0000;box-shadow:0 4px 14px rgba(204,0,0,0.28);'
+            : 'border:2px solid #e4e4e4;box-shadow:none;')+
           '">'+f.label+'</button>';
       }).join('');
       previewRow.querySelectorAll('button').forEach(b=>{
@@ -797,58 +812,142 @@ function exportWeekPDF(){
   setTimeout(()=>{
     try{
       const pdf = new jsPDF('p','mm','a4');
+      const PW=210, M=14, CW=PW-M*2;
       const w = currentWeek;
       const ci = appData.weeklyCheckin[w] || freshCheckin();
       const bwAvg = avg(appData.bw[w]);
       const stepsAvg = avg(appData.steps[w]);
       const sleepAvg = avg(appData.sleep[w]);
       const {overall, scores} = calcTrueScore(w);
-
-      pdf.setFillColor(204,0,0); pdf.rect(0,0,210,12,'F');
-      // DEVFIT wordmark — two-tone bold italic to match the logo
-      pdf.setFontSize(22); pdf.setFont('helvetica','bolditalic');
-      pdf.setTextColor(17,17,17); pdf.text('DEV', 14, 25);
-      var _dw = pdf.getTextWidth('DEV');
-      pdf.setTextColor(204,0,0); pdf.text('FIT', 14+_dw, 25);
-      var _fw = pdf.getTextWidth('FIT');
-      pdf.setTextColor(17,17,17); pdf.setFont('helvetica','bold');
-      pdf.text(' · Week ' + (w+1) + ' Report', 14+_dw+_fw, 25);
-      pdf.setFontSize(11); pdf.setFont('helvetica','normal'); pdf.setTextColor(100,100,100);
-      pdf.text(appData.clientName || 'Client', 14, 32);
       const today = new Date().toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'});
-      pdf.text(today, 14, 37);
-      if(pdfLogoImg) pdf.addImage(pdfLogoImg,'PNG',186,13,18,18);
 
-      let y = 50;
-      pdf.setDrawColor(204,0,0); pdf.setLineWidth(0.4);
-      pdf.line(14,y,196,y); y+=8;
+      function sc(s){ return s>=85?[45,122,58]:s>=65?[184,134,11]:s>=40?[204,85,0]:[204,0,0]; }
+      function sg(s){ return s>=85?'Excellent':s>=65?'Good':s>=40?'Fair':'Needs Work'; }
+      function slab(txt,yy){ pdf.setFontSize(7); pdf.setFont('helvetica','bold'); pdf.setTextColor(140,140,140); pdf.text(txt,M,yy); }
 
-      pdf.setFontSize(13); pdf.setFont('helvetica','bold'); pdf.setTextColor(17,17,17);
-      pdf.text('Overall Score: ' + (overall===null?'—':overall+'%'), 14, y); y+=8;
+      // ── HEADER ──
+      pdf.setFillColor(204,0,0); pdf.rect(0,0,PW,13,'F');
+      pdf.setFontSize(17); pdf.setFont('helvetica','bolditalic');
+      pdf.setTextColor(17,17,17); pdf.text('DEV',M,27);
+      const dw=pdf.getTextWidth('DEV');
+      pdf.setTextColor(204,0,0); pdf.text('FIT',M+dw,27);
+      const fw=pdf.getTextWidth('FIT');
+      pdf.setTextColor(60,60,60); pdf.setFont('helvetica','bold'); pdf.setFontSize(12);
+      pdf.text(' · Week '+(w+1)+' Report', M+dw+fw, 27);
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(9.5); pdf.setTextColor(110,110,110);
+      pdf.text((appData.clientName||'Client').toUpperCase(), M, 34);
+      pdf.text(today, M, 40);
+      if(pdfLogoImg) pdf.addImage(pdfLogoImg,'PNG',189,15,15,15);
+      pdf.setDrawColor(204,0,0); pdf.setLineWidth(0.5); pdf.line(M,44,PW-M,44);
 
-      pdf.setFontSize(10); pdf.setFont('helvetica','normal');
-      pdf.text('Bodyweight avg: ' + (bwAvg===null?'—':bwAvg.toFixed(1)+' kg'), 14, y); y+=6;
-      pdf.text('Steps avg: ' + (stepsAvg===null?'—':Math.round(stepsAvg).toLocaleString()), 14, y); y+=6;
-      pdf.text('Sleep avg: ' + (sleepAvg===null?'—':sleepAvg.toFixed(1)+' h'), 14, y); y+=6;
-      pdf.text('Overload: ' + (ci.overload||'—'), 14, y); y+=6;
-      pdf.text('Diet: ' + (ci.diet||'—'), 14, y); y+=6;
-      pdf.text('Stress: ' + (ci.stress||'—'), 14, y); y+=6;
-      pdf.text('Body fat: ' + (ci.bfDir||'—') + (ci.bf?(' ('+ci.bf+'%)'):''), 14, y); y+=10;
-
-      // Add bodyweight chart
-      const bwImg = document.getElementById('exp-bw').toDataURL('image/png');
-      pdf.setFont('helvetica','bold'); pdf.setFontSize(11); pdf.text('Bodyweight Trend', 14, y); y+=4;
-      pdf.addImage(bwImg, 'PNG', 14, y, 182, 70); y+=78;
-
-      if(ci.notes){
-        pdf.setFont('helvetica','bold'); pdf.setFontSize(11); pdf.text('Trainer notes', 14, y); y+=6;
-        pdf.setFont('helvetica','normal'); pdf.setFontSize(10);
-        pdf.text(pdf.splitTextToSize(ci.notes, 180), 14, y);
+      // ── SCORE HERO ──
+      let y=49;
+      slab('TRUE PROGRESS SCORE', y); y+=4;
+      if(overall!==null){
+        const [r,g,b]=sc(overall);
+        pdf.setFillColor(r,g,b); pdf.roundedRect(M,y,CW,21,3,3,'F');
+        const dr=Math.max(0,r-40),dg=Math.max(0,g-40),db=Math.max(0,b-40);
+        pdf.setFillColor(dr,dg,db); pdf.roundedRect(M,y,5,21,3,3,'F');
+        pdf.setFontSize(26); pdf.setFont('helvetica','bold'); pdf.setTextColor(255,255,255);
+        pdf.text(overall+'%', M+9, y+14);
+        pdf.setFontSize(12); pdf.setFont('helvetica','normal');
+        pdf.text(sg(overall), M+42, y+14);
+        pdf.setFontSize(8.5);
+        pdf.text('Week '+(w+1)+' / '+(appData.programDuration||totalWeeks), PW-M-2, y+14, {align:'right'});
+        y+=27;
+      } else {
+        pdf.setFillColor(240,240,240); pdf.roundedRect(M,y,CW,15,3,3,'F');
+        pdf.setFontSize(10); pdf.setFont('helvetica','normal'); pdf.setTextColor(160,160,160);
+        pdf.text('No data logged this week', M+CW/2, y+9, {align:'center'});
+        y+=21;
       }
 
-      pdf.setFillColor(204,0,0); pdf.rect(0,287,210,10,'F');
-      pdf.setTextColor(255,255,255); pdf.setFontSize(9);
-      pdf.text('DevFit · Dominance Through Discipline', 14, 293);
+      // ── METRIC CARDS ──
+      slab('WEEKLY METRICS', y); y+=4;
+      const cw3=(CW-6)/3, ch=17;
+      const dietLabel={met:'On Track',missed_few:'Missed Few',binge:'Off Track'};
+      const cards=[
+        {lbl:'Avg Weight',  val:bwAvg===null?'—':bwAvg.toFixed(1)+' kg'},
+        {lbl:'Avg Steps',   val:stepsAvg===null?'—':Math.round(stepsAvg).toLocaleString()},
+        {lbl:'Avg Sleep',   val:sleepAvg===null?'—':sleepAvg.toFixed(1)+' hrs'},
+        {lbl:'Overload',    val:ci.overload?(ci.overload.charAt(0).toUpperCase()+ci.overload.slice(1)):'—'},
+        {lbl:'Diet',        val:ci.diet?(dietLabel[ci.diet]||ci.diet):'—'},
+        {lbl:'Stress',      val:ci.stress?(ci.stress.charAt(0).toUpperCase()+ci.stress.slice(1)):'—'},
+      ];
+      for(let i=0;i<6;i++){
+        const col=i%3, row=Math.floor(i/3);
+        const cx=M+col*(cw3+3), cy=y+row*(ch+3);
+        pdf.setFillColor(245,245,247); pdf.roundedRect(cx,cy,cw3,ch,2,2,'F');
+        pdf.setFontSize(7); pdf.setFont('helvetica','normal'); pdf.setTextColor(130,130,130);
+        pdf.text(cards[i].lbl.toUpperCase(), cx+3, cy+5.5);
+        pdf.setFontSize(10.5); pdf.setFont('helvetica','bold'); pdf.setTextColor(25,25,25);
+        pdf.text(cards[i].val, cx+3, cy+13);
+      }
+      y+=2*(ch+3)+5;
+
+      // ── SIGNAL BREAKDOWN ──
+      slab('SIGNAL BREAKDOWN', y); y+=4;
+      const xName=M, xBar=M+40, barW=58, xScore=xBar+barW+3, xWt=xScore+18, xContrib=xWt+16;
+      pdf.setFontSize(7); pdf.setFont('helvetica','bold'); pdf.setTextColor(120,120,120);
+      pdf.text('Signal',xName,y); pdf.text('Score',xScore,y); pdf.text('Wt%',xWt,y); pdf.text('Contrib',xContrib,y);
+      y+=2; pdf.setDrawColor(210,210,210); pdf.setLineWidth(0.2); pdf.line(M,y,PW-M,y); y+=2.5;
+      const rowH=8.5;
+      Object.values(scores).forEach((s,idx)=>{
+        if(idx%2===0){ pdf.setFillColor(250,250,250); pdf.rect(M,y-1,CW,rowH,'F'); }
+        if(s.val===null){
+          pdf.setFontSize(8); pdf.setFont('helvetica','normal'); pdf.setTextColor(170,170,170);
+          pdf.text(s.label,xName,y+4.5); pdf.text('—',xScore,y+4.5); pdf.text(s.weight+'%',xWt,y+4.5); pdf.text('—',xContrib,y+4.5);
+        } else {
+          const [r,g,b]=sc(s.val);
+          pdf.setFontSize(8); pdf.setFont('helvetica','bold'); pdf.setTextColor(30,30,30);
+          pdf.text(s.label,xName,y+4.5);
+          pdf.setFillColor(228,228,232); pdf.roundedRect(xBar,y+2,barW,3.5,1,1,'F');
+          pdf.setFillColor(r,g,b); pdf.roundedRect(xBar,y+2,barW*(s.val/100),3.5,1,1,'F');
+          pdf.setFont('helvetica','bold'); pdf.setTextColor(r,g,b);
+          pdf.text(s.val+'%',xScore,y+4.5);
+          pdf.setFont('helvetica','normal'); pdf.setTextColor(100,100,100);
+          pdf.text(s.weight+'%',xWt,y+4.5);
+          pdf.setFont('helvetica','bold'); pdf.setTextColor(30,30,30);
+          pdf.text(Math.round(s.val*s.weight/100)+'pts',xContrib,y+4.5);
+        }
+        y+=rowH;
+        pdf.setDrawColor(228,228,228); pdf.setLineWidth(0.1); pdf.line(M,y,PW-M,y);
+      });
+      y+=4;
+
+      // ── BODY COMPOSITION ──
+      if(ci.bf||ci.bfDir){
+        slab('BODY COMPOSITION',y); y+=5;
+        pdf.setFontSize(9); pdf.setFont('helvetica','normal'); pdf.setTextColor(30,30,30);
+        const bfParts=[];
+        if(ci.bf) bfParts.push('Body fat: '+ci.bf+'%');
+        if(ci.bfDir) bfParts.push('Trend: '+ci.bfDir.replace(/_/g,' '));
+        pdf.text(bfParts.join('   ·   '),M,y); y+=7;
+      }
+
+      // ── BODYWEIGHT CHART ──
+      if(y>200){ pdf.addPage(); y=20; }
+      slab('BODYWEIGHT TREND',y); y+=4;
+      pdf.addImage(document.getElementById('exp-bw').toDataURL('image/png'),'PNG',M,y,CW,60); y+=66;
+
+      // ── TRAINER NOTES ──
+      if(ci.notes&&ci.notes.trim()){
+        if(y>258){ pdf.addPage(); y=20; }
+        slab('TRAINER NOTES',y); y+=4;
+        const lines=pdf.splitTextToSize(ci.notes,CW-8);
+        const nh=lines.length*5+10;
+        pdf.setFillColor(250,248,244); pdf.roundedRect(M,y,CW,nh,2,2,'F');
+        pdf.setDrawColor(230,220,210); pdf.setLineWidth(0.3); pdf.roundedRect(M,y,CW,nh,2,2,'S');
+        pdf.setFontSize(9); pdf.setFont('helvetica','normal'); pdf.setTextColor(50,50,50);
+        pdf.text(lines,M+4,y+7);
+      }
+
+      // ── FOOTER ──
+      pdf.setFillColor(204,0,0); pdf.rect(0,287,PW,10,'F');
+      pdf.setFontSize(8); pdf.setFont('helvetica','normal'); pdf.setTextColor(255,255,255);
+      pdf.text('DevFit · Dominance Through Discipline',M,293);
+      pdf.setTextColor(255,200,200);
+      pdf.text('devfitportal.vercel.app',PW-M,293,{align:'right'});
 
       pdf.save('DevFit_Week'+(w+1)+'_Report.pdf');
       toast('Week report saved');
@@ -864,72 +963,154 @@ function exportProgramPDF(){
 
   const rangeVal = document.getElementById('program-report-range').value;
   const weeksToInclude = rangeVal==='all' ? totalWeeks : parseInt(rangeVal);
+  const startW = totalWeeks - weeksToInclude;
 
   buildExportCharts();
   setTimeout(()=>{
     try{
       const pdf = new jsPDF('p','mm','a4');
-      pdf.setFillColor(204,0,0); pdf.rect(0,0,210,12,'F');
-      // DEVFIT wordmark — two-tone bold italic to match the logo
-      pdf.setFontSize(22); pdf.setFont('helvetica','bolditalic');
-      pdf.setTextColor(17,17,17); pdf.text('DEV', 14, 25);
-      var _dw = pdf.getTextWidth('DEV');
-      pdf.setTextColor(204,0,0); pdf.text('FIT', 14+_dw, 25);
-      var _fw = pdf.getTextWidth('FIT');
-      pdf.setTextColor(17,17,17); pdf.setFont('helvetica','bold');
-      pdf.text(' · Program Report', 14+_dw+_fw, 25);
-      pdf.setFontSize(11); pdf.setFont('helvetica','normal'); pdf.setTextColor(100,100,100);
-      pdf.text(appData.clientName || 'Client', 14, 32);
-      const today = new Date().toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'});
-      pdf.text(today + ' · ' + weeksToInclude + ' weeks', 14, 37);
-      if(pdfLogoImg) pdf.addImage(pdfLogoImg,'PNG',186,13,18,18);
+      const PW=210, M=14, CW=PW-M*2;
+      const today=new Date().toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'});
 
-      let y = 50;
-      pdf.setDrawColor(204,0,0); pdf.setLineWidth(0.4);
-      pdf.line(14,y,196,y); y+=8;
-
-      pdf.setFont('helvetica','bold'); pdf.setFontSize(13); pdf.setTextColor(17,17,17);
-      pdf.text('Weekly Summary', 14, y); y+=8;
-      pdf.setFontSize(9); pdf.setFont('helvetica','normal');
-
-      // Table header
-      pdf.setFillColor(240,240,240); pdf.rect(14,y-4,182,7,'F');
-      pdf.setFont('helvetica','bold');
-      pdf.text('Week',16,y); pdf.text('BW avg',40,y); pdf.text('Steps',70,y); pdf.text('Sleep',95,y); pdf.text('Overload',115,y); pdf.text('Diet',150,y); pdf.text('Score',180,y);
-      y+=8;
-
-      pdf.setFont('helvetica','normal');
-      const startW = totalWeeks - weeksToInclude;
-      for(let w=startW; w<totalWeeks; w++){
-        const ci = appData.weeklyCheckin[w] || freshCheckin();
-        const bwA = avg(appData.bw[w]);
-        const stA = avg(appData.steps[w]);
-        const slA = avg(appData.sleep[w]);
-        const {overall} = calcTrueScore(w);
-        pdf.text('W'+(w+1), 16, y);
-        pdf.text(bwA===null?'—':bwA.toFixed(1), 40, y);
-        pdf.text(stA===null?'—':Math.round(stA).toLocaleString(), 70, y);
-        pdf.text(slA===null?'—':slA.toFixed(1), 95, y);
-        pdf.text((ci.overload||'—').slice(0,10), 115, y);
-        pdf.text((ci.diet||'—').slice(0,10), 150, y);
-        pdf.text(overall===null?'—':overall+'%', 180, y);
-        y+=6;
-        if(y>270){ pdf.addPage(); y=20; }
+      function sc(s){ return s>=85?[45,122,58]:s>=65?[184,134,11]:s>=40?[204,85,0]:[204,0,0]; }
+      function sg(s){ return s>=85?'Excellent':s>=65?'Good':s>=40?'Fair':'Needs Work'; }
+      function slab(txt,yy){ pdf.setFontSize(7); pdf.setFont('helvetica','bold'); pdf.setTextColor(140,140,140); pdf.text(txt,M,yy); }
+      let pageNum=1;
+      function footer(){
+        pdf.setFillColor(204,0,0); pdf.rect(0,287,PW,10,'F');
+        pdf.setFontSize(8); pdf.setFont('helvetica','normal'); pdf.setTextColor(255,255,255);
+        pdf.text('DevFit · Dominance Through Discipline',M,293);
+        pdf.setTextColor(255,200,200);
+        pdf.text('Page '+pageNum+'  ·  devfitportal.vercel.app',PW-M,293,{align:'right'});
+      }
+      function miniHeader(label){
+        pdf.setFillColor(204,0,0); pdf.rect(0,0,PW,10,'F');
+        pdf.setFontSize(9); pdf.setFont('helvetica','bold'); pdf.setTextColor(255,255,255);
+        pdf.text('DevFit · '+(appData.clientName||'Client')+' · '+label,M,7);
+      }
+      function tableHeader(y){
+        pdf.setFillColor(30,30,35); pdf.rect(M,y,CW,8,'F');
+        pdf.setFontSize(7.5); pdf.setFont('helvetica','bold'); pdf.setTextColor(255,255,255);
+        pdf.text('Week',M+2,y+5.5); pdf.text('BW avg',M+18,y+5.5); pdf.text('Steps',M+42,y+5.5);
+        pdf.text('Sleep',M+66,y+5.5); pdf.text('Overload',M+88,y+5.5); pdf.text('Diet',M+118,y+5.5);
+        pdf.text('Score',M+148,y+5.5); pdf.text('Grade',M+164,y+5.5);
+        return y+10;
       }
 
-      y+=6;
-      const bwImg = document.getElementById('exp-bw').toDataURL('image/png');
-      const scImg = document.getElementById('exp-score').toDataURL('image/png');
-      if(y>180){ pdf.addPage(); y=20; }
-      pdf.setFont('helvetica','bold'); pdf.setFontSize(11); pdf.text('Bodyweight Trend', 14, y); y+=4;
-      pdf.addImage(bwImg, 'PNG', 14, y, 182, 60); y+=68;
-      if(y>200){ pdf.addPage(); y=20; }
-      pdf.text('Weekly Progress Score', 14, y); y+=4;
-      pdf.addImage(scImg, 'PNG', 14, y, 182, 60);
+      // ── PAGE 1: DASHBOARD ──
+      pdf.setFillColor(204,0,0); pdf.rect(0,0,PW,13,'F');
+      pdf.setFontSize(17); pdf.setFont('helvetica','bolditalic');
+      pdf.setTextColor(17,17,17); pdf.text('DEV',M,27);
+      const dw=pdf.getTextWidth('DEV');
+      pdf.setTextColor(204,0,0); pdf.text('FIT',M+dw,27);
+      const fw=pdf.getTextWidth('FIT');
+      pdf.setTextColor(60,60,60); pdf.setFont('helvetica','bold'); pdf.setFontSize(12);
+      pdf.text(' · Program Report',M+dw+fw,27);
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(9.5); pdf.setTextColor(110,110,110);
+      pdf.text((appData.clientName||'Client').toUpperCase(),M,34);
+      pdf.text(today+' · '+weeksToInclude+' weeks',M,40);
+      if(pdfLogoImg) pdf.addImage(pdfLogoImg,'PNG',189,15,15,15);
+      pdf.setDrawColor(204,0,0); pdf.setLineWidth(0.5); pdf.line(M,44,PW-M,44);
 
-      pdf.setFillColor(204,0,0); pdf.rect(0,287,210,10,'F');
-      pdf.setTextColor(255,255,255); pdf.setFontSize(9);
-      pdf.text('DevFit · Dominance Through Discipline', 14, 293);
+      // ── KPI SUMMARY ──
+      const allScores=[], bwVals=[];
+      for(let ww=startW;ww<totalWeeks;ww++){
+        const {overall}=calcTrueScore(ww);
+        if(overall!==null) allScores.push({w:ww,s:overall});
+        const ba=avg(appData.bw[ww]);
+        if(ba!==null) bwVals.push(ba);
+      }
+      const avgSc=allScores.length>0?Math.round(allScores.reduce((a,b)=>a+b.s,0)/allScores.length):null;
+      const bestE=allScores.length>0?allScores.reduce((a,b)=>a.s>b.s?a:b):null;
+      const cons=allScores.length>0?Math.round(allScores.filter(s=>s.s>=65).length/allScores.length*100):null;
+      const bwChg=bwVals.length>=2?+(bwVals[bwVals.length-1]-bwVals[0]).toFixed(1):null;
+
+      let y=49;
+      slab('PROGRAM SUMMARY',y); y+=4;
+      const kw=(CW-9)/4, kh=27;
+      const kpis=[
+        {lbl:'Avg Score',      val:avgSc===null?'—':avgSc+'%',        sub:avgSc===null?'':sg(avgSc), colored:avgSc!==null},
+        {lbl:'Best Week',      val:bestE===null?'—':'Week '+(bestE.w+1), sub:bestE===null?'':bestE.s+'%', colored:false},
+        {lbl:'Consistency',    val:cons===null?'—':cons+'%',           sub:'Weeks ≥ 65%', colored:false},
+        {lbl:'Weight Change',  val:bwChg===null?'—':(bwChg>0?'+':'')+bwChg+' kg', sub:bwVals.length>=2?bwVals[0].toFixed(1)+'→'+bwVals[bwVals.length-1].toFixed(1)+' kg':'', colored:false},
+      ];
+      kpis.forEach((k,i)=>{
+        const kx=M+i*(kw+3);
+        if(k.colored&&avgSc!==null){
+          const [r,g,b]=sc(avgSc);
+          pdf.setFillColor(r,g,b); pdf.roundedRect(kx,y,kw,kh,2,2,'F');
+          pdf.setFontSize(7); pdf.setFont('helvetica','bold'); pdf.setTextColor(255,255,255);
+          pdf.text(k.lbl.toUpperCase(),kx+3,y+6);
+          pdf.setFontSize(15); pdf.text(k.val,kx+3,y+17);
+          pdf.setFontSize(7.5); pdf.setFont('helvetica','normal');
+          pdf.text(k.sub,kx+3,y+24);
+        } else {
+          pdf.setFillColor(245,245,247); pdf.roundedRect(kx,y,kw,kh,2,2,'F');
+          pdf.setFontSize(7); pdf.setFont('helvetica','bold'); pdf.setTextColor(130,130,130);
+          pdf.text(k.lbl.toUpperCase(),kx+3,y+6);
+          pdf.setFontSize(13); pdf.setFont('helvetica','bold'); pdf.setTextColor(25,25,25);
+          pdf.text(k.val,kx+3,y+17);
+          pdf.setFontSize(7.5); pdf.setFont('helvetica','normal'); pdf.setTextColor(100,100,100);
+          pdf.text(k.sub,kx+3,y+24);
+        }
+      });
+      y+=kh+7;
+
+      // ── CHARTS ──
+      slab('BODYWEIGHT TREND',y); y+=4;
+      pdf.addImage(document.getElementById('exp-bw').toDataURL('image/png'),'PNG',M,y,CW,60); y+=66;
+      slab('WEEKLY PROGRESS SCORE',y); y+=4;
+      pdf.addImage(document.getElementById('exp-score').toDataURL('image/png'),'PNG',M,y,CW,60);
+      footer(); pageNum++;
+
+      // ── PAGE 2+: WEEKLY TABLE ──
+      pdf.addPage();
+      miniHeader('Weekly Breakdown');
+      let ty=16;
+      slab('WEEKLY BREAKDOWN · '+weeksToInclude+' WEEKS',ty); ty+=5;
+      ty=tableHeader(ty);
+
+      for(let ww=startW;ww<totalWeeks;ww++){
+        if(ty>277){
+          footer(); pageNum++;
+          pdf.addPage();
+          miniHeader('Weekly Breakdown (cont.)');
+          ty=14; ty=tableHeader(ty);
+        }
+        const ci=appData.weeklyCheckin[ww]||freshCheckin();
+        const bwA=avg(appData.bw[ww]);
+        const stA=avg(appData.steps[ww]);
+        const slA=avg(appData.sleep[ww]);
+        const {overall}=calcTrueScore(ww);
+        const tRowH=7;
+        if((ww-startW)%2===0){ pdf.setFillColor(250,250,252); } else { pdf.setFillColor(255,255,255); }
+        pdf.rect(M,ty,CW,tRowH,'F');
+        if(overall!==null){
+          const [r,g,b]=sc(overall);
+          pdf.setFillColor(r,g,b); pdf.rect(M,ty,2,tRowH,'F');
+        }
+        pdf.setFontSize(7.5); pdf.setFont('helvetica','bold'); pdf.setTextColor(30,30,30);
+        pdf.text('W'+(ww+1),M+2,ty+4.5);
+        pdf.setFont('helvetica','normal');
+        pdf.text(bwA===null?'—':bwA.toFixed(1),M+18,ty+4.5);
+        pdf.text(stA===null?'—':Math.round(stA).toLocaleString(),M+42,ty+4.5);
+        pdf.text(slA===null?'—':slA.toFixed(1),M+66,ty+4.5);
+        pdf.text((ci.overload||'—').slice(0,9),M+88,ty+4.5);
+        pdf.text((ci.diet||'—').slice(0,9),M+118,ty+4.5);
+        if(overall!==null){
+          const [r,g,b]=sc(overall);
+          pdf.setFont('helvetica','bold'); pdf.setTextColor(r,g,b);
+          pdf.text(overall+'%',M+148,ty+4.5);
+          pdf.setFont('helvetica','normal');
+          pdf.text(sg(overall),M+164,ty+4.5);
+        } else {
+          pdf.setFont('helvetica','normal'); pdf.setTextColor(160,160,160);
+          pdf.text('—',M+148,ty+4.5); pdf.text('—',M+164,ty+4.5);
+        }
+        pdf.setDrawColor(228,228,235); pdf.setLineWidth(0.1); pdf.line(M,ty+tRowH,PW-M,ty+tRowH);
+        ty+=tRowH;
+      }
+      footer();
 
       pdf.save('DevFit_Program_Report.pdf');
       toast('Program report saved');
@@ -1173,6 +1354,16 @@ body{padding-bottom:104px!important}
     });
   }
 })();
+</script>
+<script>
+function paintThemeToggle(){
+  var cur = 'dark';
+  try{ if(localStorage.getItem('devfit_theme')==='light') cur='light'; }catch(e){}
+  document.querySelectorAll('#df-theme-toggle .df-theme-opt').forEach(function(b){
+    b.classList.toggle('active', b.dataset.theme === cur);
+  });
+}
+paintThemeToggle();
 </script>
 </body>
 </html>

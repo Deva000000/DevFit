@@ -458,7 +458,7 @@ html.nosplash #devfit-splash{display:none!important}
             <p><b>3. Goal adjustment.</b> Lose = −20%, Maintain = TDEE, Build = +10% — moderate, sustainable rates (~0.5–1% bodyweight/week).<br>
             <span class="ref">Helms ER et al., JISSN 2014; Aragon & Schoenfeld 2013.</span></p>
 
-            <p><b>4. Macros.</b> Protein <code>1.8–2.0 g/kg</code> (higher when cutting to protect muscle), fat at <code>25%</code> of calories, carbs fill the rest.<br>
+            <p><b>4. Macros.</b> Protein <code>2.2 g/kg</code> maintain · <code>2.0 g/kg</code> gain · <code>2.5 g/kg</code> cut (higher when cutting to protect muscle), fat at <code>25%</code> of calories, carbs fill the rest.<br>
             <span class="ref">Morton RW et al. meta-analysis, Br J Sports Med 2018;52(6):376–84.</span></p>
           </div>
         </details>
@@ -710,7 +710,7 @@ document.getElementById('date-pick').value=currentDate;
     const mult = C.goal==='lose'?0.80 : C.goal==='gain'?1.10 : 1.00;
     const target = tdee*mult;
     // 4. Macros — protein g/kg, fat 25% kcal, carbs remainder
-    const pPerKg = C.goal==='lose'?2.0 : 1.8;
+    const pPerKg = C.goal==='lose'?2.5 : C.goal==='gain'?2.0 : 2.2;
     const protein = wt*pPerKg;
     const fat = (target*0.25)/9;
     const carbs = Math.max(0,(target - protein*4 - fat*9)/4);

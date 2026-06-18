@@ -1180,6 +1180,11 @@ function renderExtraCards(){
 function drawRingBig(id, score, color){
   const c=document.getElementById(id); if(!c) return;
   const ctx=c.getContext('2d');
+  // Render at device pixel ratio so the ring is crisp on retina screens (was blurry)
+  const SIZE=88, dpr=Math.max(1,Math.min(3,window.devicePixelRatio||1));
+  if(c.width!==Math.round(SIZE*dpr)){ c.width=Math.round(SIZE*dpr); c.height=Math.round(SIZE*dpr); }
+  c.style.width=SIZE+'px'; c.style.height=SIZE+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
   const r=36,cx=44,cy=44;
   ctx.clearRect(0,0,88,88);
   const segments=[

@@ -70,15 +70,6 @@ html[data-theme="light"] .header{
   box-shadow:0 12px 34px rgba(204,0,0,0.12),0 1px 0 rgba(255,255,255,0.7) inset !important;
 }
 
-/* ---------- Theme-aware brand emblem ----------
-   The DevFit "D" mark exists in two cuts: a white-D for dark surfaces and a
-   black-D for light surfaces. We ship both <img> tags and let the theme decide,
-   so the logo never disappears (no more white box behind black art).
-   Default (dark theme) shows the white-D; light theme flips to the black-D. */
-.header-logo,.dfx-emblem-dark,.dfx-emblem-light{background:transparent !important;object-fit:contain !important}
-.dfx-emblem-light{display:none}
-html[data-theme="light"] .dfx-emblem-dark{display:none}
-html[data-theme="light"] .dfx-emblem-light{display:inline-block}
 html[data-theme="light"] nav.devfit-tabnav,
 html[data-theme="light"] nav.prog-subnav{
   background:#ffffff !important;

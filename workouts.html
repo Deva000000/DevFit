@@ -93,6 +93,11 @@
   .ex-head:first-child{text-align:left}
   .del-mini{background:transparent;border:none;color:#cbd5e1;font-size:18px;cursor:pointer;line-height:1;padding:0}
   .del-mini:hover{color:#cc0000}
+  /* Cardio exercise row in plan editor — name + CARDIO tag (no sets/reps) */
+  .ex-row-cardio{grid-template-columns:1.6fr 1.1fr 28px}
+  .ex-cardio-tag{display:inline-flex;align-items:center;justify-content:center;background:#fef2f2;color:#cc0000;border:1px solid #fecaca;border-radius:8px;font-size:9px;font-weight:800;letter-spacing:.06em;padding:4px 0}
+  .add-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+  .add-row .add-btn{margin-top:0}
   .add-btn{width:100%;background:transparent;border:1.5px dashed rgba(255,255,255,0.4);color:#fff;border-radius:var(--radius);padding:10px;font-family:'DM Sans',system-ui,sans-serif;font-size:13px;font-weight:600;cursor:pointer;margin-top:6px}
   .add-btn:hover{border-color:#cc0000;color:#cc0000}
   .add-btn.light{border-color:#cbd5e1;color:#475569}
@@ -417,19 +422,31 @@ function renderPlan(){
         <input type="text" placeholder="Workout name (e.g. Push Day)" value="${escapeHTML(w.name)}" data-w="${w.id}" data-f="name">
         <button class="del-mini" data-del-w="${w.id}" aria-label="Delete workout">×</button>
       </div>
-      <div class="ex-row"><div class="ex-head">Exercise</div><div class="ex-head">Sets</div><div class="ex-head">Reps</div><div></div></div>
+      <div class="ex-row ex-head-row"><div class="ex-head">Exercise</div><div class="ex-head">Sets</div><div class="ex-head">Reps</div><div></div></div>
       <div class="exercises" data-w="${w.id}"></div>
-      <button class="add-btn light" data-add-ex="${w.id}">+ Add exercise</button>`;
+      <div class="add-row">
+        <button class="add-btn light" data-add-ex="${w.id}">+ Strength</button>
+        <button class="add-btn light" data-add-cardio="${w.id}">+ Cardio</button>
+      </div>`;
     list.appendChild(card);
     const exDiv=card.querySelector('.exercises');
     w.exercises.forEach(ex=>{
       const row=document.createElement('div');
-      row.className='ex-row';
-      row.innerHTML=`
-        <input class="ex-name" type="text" placeholder="e.g. Bench Press" value="${escapeHTML(ex.name)}" data-w="${w.id}" data-ex="${ex.id}" data-f="name">
-        <input class="ex-num"  type="number" inputmode="numeric" placeholder="—" value="${ex.tSets??''}" data-w="${w.id}" data-ex="${ex.id}" data-f="tSets">
-        <input class="ex-num"  type="number" inputmode="numeric" placeholder="—" value="${ex.tReps??''}" data-w="${w.id}" data-ex="${ex.id}" data-f="tReps">
-        <button class="del-mini" data-del-ex="${w.id}|${ex.id}" aria-label="Delete exercise">×</button>`;
+      if(exIsCardio(ex)){
+        // Cardio exercise — no sets/reps targets, just a name + tag
+        row.className='ex-row ex-row-cardio';
+        row.innerHTML=`
+          <input class="ex-name" type="text" placeholder="e.g. Running, Cycling, Swimming" value="${escapeHTML(ex.name)}" data-w="${w.id}" data-ex="${ex.id}" data-f="name">
+          <div class="ex-cardio-tag">CARDIO</div>
+          <button class="del-mini" data-del-ex="${w.id}|${ex.id}" aria-label="Delete exercise">×</button>`;
+      } else {
+        row.className='ex-row';
+        row.innerHTML=`
+          <input class="ex-name" type="text" placeholder="e.g. Bench Press" value="${escapeHTML(ex.name)}" data-w="${w.id}" data-ex="${ex.id}" data-f="name">
+          <input class="ex-num"  type="number" inputmode="numeric" placeholder="—" value="${ex.tSets??''}" data-w="${w.id}" data-ex="${ex.id}" data-f="tSets">
+          <input class="ex-num"  type="number" inputmode="numeric" placeholder="—" value="${ex.tReps??''}" data-w="${w.id}" data-ex="${ex.id}" data-f="tReps">
+          <button class="del-mini" data-del-ex="${w.id}|${ex.id}" aria-label="Delete exercise">×</button>`;
+      }
       exDiv.appendChild(row);
     });
   });
@@ -471,6 +488,14 @@ function renderPlan(){
       const w=data.plan.workouts.find(x=>x.id===b.dataset.addEx);
       if(!w) return;
       w.exercises.push({id:uid(),name:'',tSets:'',tReps:''});
+      save(); renderPlan();
+    });
+  });
+  list.querySelectorAll('[data-add-cardio]').forEach(b=>{
+    b.addEventListener('click',()=>{
+      const w=data.plan.workouts.find(x=>x.id===b.dataset.addCardio);
+      if(!w) return;
+      w.exercises.push({id:uid(),name:'',type:'cardio'});
       save(); renderPlan();
     });
   });
@@ -680,9 +705,13 @@ function totalSetsCount(sets){return sets.filter(s=>(Number(s.reps)||0)>0||(Numb
 function isCardio(name){
   return /\b(run|running|jog|jogging|cycl|cycling|bike|biking|spin|swim|swimming|cardio|walk|walking|hike|hiking|elliptical|treadmill|sprint|sprints|skipping|jump\s?rope|rowing|stair|stepper|incline\s?walk)\b/i.test(name||'');
 }
+// An exercise is cardio if explicitly tagged (type==='cardio') OR its name looks
+// like cardio. The explicit tag means users can add "Stairmaster" etc. via the
+// "+ Cardio" button without needing a magic keyword.
+function exIsCardio(ex){ return !!ex && (ex.type==='cardio' || isCardio(ex.name)); }
 // One log "set" for cardio holds {min, km}; pace is derived.
 function freshLog(ex){
-  if(isCardio(ex.name)) return {exId:ex.id, sets:[{min:'',km:''}]};
+  if(exIsCardio(ex)) return {exId:ex.id, sets:[{min:'',km:''}]};
   return {exId:ex.id, sets:Array.from({length:Number(ex.tSets)||3},()=>({reps:'',weight:''}))};
 }
 function cardioPace(min,km){
@@ -690,6 +719,85 @@ function cardioPace(min,km){
   if(m<=0||d<=0) return '';
   const p=m/d; const mm=Math.floor(p); const ss=Math.round((p-mm)*60);
   return mm+':'+String(ss).padStart(2,'0')+' /km';
+}
+function fmtDuration(min){
+  const m=Number(min)||0; const whole=Math.floor(m); const sec=Math.round((m-whole)*60);
+  return whole+':'+String(sec).padStart(2,'0');
+}
+function activityEmoji(n){ n=(n||'').toLowerCase();
+  if(/swim/.test(n))return '🏊'; if(/cycl|cycling|bike|biking|spin/.test(n))return '🚴';
+  if(/row/.test(n))return '🚣'; if(/walk|hike|hiking/.test(n))return '🚶';
+  if(/run|running|jog|jogging|sprint/.test(n))return '🏃'; return '🔥'; }
+function activityMET(n){ n=(n||'').toLowerCase();
+  if(/swim/.test(n))return 8.3; if(/cycl|bike|spin/.test(n))return 7.5;
+  if(/run|jog|sprint/.test(n))return 9.8; if(/row/.test(n))return 7.0;
+  if(/elliptical/.test(n))return 5.0; if(/walk|hike|tread|stair|step/.test(n))return 4.3;
+  return 7.0; }
+function latestBodyweight(){
+  try{
+    const pl=JSON.parse(localStorage.getItem('progressLog2')||'{}');
+    if(pl.bw&&pl.bw.length){
+      for(let w=pl.bw.length-1;w>=0;w--){ const wk=pl.bw[w]; if(!wk) continue;
+        for(let d=wk.length-1;d>=0;d--){ const v=Number(wk[d]); if(v>0) return v; } }
+    }
+    if(pl.startWeight){ const v=Number(pl.startWeight); if(v>0) return v; }
+  }catch(e){}
+  return 70;
+}
+// Calories via MET × bodyweight(kg) × hours — the standard estimate.
+function cardioCalories(name,min){
+  const m=Number(min)||0; if(m<=0) return 0;
+  return Math.round(activityMET(name)*latestBodyweight()*(m/60));
+}
+function cardioGoalKm(){ try{ const v=Number(localStorage.getItem('devfit_cardioGoalKm')); if(v>0) return v; }catch(e){} return 30; }
+// Set of dates that have a logged cardio session.
+function cardioDatesSet(){
+  const set=new Set();
+  (data.sessions||[]).forEach(s=>{
+    const w=data.plan.workouts.find(x=>x.id===s.workoutId);
+    const has=(s.logs||[]).some(l=>{ const ex=w&&w.exercises.find(e=>e.id===l.exId);
+      return ex&&exIsCardio(ex)&&l.sets&&l.sets[0]&&((Number(l.sets[0].km)||0)>0||(Number(l.sets[0].min)||0)>0); });
+    if(has) set.add(s.date);
+  });
+  return set;
+}
+function cardioStreakDays(dateStr){
+  const set=cardioDatesSet(); if(!set.size) return 0;
+  const fmt=x=>x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');
+  let streak=0; const d=new Date((dateStr||todayStr())+'T00:00:00');
+  while(set.has(fmt(d))){ streak++; d.setDate(d.getDate()-1); }
+  return streak;
+}
+// Total cardio km + distinct session-days in the same calendar month as dateStr.
+function cardioMonthStats(dateStr){
+  const ref=new Date((dateStr||todayStr())+'T00:00:00');
+  const y=ref.getFullYear(), mo=ref.getMonth();
+  let km=0; const days=new Set();
+  (data.sessions||[]).forEach(s=>{
+    const d=new Date(s.date+'T00:00:00'); if(d.getFullYear()!==y||d.getMonth()!==mo) return;
+    const w=data.plan.workouts.find(x=>x.id===s.workoutId);
+    let hasCardio=false;
+    (s.logs||[]).forEach(l=>{ const ex=w&&w.exercises.find(e=>e.id===l.exId);
+      if(ex&&exIsCardio(ex)){ const cs=l.sets&&l.sets[0];
+        if(cs&&((Number(cs.km)||0)>0||(Number(cs.min)||0)>0)){ km+=Number(cs.km)||0; hasCardio=true; } } });
+    if(hasCardio) days.add(s.date);
+  });
+  return {km:Math.round(km*10)/10, sessions:days.size};
+}
+// Is this distance the longest cardio run in the current calendar week?
+function isLongestThisWeek(dateStr,km){
+  if(!(km>0)) return false;
+  const ref=new Date((dateStr||todayStr())+'T00:00:00');
+  const dow=ref.getDay(); const mon=new Date(ref); mon.setDate(ref.getDate()-(dow===0?6:dow-1));
+  const sun=new Date(mon); sun.setDate(mon.getDate()+6);
+  const fmt=x=>x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');
+  const monStr=fmt(mon), sunStr=fmt(sun);
+  let maxKm=0;
+  (data.sessions||[]).forEach(s=>{ if(s.date<monStr||s.date>sunStr) return;
+    const w=data.plan.workouts.find(x=>x.id===s.workoutId);
+    (s.logs||[]).forEach(l=>{ const ex=w&&w.exercises.find(e=>e.id===l.exId);
+      if(ex&&exIsCardio(ex)&&l.sets&&l.sets[0]){ const k=Number(l.sets[0].km)||0; if(k>maxKm) maxKm=k; } }); });
+  return km>=maxKm;
 }
 
 document.getElementById('log-date').value=todayStr();
@@ -793,7 +901,7 @@ function renderLog(){
     card.className='log-ex';
 
     // ----- CARDIO: duration + distance (no sets×reps) -----
-    if(isCardio(ex.name)){
+    if(exIsCardio(ex)){
       const cs=(log.sets&&log.sets[0])||{min:'',km:''};
       let metaParts=['<span class="log-ex-target">Cardio</span>'];
       if(last && last.log.sets && last.log.sets[0]){
@@ -1113,6 +1221,117 @@ function drawExportCard(canvas, workout, session, theme){
   // Tighter outer padding kills the dead margin the user marked around all edges.
   const PAD = 60;
   const fmtNum = n => Math.round(n).toLocaleString('en-US');
+  const setLS = v => { try{ ctx.letterSpacing = v; }catch(e){} };
+
+  // ===== CARDIO CARD — dedicated layout when the session is pure cardio =====
+  const _meta = workout.exercises.map(ex=>({ex, log:session.logs.find(l=>l.exId===ex.id)})).filter(o=>o.log);
+  const _cardio = _meta.filter(o=>exIsCardio(o.ex)).map(o=>{ const cs=(o.log.sets&&o.log.sets[0])||{}; return {name:o.ex.name||'Cardio', min:Number(cs.min)||0, km:Number(cs.km)||0}; }).filter(c=>c.min>0||c.km>0);
+  const _strength = _meta.filter(o=>!exIsCardio(o.ex) && o.log.sets && o.log.sets.some(s=>(Number(s.reps)||0)>0||(Number(s.weight)||0)>0));
+  if(_cardio.length && !_strength.length){
+    const C = W - PAD*2;
+    const hero = _cardio.slice().sort((a,b)=>(b.km-a.km)||(b.min-a.min))[0];
+    const hasKm = hero.km>0;
+    const panelBg = theme==='light' ? 'rgba(0,0,0,0.045)' : theme==='transparent' ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.06)';
+    const dim = theme==='light' ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.14)';
+    let y = PAD + 4;
+
+    // --- Header: "CARDIO SESSION" + streak badge ---
+    ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+    setLS('3px'); ctx.font=F(TW,30); ctx.fillStyle=p.fg; ctx.fillText('CARDIO SESSION', PAD, y+30); setLS('0px');
+    ctx.fillStyle=p.accent; roundRect(ctx,PAD,y+44,168,6,3); ctx.fill();
+    const streak=cardioStreakDays(session.date);
+    if(streak>=2){
+      const bt='🔥 '+streak+'-DAY STREAK';
+      ctx.font=F(TW,26); const tw=ctx.measureText(bt).width; const bh=48, bwid=tw+46, bx=W-PAD-bwid, by=y;
+      ctx.fillStyle = theme==='light'?'rgba(204,0,0,0.10)':'rgba(255,58,58,0.16)';
+      roundRect(ctx,bx,by,bwid,bh,bh/2); ctx.fill();
+      ctx.strokeStyle=p.accent; ctx.lineWidth=2; roundRect(ctx,bx,by,bwid,bh,bh/2); ctx.stroke();
+      ctx.fillStyle=p.accent; ctx.textBaseline='middle'; ctx.fillText(bt,bx+23,by+bh/2+1); ctx.textBaseline='alphabetic';
+    }
+    y += 112;
+
+    // --- Hero: big distance (or duration) + activity ---
+    const bigVal = hasKm ? hero.km.toFixed(1) : fmtDuration(hero.min);
+    const bigUnit = hasKm ? 'KM' : 'MIN';
+    ctx.font=F(TW,200); ctx.fillStyle=p.fg;
+    const bm=vmet(bigVal,200);
+    ctx.fillText(bigVal, PAD, y+bm.a);
+    const valW=ctx.measureText(bigVal).width;
+    ctx.font=F(TW,70); ctx.fillStyle=p.accent; ctx.fillText(bigUnit, PAD+valW+18, y+bm.a);
+    y += bm.a + 16;
+    ctx.font=F(TW,62); ctx.fillStyle=p.fg;
+    ctx.fillText((hero.name||'Cardio').toUpperCase()+'  '+activityEmoji(hero.name), PAD, y+50);
+    y += 92;
+
+    // --- Divider ---
+    ctx.fillStyle=p.divider; ctx.fillRect(PAD,y,C,1); y += 40;
+
+    // --- Stat tiles: Duration / Avg Pace / Calories ---
+    const cals=cardioCalories(hero.name,hero.min);
+    const tiles=[
+      {ic:'⏱', val:fmtDuration(hero.min), lbl:'DURATION'},
+      {ic:'🚀', val: hasKm?cardioPace(hero.min,hero.km).replace(' /km',''):'—', lbl: hasKm?'AVG PACE /KM':'AVG PACE'},
+      {ic:'🔥', val: cals?String(cals):'—', lbl:'CALORIES'}
+    ];
+    const colW=C/3;
+    tiles.forEach((t,i)=>{
+      const cx=PAD+colW*i+colW/2;
+      if(i>0){ ctx.fillStyle=p.divider; ctx.fillRect(PAD+colW*i, y+8, 1, 94); }
+      ctx.textAlign='center';
+      ctx.font=F(TW,40); ctx.fillStyle=p.accent; ctx.fillText(t.ic, cx, y+44);
+      ctx.font=F(TW,52); ctx.fillStyle=p.fg; ctx.fillText(t.val, cx, y+98);
+      setLS('1px'); ctx.font=F(BW,23); ctx.fillStyle=p.sub; ctx.fillText(t.lbl, cx, y+130); setLS('0px');
+    });
+    ctx.textAlign='left';
+    y += 168;
+
+    // --- Monthly cardio goal ---
+    const month=cardioMonthStats(session.date), goal=cardioGoalKm();
+    const pct=Math.max(0,Math.min(100,Math.round((month.km/goal)*100)));
+    setLS('2px'); ctx.font=F(BW,26); ctx.fillStyle=p.sub; ctx.fillText('MONTHLY CARDIO GOAL', PAD, y+22); setLS('0px');
+    y += 40;
+    ctx.font=F(TW,64); ctx.fillStyle=p.accent; ctx.fillText(pct+'%', PAD, y+52);
+    ctx.font=F(BW,28); ctx.fillStyle=p.sub; ctx.fillText(month.km.toFixed(1)+' / '+goal+' KM', PAD, y+92);
+    ctx.textAlign='right'; ctx.font=F(BW,26); ctx.fillStyle=p.sub;
+    ctx.fillText(month.sessions+' session'+(month.sessions===1?'':'s')+' this month', W-PAD, y+92);
+    ctx.textAlign='left';
+    y += 116;
+    const N=20, gap=8, barW=(C-(N-1)*gap)/N, barH=34, filled=Math.round(pct/100*N);
+    for(let i=0;i<N;i++){ ctx.fillStyle = i<filled ? p.accent : dim; roundRect(ctx, PAD+i*(barW+gap), y, barW, barH, 3); ctx.fill(); }
+    y += barH + 36;
+
+    // --- Achievement (only when genuinely earned) ---
+    if(isLongestThisWeek(session.date, hero.km)){
+      const ah=92;
+      ctx.fillStyle=panelBg; roundRect(ctx,PAD,y,C,ah,16); ctx.fill();
+      ctx.strokeStyle=p.divider; ctx.lineWidth=1; roundRect(ctx,PAD,y,C,ah,16); ctx.stroke();
+      ctx.fillStyle = theme==='light'?'rgba(204,0,0,0.12)':'rgba(255,58,58,0.18)';
+      ctx.beginPath(); ctx.arc(PAD+46, y+ah/2, 28, 0, Math.PI*2); ctx.fill();
+      ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font=F(TW,32); ctx.fillStyle=p.accent; ctx.fillText('🏆', PAD+46, y+ah/2+1);
+      ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+      setLS('2px'); ctx.font=F(BW,22); ctx.fillStyle=p.sub; ctx.fillText('ACHIEVEMENT UNLOCKED', PAD+92, y+36); setLS('0px');
+      ctx.font=F(TW,36); ctx.fillStyle=p.fg; ctx.fillText('LONGEST RUN THIS WEEK', PAD+92, y+72);
+      y += ah + 28;
+    }
+
+    // --- Footer: DEVFIT + STRONGER EVERY DAY + @handle ---
+    const fy = H - PAD - 8;
+    ctx.textBaseline='alphabetic'; ctx.textAlign='left';
+    ctx.font='italic 700 60px "Inter", system-ui, sans-serif';
+    const devColor=(theme==='transparent')?'#ffffff':p.fg;
+    const dW=ctx.measureText('DEV').width;
+    ctx.fillStyle=devColor; ctx.fillText('DEV', PAD, fy-24);
+    ctx.fillStyle=p.accent; ctx.fillText('FIT', PAD+dW, fy-24);
+    setLS('3px'); ctx.font=F(BW,21); ctx.fillStyle=p.sub; ctx.fillText('STRONGER EVERY DAY', PAD, fy+8); setLS('0px');
+    ctx.textAlign='right'; ctx.font=F(BW,34); ctx.fillStyle=p.sub;
+    let handle='@user';
+    try{ const cn=(localStorage.getItem('devfit_displayName')||'').trim();
+      if(cn) handle='@'+cn.replace(/^@+/,'');
+      else { const u=JSON.parse(localStorage.getItem('devfit_user')||'{}'); if(u.email) handle='@'+u.email.split('@')[0]; }
+    }catch(e){}
+    ctx.fillText(handle, W-PAD, fy-20);
+    return;
+  }
 
   // ---- Compute exercise lines + totals (Exercises / Sets / Volume / Distance) ----
   const lines = [];
@@ -1122,7 +1341,7 @@ function drawExportCard(canvas, workout, session, theme){
     if(!log) return;
 
     // Cardio: duration + distance (+ pace)
-    if(isCardio(ex.name)){
+    if(exIsCardio(ex)){
       const cs = (log.sets && log.sets[0]) || {};
       const min = Number(cs.min)||0, km = Number(cs.km)||0;
       if(min<=0 && km<=0) return;

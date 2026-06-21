@@ -312,8 +312,18 @@ html.nosplash #devfit-splash{display:none!important}
         <button class="diet-share-btn" id="diet-share-btn" type="button">Share Card</button>
         <button class="diet-pdf-btn" id="diet-pdf-btn" type="button">Export PDF</button>
       </div>
-      <button class="diet-clear-btn" id="diet-clear-btn" type="button">Clear Day</button>
     </div>
+
+    <!-- DIET PLAN LIBRARY -->
+    <details class="card diet-lib-card" id="diet-lib-card">
+      <summary class="diet-lib-summary">Diet plan library <span class="diet-lib-count" id="diet-lib-count"></span></summary>
+      <div class="plan-lib-actions">
+        <button class="lib-btn save" id="save-diet-btn" type="button">＋ Save today as plan</button>
+        <button class="lib-btn clear" id="diet-clear-btn" type="button">Clear day</button>
+      </div>
+      <div id="diet-lib-list"></div>
+      <div class="lib-hint">Save a day's meals under a name — keep plans for different goals, or build a client's plan, share the PDF, then load your own back.</div>
+    </details>
 
     <!-- MACRO PIE CHART -->
     <div class="card-light" id="macro-pie-card" style="display:none">
@@ -814,6 +824,7 @@ function renderDay(){
   renderMeals();
   renderTrend();
   renderMacroChart();
+  renderDietLibrary();
 }
 
 // Calories-remaining hero + 3 macro progress bars (consumed vs target)
@@ -977,6 +988,71 @@ document.getElementById('diet-clear-btn').addEventListener('click',()=>{
 });
 
 document.getElementById('diet-pdf-btn').addEventListener('click',generateNutritionPDF);
+
+// ── DIET PLAN LIBRARY (save / load named day plans) ──────────────
+function getDietPlans(){ if(!Array.isArray(data.dietPlans)) data.dietPlans=[]; return data.dietPlans; }
+function planMealsMacros(meals){
+  let t={cal:0,p:0,c:0,f:0};
+  (meals||[]).forEach(m=>(m.items||[]).forEach(it=>{t.cal+=+it.cal||0;t.p+=+it.p||0;t.c+=+it.c||0;t.f+=+it.f||0;}));
+  return {cal:Math.round(t.cal),p:Math.round(t.p),c:Math.round(t.c),f:Math.round(t.f)};
+}
+function renderDietLibrary(){
+  const el=document.getElementById('diet-lib-list'); if(!el) return;
+  const lib=getDietPlans();
+  const cnt=document.getElementById('diet-lib-count');
+  if(cnt) cnt.textContent=lib.length?(lib.length+' saved'):'';
+  if(!lib.length){ el.innerHTML='<div class="lib-empty">No saved plans yet. Log a day’s meals, then tap “Save today as plan”.</div>'; return; }
+  el.innerHTML=lib.map(p=>{
+    const mc=(p.meals||[]).filter(m=>m.items&&m.items.length).length;
+    const mac=planMealsMacros(p.meals);
+    const meta=mac.cal.toLocaleString()+' kcal · '+mc+' meal'+(mc!==1?'s':'')+' · P'+mac.p+' C'+mac.c+' F'+mac.f;
+    return '<div class="lib-row">'+
+      '<div class="lib-info" data-load="'+p.id+'"><div class="lib-name">'+escHtml(p.name)+'</div><div class="lib-meta">'+escHtml(meta)+'</div></div>'+
+      '<button class="lib-load" data-load="'+p.id+'">Load</button>'+
+      '<button class="lib-del" data-del="'+p.id+'" aria-label="Delete">&times;</button>'+
+    '</div>';
+  }).join('');
+  el.querySelectorAll('[data-load]').forEach(b=>b.addEventListener('click',()=>loadDietPlan(b.dataset.load)));
+  el.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>deleteDietPlan(b.dataset.del)));
+}
+function saveDietPlan(){
+  const day=ensureDay(currentDate);
+  const hasFood=day.meals.some(m=>m.items&&m.items.length);
+  if(!hasFood){ alert('Log some food first.'); return; }
+  const name=prompt('Save this day as a diet plan:','My Plan');
+  if(name===null) return;
+  const nm=name.trim().slice(0,50); if(!nm) return;
+  const meals=JSON.parse(JSON.stringify(day.meals));
+  const targets=Object.assign({},data.targets);
+  const lib=getDietPlans();
+  const existing=lib.find(p=>p.name.toLowerCase()===nm.toLowerCase());
+  if(existing){
+    if(!confirm('A plan named "'+nm+'" already exists. Overwrite it?')) return;
+    existing.meals=meals; existing.targets=targets; existing.savedAt=Date.now();
+  } else {
+    lib.unshift({id:uid(),name:nm,savedAt:Date.now(),meals,targets});
+  }
+  save(); renderDietLibrary();
+}
+function loadDietPlan(id){
+  const lib=getDietPlans(); const p=lib.find(x=>x.id===id); if(!p) return;
+  const label=new Date(currentDate+'T12:00:00').toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'});
+  if(!confirm('Load “'+p.name+'” onto '+label+'? This replaces the meals logged for that day.')) return;
+  const meals=JSON.parse(JSON.stringify(p.meals)).map(m=>({id:uid(),name:m.name,items:(m.items||[]).map(it=>Object.assign({},it,{id:uid()}))}));
+  data.days[currentDate]={meals};
+  if(p.targets){
+    data.targets=Object.assign({cal:'',p:'',c:'',f:''},p.targets);
+    ['cal','p','c','f'].forEach(k=>{ const elx=document.getElementById('t-'+k); if(elx) elx.value=(data.targets[k]===''||data.targets[k]==null)?'':data.targets[k]; });
+  }
+  save(); renderDay();
+}
+function deleteDietPlan(id){
+  const lib=getDietPlans(); const p=lib.find(x=>x.id===id); if(!p) return;
+  if(!confirm('Delete saved plan “'+p.name+'”? This cannot be undone.')) return;
+  data.dietPlans=lib.filter(x=>x.id!==id);
+  save(); renderDietLibrary();
+}
+document.getElementById('save-diet-btn').addEventListener('click',saveDietPlan);
 
 function generateNutritionPDF(){
   const jsPDFlib=window.jspdf&&window.jspdf.jsPDF;
@@ -1364,8 +1440,31 @@ applyNutritionTierGates();
   .diet-share-btn:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(204,0,0,0.35)}
   .diet-pdf-btn{background:rgba(255,255,255,0.08);color:#e2e8f0;border:1px solid rgba(255,255,255,0.18);border-radius:12px;padding:13px;font-family:'DM Sans',system-ui,sans-serif;font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;transition:all .15s}
   .diet-pdf-btn:hover{background:rgba(255,255,255,0.14);color:#fff}
-  .diet-clear-btn{width:100%;background:transparent;color:rgba(204,0,0,0.7);border:1px solid rgba(204,0,0,0.3);border-radius:10px;padding:10px;font-family:'DM Sans',system-ui,sans-serif;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;margin-top:8px;transition:all .15s}
-  .diet-clear-btn:hover{background:rgba(204,0,0,0.08);color:#cc0000;border-color:rgba(204,0,0,0.55)}
+  /* DIET PLAN LIBRARY */
+  .diet-lib-card{padding:0;overflow:hidden}
+  .diet-lib-summary{list-style:none;cursor:pointer;padding:15px 16px;font-family:'DM Sans',system-ui,sans-serif;font-size:13px;font-weight:800;letter-spacing:.04em;color:#e2e8f0;text-transform:uppercase;display:flex;align-items:center;gap:8px;user-select:none}
+  .diet-lib-summary::-webkit-details-marker{display:none}
+  .diet-lib-summary::before{content:'▸';color:#cc0000;font-size:12px;transition:transform .18s}
+  .diet-lib-card[open] .diet-lib-summary::before{transform:rotate(90deg)}
+  .diet-lib-count{margin-left:auto;font-size:11px;font-weight:600;color:rgba(255,255,255,0.45);text-transform:none;letter-spacing:0}
+  .diet-lib-card>.plan-lib-actions,.diet-lib-card>#diet-lib-list,.diet-lib-card>.lib-hint{margin-left:16px;margin-right:16px}
+  .diet-lib-card>.lib-hint{margin-bottom:16px}
+  .plan-lib-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+  .lib-btn{border:none;border-radius:10px;padding:11px;font-family:'DM Sans',system-ui,sans-serif;font-size:12px;font-weight:700;letter-spacing:.04em;cursor:pointer;transition:all .15s}
+  .lib-btn.save{background:rgba(204,0,0,0.16);color:#ff8a8a;border:1px solid rgba(204,0,0,0.34)}
+  .lib-btn.save:hover{background:rgba(204,0,0,0.24);color:#fff}
+  .lib-btn.clear{background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.14)}
+  .lib-btn.clear:hover{background:rgba(255,255,255,0.10);color:#fff}
+  .lib-row{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.10);border-radius:10px;padding:11px 12px;margin-bottom:7px}
+  .lib-info{flex:1;min-width:0;cursor:pointer}
+  .lib-name{font-family:'DM Sans',system-ui,sans-serif;font-size:14px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lib-meta{font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px}
+  .lib-load{background:#2f9e57;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-family:'DM Sans',system-ui,sans-serif;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0}
+  .lib-load:hover{background:#268247}
+  .lib-del{background:transparent;border:none;color:rgba(255,255,255,0.35);font-size:18px;cursor:pointer;padding:0 2px;flex-shrink:0;line-height:1}
+  .lib-del:hover{color:#cc0000}
+  .lib-empty{font-size:12px;color:rgba(255,255,255,0.45);font-style:italic;padding:6px 2px}
+  .lib-hint{font-size:11px;color:#aaa;margin-top:8px;line-height:1.4}
   .ds-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:none;align-items:center;justify-content:center;padding:1rem;overflow:auto}
   .ds-overlay.show{display:flex}
   .ds-modal{background:#1a1a1a;border:1px solid #2a2a2a;border-top:3px solid #cc0000;border-radius:14px;padding:18px;max-width:420px;width:100%;max-height:95vh;overflow:auto}

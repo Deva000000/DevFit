@@ -143,6 +143,24 @@
   .share-btn:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(204,0,0,0.35)}
   .share-btn:disabled{background:#666;box-shadow:none;cursor:not-allowed;transform:none}
 
+  /* PLAN LIBRARY */
+  .plan-lib-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+  .lib-btn{border:none;border-radius:var(--radius);padding:11px;font-family:'DM Sans',system-ui,sans-serif;font-size:12px;font-weight:700;letter-spacing:.04em;cursor:pointer;transition:all .15s}
+  .lib-btn.save{background:rgba(204,0,0,0.14);color:#ff8a8a;border:1px solid rgba(204,0,0,0.32)}
+  .lib-btn.save:hover{background:rgba(204,0,0,0.22);color:#fff}
+  .lib-btn.clear{background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.14)}
+  .lib-btn.clear:hover{background:rgba(255,255,255,0.10);color:#fff}
+  .lib-row{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.10);border-radius:var(--radius);padding:11px 12px;margin-bottom:7px}
+  .lib-info{flex:1;min-width:0;cursor:pointer}
+  .lib-name{font-family:'DM Sans',system-ui,sans-serif;font-size:14px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lib-meta{font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px}
+  .lib-load{background:#2f9e57;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-family:'DM Sans',system-ui,sans-serif;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0}
+  .lib-load:hover{background:#26824799;background:#268247}
+  .lib-del{background:transparent;border:none;color:rgba(255,255,255,0.35);font-size:18px;cursor:pointer;padding:0 2px;flex-shrink:0;line-height:1}
+  .lib-del:hover{color:#cc0000}
+  .lib-empty{font-size:12px;color:rgba(255,255,255,0.45);font-style:italic;padding:6px 2px}
+  .lib-hint{font-size:11px;color:#aaa;margin-top:8px;line-height:1.4}
+
   /* RESET HISTORY BUTTON */
   .reset-btn{width:100%;background:transparent;border:1px solid rgba(255,255,255,0.14);color:rgba(255,255,255,0.5);border-radius:var(--radius);padding:9px;font-family:'DM Sans',system-ui,sans-serif;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;margin-top:8px;transition:all .15s}
   .reset-btn:hover{border-color:#cc0000;color:#ff6b6b}
@@ -285,6 +303,15 @@ html.nosplash #devfit-splash{display:none!important}
   <!-- PLAN VIEW -->
   <div id="view-plan" style="display:none">
     <div class="card">
+      <div class="section-label">Plan library</div>
+      <div class="plan-lib-actions">
+        <button class="lib-btn save" id="save-plan-btn" type="button">＋ Save current plan</button>
+        <button class="lib-btn clear" id="clear-plan-btn" type="button">Clear / new blank</button>
+      </div>
+      <div id="plan-lib-list"></div>
+      <div class="lib-hint">Save your routine under a name — keep several mesocycles, or build a client's plan, share the PDF, then load your own back.</div>
+    </div>
+    <div class="card">
       <div class="section-label">Program details</div>
       <input type="text" class="inp" id="plan-name" placeholder="Program name (e.g. 8-Week Hypertrophy)" style="margin-bottom:8px">
       <input type="text" class="inp" id="plan-client" placeholder="Client / athlete name (optional)">
@@ -404,7 +431,7 @@ document.querySelectorAll('.mode-btn').forEach(btn=>{
     document.getElementById('view-plan').style.display    = currentMode==='plan'?'':'none';
     document.getElementById('view-progress').style.display= currentMode==='progress'?'':'none';
     if(currentMode==='log')      renderLog();
-    if(currentMode==='plan')   { renderPlan(); loadPlanMeta(); }
+    if(currentMode==='plan')   { renderPlan(); loadPlanMeta(); renderPlanLibrary(); }
     if(currentMode==='progress') renderProgressView();
   });
 });
@@ -529,6 +556,74 @@ function loadPlanMeta(){
     save();
   });
 });
+
+// ---------- PLAN LIBRARY (save / load named routines) ----------
+function getPlanLibrary(){ if(!Array.isArray(data.planLibrary)) data.planLibrary=[]; return data.planLibrary; }
+function snapshotPlan(){
+  return JSON.parse(JSON.stringify({
+    name:data.plan.name||'', client:data.plan.client||'', notes:data.plan.notes||'',
+    workouts:data.plan.workouts||[]
+  }));
+}
+function planExCount(p){ return (p.workouts||[]).reduce((s,w)=>s+(w.exercises?w.exercises.filter(e=>e.name).length:0),0); }
+
+function renderPlanLibrary(){
+  const el=document.getElementById('plan-lib-list'); if(!el) return;
+  const lib=getPlanLibrary();
+  if(!lib.length){ el.innerHTML='<div class="lib-empty">No saved plans yet. Build a routine below, then tap “Save current plan”.</div>'; return; }
+  el.innerHTML=lib.map(p=>{
+    const wc=(p.plan.workouts||[]).length;
+    const ec=planExCount(p.plan);
+    const meta=wc+' workout'+(wc!==1?'s':'')+' · '+ec+' exercise'+(ec!==1?'s':'')+(p.plan.client?' · '+escapeHTML(p.plan.client):'');
+    return '<div class="lib-row">'+
+      '<div class="lib-info" data-load="'+p.id+'"><div class="lib-name">'+escapeHTML(p.name)+'</div><div class="lib-meta">'+meta+'</div></div>'+
+      '<button class="lib-load" data-load="'+p.id+'">Load</button>'+
+      '<button class="lib-del" data-del="'+p.id+'" aria-label="Delete">×</button>'+
+    '</div>';
+  }).join('');
+  el.querySelectorAll('[data-load]').forEach(b=>b.addEventListener('click',()=>loadPlanFromLibrary(b.dataset.load)));
+  el.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>deletePlanFromLibrary(b.dataset.del)));
+}
+function saveCurrentPlan(){
+  const hasContent=(data.plan.workouts||[]).some(w=>w.name||(w.exercises&&w.exercises.some(e=>e.name)));
+  if(!hasContent){ toast('Add at least one workout first'); return; }
+  const def=(data.plan.name||'').trim();
+  const name=prompt('Save this plan as:',def||'My Plan');
+  if(name===null) return;
+  const nm=name.trim().slice(0,50); if(!nm) return;
+  const lib=getPlanLibrary();
+  const snap=snapshotPlan(); snap.name=nm;
+  const existing=lib.find(p=>p.name.toLowerCase()===nm.toLowerCase());
+  if(existing){
+    if(!confirm('A plan named "'+nm+'" already exists. Overwrite it?')) return;
+    existing.plan=snap; existing.savedAt=Date.now();
+  } else {
+    lib.unshift({id:uid(),name:nm,savedAt:Date.now(),plan:snap});
+  }
+  save(); renderPlanLibrary(); toast('Saved “'+nm+'”');
+}
+function loadPlanFromLibrary(id){
+  const lib=getPlanLibrary(); const p=lib.find(x=>x.id===id); if(!p) return;
+  if(!confirm('Load “'+p.name+'”? This replaces the plan in the editor. Your saved plans and past sessions are kept.')) return;
+  const snap=JSON.parse(JSON.stringify(p.plan));
+  data.plan.name=snap.name||''; data.plan.client=snap.client||''; data.plan.notes=snap.notes||'';
+  data.plan.workouts=snap.workouts||[];
+  save(); renderPlan(); loadPlanMeta(); toast('Loaded “'+p.name+'”');
+}
+function deletePlanFromLibrary(id){
+  const lib=getPlanLibrary(); const p=lib.find(x=>x.id===id); if(!p) return;
+  if(!confirm('Delete saved plan “'+p.name+'”? This cannot be undone.')) return;
+  data.planLibrary=lib.filter(x=>x.id!==id);
+  save(); renderPlanLibrary();
+}
+function clearCurrentPlan(){
+  const hasContent=(data.plan.workouts||[]).some(w=>w.name||(w.exercises&&w.exercises.length));
+  if(hasContent && !confirm('Clear the current plan to start blank? Save it first if you want to keep it — past sessions are untouched.')) return;
+  data.plan.name=''; data.plan.client=''; data.plan.notes=''; data.plan.workouts=[];
+  save(); renderPlan(); loadPlanMeta(); renderPlanLibrary(); toast('Blank plan ready');
+}
+document.getElementById('save-plan-btn').addEventListener('click',saveCurrentPlan);
+document.getElementById('clear-plan-btn').addEventListener('click',clearCurrentPlan);
 
 // ---------- SHARE PROGRAM PDF ----------
 document.getElementById('share-plan-btn').addEventListener('click',exportPlanPDF);

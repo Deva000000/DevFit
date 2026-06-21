@@ -78,9 +78,12 @@ html[data-theme="light"] nav.prog-subnav{
 html[data-theme="light"] nav.devfit-tabnav a{color:#6b6258 !important;}
 html[data-theme="light"] nav.devfit-tabnav a:hover{color:#14110e !important;}
 html[data-theme="light"] nav.devfit-tabnav a.active{color:#fff !important;}
-html[data-theme="light"] nav.prog-subnav button{color:#6b6258 !important;}
+html[data-theme="light"] nav.prog-subnav{border-bottom-color:rgba(20,15,10,0.12) !important;}
+html[data-theme="light"] nav.prog-subnav button{color:#8a8178 !important;}
 html[data-theme="light"] nav.prog-subnav button:hover{color:#14110e !important;}
-html[data-theme="light"] nav.prog-subnav button.active{color:#fff !important;}
+/* Underline tabs: active state is a red underline, NOT a filled pill — so the
+   active label must be dark ink (white was a leftover from the old pill design). */
+html[data-theme="light"] nav.prog-subnav button.active{color:#14110e !important;}
 
 /* Week tabs: inactive pill text is white (for dark bg) — flip to dark in light mode */
 html[data-theme="light"] .wtab{color:#7a2020 !important;border-color:rgba(204,0,0,0.45) !important;}
@@ -203,3 +206,69 @@ html[data-theme="light"] .df-theme-toggle{background:#faf7f3;border-color:rgba(2
 html[data-theme="light"] .df-theme-opt{color:#6b6258}
 .df-theme-opt .ic{font-size:16px;line-height:1}
 .df-theme-opt.active{background:linear-gradient(135deg,#cc0000,#ff4444);color:#fff;box-shadow:0 6px 16px rgba(204,0,0,0.35)}
+
+/* ===========================================================
+   LIGHT THEME — component coverage (v4.28+)
+   The front-page dashboards (Today Overview, Training Status),
+   the plan/diet libraries and the underline section tabs were all
+   built with dark-tuned white/translucent colours. Without these
+   overrides their text is white-on-white in light mode. One ink
+   ramp keeps the hierarchy premium:
+     #14110e  near-black  — headline values, active labels
+     #3a352f  body ink    — secondary values
+     #6b6258  muted       — titles / inactive tabs
+     #8a8178  faint       — captions / sublabels
+     #b8ada1  hint        — delete glyphs
+     #faf7f3  surface     — inset rows on a card
+   =========================================================== */
+
+/* ---- Underline section tabs (Training mode-switch, Nutrition slicer) ---- */
+html[data-theme="light"] .mode-switch,
+html[data-theme="light"] .diet-slicer{border-bottom-color:rgba(20,15,10,0.12) !important;}
+html[data-theme="light"] .mode-btn,
+html[data-theme="light"] .ds-tab{color:#8a8178 !important;}
+html[data-theme="light"] .mode-btn:hover,
+html[data-theme="light"] .ds-tab:hover{color:#14110e !important;}
+html[data-theme="light"] .mode-btn.active,
+html[data-theme="light"] .ds-tab.active{color:#14110e !important;}
+
+/* ---- Today Overview ---- */
+html[data-theme="light"] .ov-title{color:#6b6258 !important;}
+html[data-theme="light"] .ov-lbl{color:#8a8178 !important;}
+html[data-theme="light"] .ov-val{color:#14110e !important;}
+html[data-theme="light"] .ov-val .u{color:#8a8178 !important;}
+html[data-theme="light"] .ov-sub{color:#8a8178 !important;}
+html[data-theme="light"] .ov-tile + .ov-tile{border-left-color:rgba(20,15,10,0.10) !important;}
+html[data-theme="light"] .ov-bar{background:rgba(20,15,10,0.10) !important;}
+
+/* ---- Training Status ---- */
+html[data-theme="light"] .ts-status{color:#14110e !important;}
+html[data-theme="light"] .ts-reason,
+html[data-theme="light"] .ts-empty{color:#8a8178 !important;}
+html[data-theme="light"] .ts-cyc{color:#3a352f !important;}
+html[data-theme="light"] .ts-foot{border-top-color:rgba(20,15,10,0.10) !important;}
+html[data-theme="light"] .ts-ring-bg{stroke:rgba(20,15,10,0.12) !important;}
+html[data-theme="light"] .ts-ring-ic{color:#14110e !important;}
+/* readiness greens were tuned bright for a dark card — deepen for white */
+html[data-theme="light"] .ts-nextline{color:#1d7a44 !important;}
+
+/* ---- Plan & Diet plan libraries (shared lib-* component) ---- */
+html[data-theme="light"] .lib-row{background:#faf7f3 !important;border-color:rgba(20,15,10,0.10) !important;}
+html[data-theme="light"] .lib-name{color:#14110e !important;}
+html[data-theme="light"] .lib-meta,
+html[data-theme="light"] .lib-empty,
+html[data-theme="light"] .lib-hint{color:#8a8178 !important;}
+html[data-theme="light"] .lib-del{color:#b8ada1 !important;}
+html[data-theme="light"] .lib-del:hover{color:#cc0000 !important;}
+html[data-theme="light"] .lib-btn.clear{background:#faf7f3 !important;border-color:rgba(20,15,10,0.14) !important;color:#3a352f !important;}
+html[data-theme="light"] .lib-btn.clear:hover{background:#f1ebe4 !important;color:#14110e !important;}
+html[data-theme="light"] .lib-btn.save{background:rgba(204,0,0,0.08) !important;border-color:rgba(204,0,0,0.30) !important;color:#cc0000 !important;}
+html[data-theme="light"] .lib-btn.save:hover{background:rgba(204,0,0,0.14) !important;color:#a30000 !important;}
+html[data-theme="light"] .diet-lib-summary{color:#14110e !important;}
+html[data-theme="light"] .diet-lib-count{color:#8a8178 !important;}
+
+/* ---- Workouts plan editor controls ---- */
+html[data-theme="light"] .add-btn{color:#475569 !important;border-color:rgba(20,15,10,0.22) !important;}
+html[data-theme="light"] .add-btn:hover{color:#cc0000 !important;border-color:#cc0000 !important;}
+html[data-theme="light"] .del-mini{color:#b0a89e !important;}
+html[data-theme="light"] .del-mini:hover{color:#cc0000 !important;}

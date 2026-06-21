@@ -6,6 +6,7 @@
 <title>DevFit — Nutrition</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:ital,wght@1,700;1,800&family=Lora:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600;1,700&family=Anton&family=Righteous&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="foods-local.js"></script>
 
 <!-- PWA -->
@@ -307,7 +308,11 @@ html.nosplash #devfit-splash{display:none!important}
       <!-- Meal diary -->
       <div id="meals-wrap"></div>
       <button class="add-meal-btn" id="add-meal-btn" type="button">+ Add Meal</button>
-      <button class="diet-share-btn" id="diet-share-btn" type="button">Share Daily Card</button>
+      <div class="diet-action-btns">
+        <button class="diet-share-btn" id="diet-share-btn" type="button">Share Card</button>
+        <button class="diet-pdf-btn" id="diet-pdf-btn" type="button">Export PDF</button>
+      </div>
+      <button class="diet-clear-btn" id="diet-clear-btn" type="button">Clear Day</button>
     </div>
 
     <!-- MACRO PIE CHART -->
@@ -962,6 +967,180 @@ document.getElementById('add-meal-btn').addEventListener('click',()=>{
   save(); renderMeals();
 });
 
+document.getElementById('diet-clear-btn').addEventListener('click',()=>{
+  const dm=getDayMacros(currentDate);
+  if(!(dm.cal>0||dm.p>0||dm.c>0||dm.f>0)) return;
+  const label=new Date(currentDate+'T12:00:00').toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'});
+  if(!confirm('Clear all food entries for '+label+'?')) return;
+  data.days[currentDate]=blankDay();
+  save(); renderDay();
+});
+
+document.getElementById('diet-pdf-btn').addEventListener('click',generateNutritionPDF);
+
+function generateNutritionPDF(){
+  const jsPDFlib=window.jspdf&&window.jspdf.jsPDF;
+  if(!jsPDFlib){ alert('PDF library not loaded. Check your connection.'); return; }
+  const dm=getDayMacros(currentDate);
+  if(!(dm.cal>0||dm.p>0||dm.c>0||dm.f>0)){ alert('Log some food first.'); return; }
+
+  const doc=new jsPDFlib({orientation:'p',unit:'mm',format:'a4'});
+  const PW=210,M=14,CW=PW-M*2;
+  let y=15;
+
+  // Header bar
+  doc.setFillColor(204,0,0); doc.rect(0,0,PW,13,'F');
+  doc.setFontSize(17); doc.setFont('helvetica','bolditalic'); doc.setTextColor(255,255,255);
+  doc.text('DEV',M,10);
+  const dw=doc.getTextWidth('DEV');
+  doc.setTextColor(255,200,200); doc.text('FIT',M+dw,10);
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(255,255,255);
+  doc.text(' · Nutrition Report',M+dw+doc.getTextWidth('FIT'),10);
+
+  y=20;
+  const dateLabel=new Date(currentDate+'T12:00:00').toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  let handle='';
+  try{
+    const cn=(localStorage.getItem('devfit_displayName')||'').trim();
+    handle=cn||(JSON.parse(localStorage.getItem('devfit_user')||'{}').email||'');
+  }catch(e){}
+
+  doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.setTextColor(30,30,30);
+  doc.text(dateLabel,M,y+8); y+=14;
+  if(handle){ doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(120,120,120); doc.text(handle,M,y); y+=7; }
+  doc.setDrawColor(204,0,0); doc.setLineWidth(0.5); doc.line(M,y,PW-M,y); y+=6;
+
+  // Calorie summary box
+  const tCal=Number(data.targets.cal)||0;
+  const hasTgt=tCal>0;
+  const remain=hasTgt?Math.round(tCal-dm.cal):0;
+  doc.setFillColor(248,248,250); doc.roundedRect(M,y,CW,22,3,3,'F');
+  doc.setFontSize(22); doc.setFont('helvetica','bold'); doc.setTextColor(30,30,30);
+  doc.text(dm.cal.toLocaleString(),M+4,y+15);
+  doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(120,120,120);
+  doc.text('kcal logged',M+4,y+21);
+  if(hasTgt){
+    doc.setFontSize(10); doc.setFont('helvetica','bold');
+    doc.setTextColor(80,80,80); doc.text('Target: '+tCal.toLocaleString()+' kcal',M+CW/3+4,y+9);
+    const rc=remain>=0?[47,159,87]:[204,0,0];
+    doc.setTextColor(rc[0],rc[1],rc[2]);
+    doc.text((remain>=0?'−':'+')+Math.abs(remain).toLocaleString()+' kcal '+(remain>=0?'remaining':'over'),M+CW/3+4,y+18);
+    const pct=Math.min(1,dm.cal/tCal);
+    const fc=dm.cal>tCal?[204,0,0]:[47,159,87];
+    doc.setFillColor(220,220,225); doc.roundedRect(M,y+22,CW,3,1,1,'F');
+    doc.setFillColor(fc[0],fc[1],fc[2]); doc.roundedRect(M,y+22,CW*pct,3,1,1,'F');
+    y+=27;
+  } else { y+=24; }
+  y+=4;
+
+  // Macro tiles (3 side by side)
+  const macros=[
+    {label:'Protein',val:dm.p+'g',tgtStr:Number(data.targets.p)?data.targets.p+'g':'—',col:[74,101,114]},
+    {label:'Carbs',  val:dm.c+'g',tgtStr:Number(data.targets.c)?data.targets.c+'g':'—',col:[198,144,47]},
+    {label:'Fat',    val:dm.f+'g',tgtStr:Number(data.targets.f)?data.targets.f+'g':'—',col:[204,0,0]}
+  ];
+  const mw=(CW-8)/3;
+  macros.forEach((mac,i)=>{
+    const mx=M+i*(mw+4);
+    doc.setFillColor(245,245,247); doc.roundedRect(mx,y,mw,20,2,2,'F');
+    doc.setFillColor(mac.col[0],mac.col[1],mac.col[2]); doc.rect(mx,y,3,20,'F');
+    doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(120,120,120);
+    doc.text(mac.label.toUpperCase(),mx+5,y+6);
+    doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.setTextColor(30,30,30);
+    doc.text(mac.val,mx+5,y+15);
+    doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(150,150,150);
+    doc.text('/ '+mac.tgtStr,mx+mw-3,y+15,{align:'right'});
+  });
+  y+=24;
+
+  // Macro split bar
+  const totMacCal=(dm.p*4)+(dm.c*4)+(dm.f*9);
+  if(totMacCal>0){
+    let bx=M;
+    const segs=[['p',dm.p*4,[74,101,114]],['c',dm.c*4,[198,144,47]],['f',dm.f*9,[204,0,0]]].filter(s=>s[1]>0);
+    segs.forEach(([,v,col],i)=>{
+      const sw=CW*(v/totMacCal);
+      doc.setFillColor(col[0],col[1],col[2]);
+      doc.rect(bx,y,i<segs.length-1?Math.max(sw-1,0.5):sw,5,'F');
+      bx+=sw;
+    });
+    y+=8;
+    doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(120,120,120);
+    doc.text('Protein '+Math.round(dm.p*4/totMacCal*100)+'%',M,y);
+    doc.text('Carbs '+Math.round(dm.c*4/totMacCal*100)+'%',M+CW/2,y,{align:'center'});
+    doc.text('Fat '+Math.round(dm.f*9/totMacCal*100)+'%',M+CW,y,{align:'right'});
+    y+=6;
+  }
+  y+=4;
+
+  // Meals table header
+  const dayObj=data.days[currentDate];
+  const meals=(dayObj&&Array.isArray(dayObj.meals))?dayObj.meals:[];
+  if(meals.some(m=>m.items&&m.items.length)){
+    doc.setFillColor(30,30,35); doc.rect(M,y,CW,7,'F');
+    doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
+    doc.text('MEAL / FOOD ITEM',M+2,y+5);
+    doc.text('G',M+CW-58,y+5,{align:'right'});
+    doc.text('KCAL',M+CW-43,y+5,{align:'right'});
+    doc.text('P',M+CW-30,y+5,{align:'right'});
+    doc.text('C',M+CW-18,y+5,{align:'right'});
+    doc.text('F',M+CW-6,y+5,{align:'right'});
+    y+=9;
+
+    meals.forEach(meal=>{
+      if(!meal.items||!meal.items.length) return;
+      if(y>265){ doc.addPage(); y=20; }
+      // Meal header
+      doc.setFillColor(244,238,238); doc.roundedRect(M,y,CW,6.5,1,1,'F');
+      doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(150,0,0);
+      doc.text(meal.name,M+2,y+4.8);
+      doc.setFontSize(7.5); doc.text(mealKcal(meal)+' kcal',M+CW-2,y+4.8,{align:'right'});
+      y+=7.5;
+      // Items
+      meal.items.forEach((it,idx)=>{
+        if(y>265){ doc.addPage(); y=20; }
+        if(idx%2===0){ doc.setFillColor(250,250,252); doc.rect(M,y,CW,6.5,'F'); }
+        doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40);
+        const nm=doc.splitTextToSize(String(it.name||''),80)[0];
+        doc.text(nm,M+5,y+4.4);
+        if(it.grams){ doc.setTextColor(100,100,100); doc.text(String(it.grams),M+CW-58,y+4.4,{align:'right'}); }
+        doc.setFont('helvetica','bold'); doc.setTextColor(30,30,30);
+        doc.text(String(Math.round(it.cal||0)),M+CW-43,y+4.4,{align:'right'});
+        doc.setFont('helvetica','normal');
+        doc.setTextColor(74,101,114); doc.text(String(Math.round(it.p||0)),M+CW-30,y+4.4,{align:'right'});
+        doc.setTextColor(198,144,47); doc.text(String(Math.round(it.c||0)),M+CW-18,y+4.4,{align:'right'});
+        doc.setTextColor(204,0,0);     doc.text(String(Math.round(it.f||0)),M+CW-6,y+4.4,{align:'right'});
+        y+=6.5;
+      });
+      y+=2;
+    });
+
+    // Totals row
+    if(y>265){ doc.addPage(); y=20; }
+    doc.setFillColor(30,30,35); doc.roundedRect(M,y,CW,8,2,2,'F');
+    doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
+    doc.text('TOTAL',M+2,y+5.5);
+    doc.text(dm.cal.toLocaleString()+' kcal',M+CW-43,y+5.5,{align:'right'});
+    doc.setTextColor(180,210,230); doc.text('P '+dm.p+'g',M+CW-30,y+5.5,{align:'right'});
+    doc.setTextColor(220,195,130); doc.text('C '+dm.c+'g',M+CW-18,y+5.5,{align:'right'});
+    doc.setTextColor(255,140,140); doc.text('F '+dm.f+'g',M+CW-6,y+5.5,{align:'right'});
+    y+=10;
+  }
+
+  // Footer on every page
+  const pages=doc.getNumberOfPages();
+  for(let pn=1;pn<=pages;pn++){
+    doc.setPage(pn);
+    doc.setFillColor(204,0,0); doc.rect(0,287,PW,10,'F');
+    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(255,255,255);
+    doc.text('DevFit · Dominance Through Discipline',M,293);
+    doc.setTextColor(255,200,200);
+    doc.text('Page '+pn+'/'+pages+' · devfitportal.vercel.app',PW-M,293,{align:'right'});
+  }
+
+  doc.save('DevFit_Nutrition_'+currentDate.replace(/-/g,'')+'.pdf');
+}
+
 function lastNDates(n){
   const out=[];
   const base=new Date(currentDate);
@@ -1180,8 +1359,13 @@ applyNutritionTierGates();
 
 <!-- ===== DAILY DIET SHARE CARD ===== -->
 <style>
-  .diet-share-btn{width:100%;background:linear-gradient(135deg,#cc0000,#ff4444);color:#fff;border:none;border-radius:12px;padding:13px;font-family:'DM Sans',system-ui,sans-serif;font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;margin-top:14px;transition:all .15s;box-shadow:0 4px 12px rgba(204,0,0,0.25)}
+  .diet-action-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+  .diet-share-btn{background:linear-gradient(135deg,#cc0000,#ff4444);color:#fff;border:none;border-radius:12px;padding:13px;font-family:'DM Sans',system-ui,sans-serif;font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;transition:all .15s;box-shadow:0 4px 12px rgba(204,0,0,0.25)}
   .diet-share-btn:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(204,0,0,0.35)}
+  .diet-pdf-btn{background:rgba(255,255,255,0.08);color:#e2e8f0;border:1px solid rgba(255,255,255,0.18);border-radius:12px;padding:13px;font-family:'DM Sans',system-ui,sans-serif;font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;transition:all .15s}
+  .diet-pdf-btn:hover{background:rgba(255,255,255,0.14);color:#fff}
+  .diet-clear-btn{width:100%;background:transparent;color:rgba(204,0,0,0.7);border:1px solid rgba(204,0,0,0.3);border-radius:10px;padding:10px;font-family:'DM Sans',system-ui,sans-serif;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;margin-top:8px;transition:all .15s}
+  .diet-clear-btn:hover{background:rgba(204,0,0,0.08);color:#cc0000;border-color:rgba(204,0,0,0.55)}
   .ds-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:none;align-items:center;justify-content:center;padding:1rem;overflow:auto}
   .ds-overlay.show{display:flex}
   .ds-modal{background:#1a1a1a;border:1px solid #2a2a2a;border-top:3px solid #cc0000;border-radius:14px;padding:18px;max-width:420px;width:100%;max-height:95vh;overflow:auto}
@@ -1369,6 +1553,43 @@ applyNutritionTierGates();
       // (% of kcal removed for a cleaner, minimal card)
       y+=rowH;
     });
+
+    // Meals breakdown — show per-meal name + kcal if any meals have items
+    const dayObj=typeof data!=='undefined'?data.days[currentDate]:null;
+    const mealsArr=(dayObj&&Array.isArray(dayObj.meals))?dayObj.meals:[];
+    const mealsWithFood=mealsArr.filter(m=>m.items&&m.items.some(it=>Number(it.cal)>0));
+    if(mealsWithFood.length){
+      // Divider
+      ctx.fillStyle=pal.divider;
+      ctx.fillRect(PAD,y,W-PAD*2,2);
+      y+=44;
+
+      // Section label
+      ctx.textAlign='left'; ctx.textBaseline='top';
+      ctx.fillStyle=pal.sub;
+      ctx.font=F(700,28);
+      ctx.fillText("TODAY'S MEALS",PAD,y); y+=46;
+
+      const mRowH=56;
+      mealsWithFood.forEach(meal=>{
+        const mCal=mealKcal(meal);
+        // name
+        ctx.textAlign='left'; ctx.textBaseline='top';
+        ctx.fillStyle=pal.fg;
+        ctx.font=F(700,42);
+        // truncate if long
+        let mname=meal.name;
+        while(ctx.measureText(mname).width>W-PAD*2-200 && mname.length>4) mname=mname.slice(0,-1);
+        if(mname!==meal.name) mname=mname.trim()+'…';
+        ctx.fillText(mname,PAD,y);
+        // kcal right-aligned
+        ctx.textAlign='right';
+        ctx.fillStyle=pal.accent;
+        ctx.font=F(700,42);
+        ctx.fillText(mCal+' kcal',W-PAD,y);
+        y+=mRowH;
+      });
+    }
 
     // Footer: DEVFIT wordmark + handle
     const fy=H-PAD;

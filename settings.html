@@ -147,6 +147,10 @@
   .group-title{font-size:11.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,0.42);margin:26px 6px 11px;display:flex;align-items:center;gap:12px}
   .group-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(255,255,255,0.14),transparent)}
   .group-title:first-of-type{margin-top:6px}
+  /* Collapsible setting groups — keeps the long page compact */
+  .group-title.group-toggle{cursor:pointer;user-select:none}
+  .group-chev{order:3;font-size:11px;color:rgba(255,255,255,0.45);transition:transform .2s;margin-left:2px}
+  .group-title.collapsed .group-chev{transform:rotate(-90deg)}
   .card-sub{font-size:11.5px;color:#8a8a90;line-height:1.55;margin-top:10px}
 
   /* Share-card font picker — single horizontal scroll strip (saves vertical space) */
@@ -449,7 +453,7 @@ html.nosplash #devfit-splash{display:none!important}
 
   <div class="footer">
     DevFit · Dominance Through Discipline<br>
-    <a href="https://wa.me/60183679177">Contact trainer</a> · v4.24.0
+    <a href="https://wa.me/60183679177">Contact trainer</a> · v4.25.0
   </div>
 
 
@@ -1590,6 +1594,30 @@ function paintThemeToggle(){
   });
 }
 paintThemeToggle();
+
+// Make each settings group (Personal / Billing / Reports / App / Data) a
+// collapsible section so the page stays short — tap a header to expand it.
+(function collapsibleGroups(){
+  try{
+    var titles=[].slice.call(document.querySelectorAll('.group-title'));
+    titles.forEach(function(t,idx){
+      var body=document.createElement('div'); body.className='settings-group-body';
+      var el=t.nextElementSibling;
+      while(el && !el.classList.contains('group-title')){ var nx=el.nextElementSibling; body.appendChild(el); el=nx; }
+      t.parentNode.insertBefore(body, el);
+      t.classList.add('group-toggle');
+      var chev=document.createElement('span'); chev.className='group-chev'; chev.textContent='▾'; t.appendChild(chev);
+      // First group (Personal) open, the rest collapsed for compactness.
+      var collapsed = idx!==0;
+      if(collapsed){ body.style.display='none'; t.classList.add('collapsed'); }
+      t.addEventListener('click', function(){
+        var hidden = body.style.display==='none';
+        body.style.display = hidden ? '' : 'none';
+        t.classList.toggle('collapsed', !hidden);
+      });
+    });
+  }catch(e){}
+})();
 </script>
 </body>
 </html>

@@ -69,12 +69,26 @@
   .dash-lbl{font-size:11px;font-weight:700;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
   .dash-val{font-family:'DM Sans',system-ui,sans-serif;font-size:34px;font-weight:800;line-height:1}
   .dash-sub{font-size:10px;color:rgba(255,255,255,0.45);margin-top:4px}
-  .dash-focus{padding:14px}
-  .focus-chips{display:flex;flex-wrap:wrap;gap:7px}
-  .focus-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(204,0,0,0.14);border:1px solid rgba(204,0,0,0.4);color:#ff8a8a;border-radius:18px;padding:6px 12px;font-size:12px;font-weight:700}
-  .focus-chip.fresh{background:rgba(47,158,87,0.14);border-color:rgba(47,158,87,0.4);color:#86efac}
-  .focus-chip b{color:#fff;font-weight:800}
-  .focus-allgood{font-size:12px;color:#86efac;font-weight:600}
+  /* TRAINING STATUS — readiness + routine schedule (replaces recovery tile + muscle focus) */
+  .train-status{padding:14px}
+  .ts-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px}
+  .ts-pill{font-size:11px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;padding:5px 12px;border-radius:20px;white-space:nowrap}
+  .ts-meta{font-size:11.5px;color:rgba(255,255,255,0.55);margin-bottom:10px}
+  .ts-bar{height:6px;border-radius:4px;background:rgba(255,255,255,0.12);overflow:hidden;margin-bottom:12px}
+  .ts-bar i{display:block;height:100%;border-radius:4px;width:0;transition:width .4s}
+  .ts-next{font-size:13px;font-weight:700;color:#fff;margin-bottom:11px}
+  .ts-next b{color:#ff6b6b}
+  .ts-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .ts-chip{font-size:11px;font-weight:700;padding:5px 11px;border-radius:14px;display:inline-flex;gap:6px;align-items:center}
+  .ts-chip .d{opacity:.85;font-weight:600}
+  .ts-empty{font-size:12px;color:rgba(255,255,255,0.5)}
+  .ts-green{background:rgba(34,197,94,0.14);border:1px solid rgba(34,197,94,0.45);color:#86efac}
+  .ts-amber{background:rgba(245,158,11,0.14);border:1px solid rgba(245,158,11,0.45);color:#fcd34d}
+  .ts-red{background:rgba(204,0,0,0.16);border:1px solid rgba(204,0,0,0.5);color:#ff8a8a}
+  .ts-grey{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);color:rgba(255,255,255,0.72)}
+  /* Empty-chart placeholder — cleaner than a blank graph */
+  .chart-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;height:200px;color:#94a3b8;font-size:13px;font-weight:600;line-height:1.5;padding:0 24px}
+  .chart-empty .ce-ic{font-size:26px;margin-bottom:8px;opacity:.6}
 
   /* TODAY OVERVIEW — 4-metric front snapshot */
   .today-ov{padding:16px 14px 18px}
@@ -528,22 +542,16 @@ html.nosplash #devfit-splash{display:none!important}
     </div>
   </div>
 
-  <!-- TRAINING + RECOVERY -->
-  <div class="dash-grid">
-    <div class="dash-tile">
-      <div class="dash-lbl">This Week</div>
-      <div class="dash-val" id="streak-count" style="color:#2f9e57">0</div>
-      <div class="dash-sub">workout sessions</div>
+  <!-- TRAINING STATUS — readiness + your routine schedule -->
+  <div class="card train-status" id="train-status">
+    <div class="ts-head">
+      <div class="section-label" style="margin:0">Training Status</div>
+      <div class="ts-pill ts-grey" id="ts-pill">—</div>
     </div>
-    <div class="dash-tile">
-      <div class="dash-lbl">Recovery</div>
-      <div class="dash-val" id="recovery-score" style="color:#2563eb">—</div>
-      <div class="dash-sub" id="recovery-sub">sleep · stress · load</div>
-    </div>
-  </div>
-  <div class="card dash-focus">
-    <div class="section-label">Muscle focus — train these next</div>
-    <div id="muscle-focus"></div>
+    <div class="ts-meta" id="ts-meta"></div>
+    <div class="ts-bar"><i id="ts-bar"></i></div>
+    <div class="ts-next" id="ts-next"></div>
+    <div class="ts-chips" id="ts-chips"></div>
   </div>
 
   <!-- PROGRESS SUB-TAB NAV -->
@@ -635,9 +643,10 @@ html.nosplash #devfit-splash{display:none!important}
     </div>
   </div>
 
-  <!-- BODY MEASUREMENTS -->
-  <div class="card">
-    <div class="section-label">Body measurements — Week <span class="meas-week-num">1</span> <span style="font-size:10px;color:#aaa;font-weight:400;text-transform:none;letter-spacing:0">(cm)</span></div>
+  <!-- BODY MEASUREMENTS (collapsed by default — optional) -->
+  <details class="setup-card">
+    <summary>Body measurements <span>week <span class="meas-week-num">1</span> · cm · optional</span></summary>
+    <div class="setup-body">
     <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
       <div style="background:#fff;border:1px solid #d1d5db;border-radius:10px;padding:8px 4px;text-align:center">
         <div style="font-size:9px;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Waist</div>
@@ -666,7 +675,8 @@ html.nosplash #devfit-splash{display:none!important}
       </div>
     </div>
     <div style="font-size:11px;color:#aaa;margin-top:8px;line-height:1.4">Track weekly changes. Delta shown vs previous week.</div>
-  </div>
+    </div><!-- /setup-body -->
+  </details>
 
   <!-- SUMMARY STATS -->
   <div class="card">
@@ -716,7 +726,8 @@ html.nosplash #devfit-splash{display:none!important}
       <select id="bw-chart-range" onchange="updateChart()" style="font-family:'DM Sans',sans-serif;font-size:12px;padding:5px 10px;border:1px solid #d1d5db;border-radius:20px;background:#f8fafc;color:#333;cursor:pointer;outline:none;"></select>
     </div>
     <div id="trend-summary" style="font-size:12px;color:#666666;margin-bottom:10px;min-height:16px;"></div>
-    <div style="position:relative;height:200px;"><canvas id="trendChart"></canvas></div>
+    <div id="bw-canvas-wrap" style="position:relative;height:200px;"><canvas id="trendChart"></canvas></div>
+    <div id="bw-empty" class="chart-empty" style="display:none"><div class="ce-ic">📈</div>Start logging your bodyweight to see your trend here.</div>
   </div>
 
   <!-- CHART 2: PROGRESS SCORE (Pro) -->
@@ -765,7 +776,8 @@ html.nosplash #devfit-splash{display:none!important}
       <span><span style="width:9px;height:9px;border-radius:50%;background:#cc0000;display:inline-block;margin-right:4px;vertical-align:middle;"></span>0-49% Low</span>
     </div>
     <div id="progress-summary" style="font-size:12px;color:#666666;margin-bottom:10px;min-height:16px;"></div>
-    <div style="position:relative;height:200px;"><canvas id="progressChart"></canvas></div>
+    <div id="score-canvas-wrap" style="position:relative;height:200px;"><canvas id="progressChart"></canvas></div>
+    <div id="score-empty" class="chart-empty" style="display:none"><div class="ce-ic">📊</div>Log a full week to see your progress score.</div>
   </div>
 
   </div><!-- ===== /ANALYTICS SECTION ===== -->
@@ -1393,6 +1405,75 @@ function renderTodayOverview(){
   } else { sub('ov-sl-s','not logged'); bar('ov-sl-b',0); }
 }
 
+function renderTrainingStatus(){
+  const pill=document.getElementById('ts-pill'); if(!pill) return;
+  const meta=document.getElementById('ts-meta'), barEl=document.getElementById('ts-bar');
+  const nextEl=document.getElementById('ts-next'), chipsEl=document.getElementById('ts-chips');
+  const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const chron=(arr)=>{const o=[];for(let w=0;w<(arr||[]).length;w++)for(let d=0;d<7;d++){const v=arr[w]&&arr[w][d];if(v!==''&&v!=null&&!isNaN(Number(v)))o.push(Number(v));}return o;};
+
+  // Readiness from last night's sleep (most recent logged)
+  const sleepArr=chron(appData.sleep||[]);
+  const lastSleep=sleepArr.length?sleepArr[sleepArr.length-1]:null;
+  let pillTxt,pillCls;
+  if(lastSleep==null){ pillTxt='LOG SLEEP'; pillCls='ts-grey'; }
+  else if(lastSleep<4){ pillTxt='REST DAY'; pillCls='ts-red'; }
+  else if(lastSleep<6){ pillTxt='LOW INTENSITY'; pillCls='ts-amber'; }
+  else { pillTxt='READY TO TRAIN'; pillCls='ts-green'; }
+  pill.textContent=pillTxt; pill.className='ts-pill '+pillCls;
+
+  // Training data
+  let plan=[], sessions=[];
+  try{ const t=JSON.parse(localStorage.getItem('devfitTrainingV1')||'{}'); plan=(t.plan&&t.plan.workouts)||[]; sessions=t.sessions||[]; }catch(e){}
+  const logged=l=>l.sets&&l.sets.some(s=>(Number(s.reps)||0)>0||(Number(s.weight)||0)>0||(Number(s.min)||0)>0||(Number(s.km)||0)>0);
+  const sessWk=(typeof calcTrainingStreak==='function')?calcTrainingStreak():0;
+
+  // Not-enough-data state (no sleep AND no workouts) — small message, no fake 0%
+  if(lastSleep==null && !sessions.some(s=>s.logs&&s.logs.some(logged))){
+    meta.textContent='';
+    barEl.style.width='0%';
+    nextEl.innerHTML='';
+    chipsEl.innerHTML='<div class="ts-empty">Log your sleep and a workout to see your training readiness.</div>';
+    return;
+  }
+
+  meta.textContent = (lastSleep!=null?('last night '+(lastSleep%1?lastSleep.toFixed(1):lastSleep)+'h'):'no sleep logged')
+    + ' · ' + sessWk + ' session'+(sessWk===1?'':'s')+' this week';
+
+  // Recovery bar: hours since last ANY workout toward the 48h full-recovery window
+  const today=new Date(); today.setHours(0,0,0,0);
+  let lastWk=null; sessions.forEach(s=>{ if(s.logs&&s.logs.some(logged)){ if(!lastWk||s.date>lastWk) lastWk=s.date; } });
+  let recPct=100;
+  if(lastWk){ const d=new Date(lastWk+'T00:00:00'); recPct=Math.max(0,Math.min(100,Math.round(((today-d)/3600000)/48*100))); }
+  barEl.style.width=recPct+'%';
+  barEl.style.background = recPct>=100?'#22c55e':recPct>=50?'#f59e0b':'#cc0000';
+
+  if(!plan.length){
+    nextEl.innerHTML='';
+    chipsEl.innerHTML='<div class="ts-empty">Add workouts in <b style="color:#ff6b6b">Training</b> to see your schedule.</div>';
+    return;
+  }
+
+  // Days since each workout was last trained (48h rule → ready after 2 days)
+  const daysSince=(wid)=>{ let last=null; sessions.forEach(s=>{ if(s.workoutId===wid && s.logs && s.logs.some(logged)){ if(!last||s.date>last) last=s.date; } }); if(!last) return null; const d=new Date(last+'T00:00:00'); return Math.floor((today-d)/86400000); };
+  const items=plan.map(w=>({name:w.name||'(unnamed)', days:daysSince(w.id)}));
+
+  // Next up = most overdue / never-trained that's past the 48h window
+  const cand=items.filter(it=>it.days===null||it.days>=2);
+  let next=cand.length?cand.slice().sort((a,b)=>((b.days===null?9999:b.days)-(a.days===null?9999:a.days)))[0]:null;
+  if(next) nextEl.innerHTML='Next up: <b>'+esc(next.name)+'</b> '+(next.days===null?'· not trained yet':'· '+next.days+' day'+(next.days===1?'':'s')+' since last');
+  else nextEl.innerHTML='Next up: <b>Rest</b> · all workouts trained in the last 48h';
+
+  chipsEl.innerHTML=items.map(it=>{
+    let cls,badge;
+    if(it.days===null){ cls='ts-green'; badge='new'; }
+    else if(it.days<=1){ cls='ts-amber'; badge=it.days+'d'; }
+    else if(it.days<=4){ cls='ts-green'; badge=it.days+'d'; }
+    else { cls='ts-red'; badge=it.days+'d'; }
+    return '<span class="ts-chip '+cls+'"><b>'+esc(it.name)+'</b><span class="d">'+badge+'</span></span>';
+  }).join('');
+}
+
 const MEAS_FIELDS=['waist','chest','arms','thighs','hips'];
 function renderMeasurements(){
   const ci=appData.weeklyCheckin[currentWeek]||freshCheckin();
@@ -1638,6 +1719,7 @@ function render(){
   bindMeasurements();
   renderExtraCards();
   renderTodayOverview();
+  renderTrainingStatus();
   updateChart();
 }
 
@@ -1726,6 +1808,8 @@ function updateChart(){
   if(trendChart){trendChart.destroy();trendChart=null;}
   const {labels:l1,bwData}=buildData(bwRange);
   const hasBW=bwData.some(v=>v!==null);
+  { const wrap=document.getElementById('bw-canvas-wrap'), em=document.getElementById('bw-empty'), sm=document.getElementById('trend-summary');
+    if(wrap) wrap.style.display=hasBW?'':'none'; if(em) em.style.display=hasBW?'none':'flex'; if(sm) sm.style.display=hasBW?'':'none'; }
   if(hasBW){
     const filled=bwData.filter(v=>v!==null);
     const gt=appData.goalType||'loss';
@@ -1762,6 +1846,8 @@ function updateChart(){
   if(progressChart){progressChart.destroy();progressChart=null;}
   const {labels:l2,scoreData}=buildData(scRange);
   const hasScore=scoreData.some(v=>v!==null);
+  { const wrap=document.getElementById('score-canvas-wrap'), em=document.getElementById('score-empty'), sm=document.getElementById('progress-summary');
+    if(wrap) wrap.style.display=hasScore?'':'none'; if(em) em.style.display=hasScore?'none':'flex'; if(sm) sm.style.display=hasScore?'':'none'; }
   if(hasScore){
     const filled2=scoreData.filter(v=>v!==null);
     const avgS=Math.round(filled2.reduce((a,b)=>a+b,0)/filled2.length);

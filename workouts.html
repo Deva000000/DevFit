@@ -48,11 +48,13 @@
   @media(max-width:380px){nav.devfit-tabnav a{font-size:11px;padding:11px 4px;letter-spacing:.02em}}
 
   /* MODE SWITCH */
-  .mode-switch{display:flex;gap:6px;background:rgba(0,0,0,0.30);border-radius:10px;padding:5px;margin-bottom:12px;border:1px solid rgba(255,255,255,0.12)}
-  /* Each tab a visible pill so active vs inactive stands out against the dark page */
-  .mode-btn{flex:1;background:rgba(255,255,255,0.08);border:none;color:rgba(255,255,255,0.92);font-family:'DM Sans',system-ui,sans-serif;font-size:12px;font-weight:700;padding:9px 6px;border-radius:7px;cursor:pointer;transition:all .15s}
-  .mode-btn:hover{background:rgba(255,255,255,0.14);color:#fff}
-  .mode-btn.active{background:#cc0000;color:#fff;box-shadow:0 4px 12px rgba(204,0,0,0.45)}
+  /* Underline tabs — active red line stands out on the dark page */
+  .mode-switch{display:flex;gap:4px;background:transparent;border:none;border-bottom:1.5px solid rgba(255,255,255,0.10);border-radius:0;padding:0;margin-bottom:12px}
+  .mode-btn{flex:1;background:transparent;border:none;color:rgba(255,255,255,0.55);font-family:'DM Sans',system-ui,sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:11px 6px;border-radius:0;cursor:pointer;position:relative;transition:color .15s}
+  .mode-btn::after{content:'';position:absolute;left:10%;right:10%;bottom:-1.5px;height:3px;border-radius:3px 3px 0 0;background:transparent;transition:background .18s}
+  .mode-btn:hover{color:rgba(255,255,255,0.85)}
+  .mode-btn.active{color:#fff}
+  .mode-btn.active::after{background:linear-gradient(90deg,#cc0000,#ff5a5a)}
 
   /* CARD */
   .card{background:#2d2d2d;border:1px solid #3a3a3a;border-radius:var(--radius-lg);padding:14px;margin-bottom:10px}

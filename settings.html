@@ -147,10 +147,24 @@
   .group-title{font-size:11.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,0.42);margin:26px 6px 11px;display:flex;align-items:center;gap:12px}
   .group-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(255,255,255,0.14),transparent)}
   .group-title:first-of-type{margin-top:6px}
-  /* Collapsible setting groups — keeps the long page compact */
-  .group-title.group-toggle{cursor:pointer;user-select:none}
-  .group-chev{order:3;font-size:11px;color:rgba(255,255,255,0.45);transition:transform .2s;margin-left:2px}
+  /* Collapsible setting groups — each header is a big tappable bar */
+  .group-title.group-toggle{cursor:pointer;user-select:none;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.09);border-radius:12px;padding:15px 16px;margin:8px 0 0;color:rgba(255,255,255,0.9);font-size:12.5px;letter-spacing:.05em}
+  .group-title.group-toggle:hover{background:rgba(255,255,255,0.08)}
+  .group-title.group-toggle::after{display:none}
+  .group-chev{font-size:13px;color:rgba(255,255,255,0.5);transition:transform .2s;margin-left:auto}
   .group-title.collapsed .group-chev{transform:rotate(-90deg)}
+  .settings-group-body{padding-top:6px}
+  /* Feature guide */
+  .guide-list{display:flex;flex-direction:column;gap:14px}
+  .guide-item{display:flex;gap:12px;align-items:flex-start}
+  .gi-ic{flex:0 0 auto;width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800}
+  .gi-tx{font-size:12.5px;line-height:1.5;color:rgba(255,255,255,0.62)}
+  .gi-tx b{color:#fff;font-weight:700;display:block;margin-bottom:1px}
+  .gi-tx b:not(:first-child){display:inline;color:#fff}
+  html[data-theme="light"] .gi-tx{color:rgba(20,15,10,0.62)}
+  html[data-theme="light"] .gi-tx b{color:#1a1410}
+  html[data-theme="light"] .group-title.group-toggle{background:rgba(0,0,0,0.035);border-color:rgba(0,0,0,0.09);color:rgba(20,15,10,0.82)}
+  html[data-theme="light"] .group-title.group-toggle:hover{background:rgba(0,0,0,0.06)}
   .card-sub{font-size:11.5px;color:#8a8a90;line-height:1.55;margin-top:10px}
 
   /* Share-card font picker — single horizontal scroll strip (saves vertical space) */
@@ -262,6 +276,20 @@ html.nosplash #devfit-splash{display:none!important}
     <a href="workouts.html">Training</a>
     <a href="settings.html" class="active">Settings</a>
   </nav>
+
+  <!-- ============================ GUIDE ============================ -->
+  <div class="group-title">How DevFit works</div>
+  <div class="card" id="card-guide">
+    <div class="guide-list">
+      <div class="guide-item"><div class="gi-ic" style="background:rgba(47,158,87,0.16);color:#4ade80">◉</div><div class="gi-tx"><b>Progress (home)</b>Log bodyweight, steps and sleep each day. The <b>Today Overview</b> shows them vs your goals, and <b>Training Status</b> tells you if you're recovered enough to train (from last night's sleep) and which routine is next.</div></div>
+      <div class="guide-item"><div class="gi-ic" style="background:rgba(204,0,0,0.16);color:#ff6b6b">▦</div><div class="gi-tx"><b>Training</b>Build your plan in <b>Edit Plan</b> (add strength or cardio moves), log each session under <b>Log Session</b>, and track lifts over time in <b>Progress</b>. Generate a branded share card or program PDF.</div></div>
+      <div class="guide-item"><div class="gi-ic" style="background:rgba(59,130,246,0.16);color:#60a5fa">🍎</div><div class="gi-tx"><b>Nutrition</b>Use the <b>macro calculator</b> (Mifflin-St Jeor / Katch-McArdle + activity) to set calorie &amp; macro targets, then log food against them in the daily diary. Search a large food database by name or barcode.</div></div>
+      <div class="guide-item"><div class="gi-ic" style="background:rgba(198,144,47,0.16);color:#fbbf24">★</div><div class="gi-tx"><b>Score &amp; Analytics (Pro)</b>A weekly <b>True Progress Score</b> blends bodyweight direction, overload, diet, sleep, steps and stress with world-standard weights. Charts show your trend once you've logged a little data.</div></div>
+      <div class="guide-item"><div class="gi-ic" style="background:rgba(168,85,247,0.16);color:#c4b5fd">⤬</div><div class="gi-tx"><b>Share cards</b>Workout, cardio and weekly-progress cards in light, dark or transparent themes. Set your @handle and card font below under <b>Personal → Share Card</b>.</div></div>
+      <div class="guide-item"><div class="gi-ic" style="background:rgba(34,197,94,0.16);color:#86efac">☁</div><div class="gi-tx"><b>Cloud sync</b>Everything saves on this device and syncs to your account automatically, so logging in on another phone restores your data. No buttons to press.</div></div>
+    </div>
+    <div class="card-sub">Tap any group below to open its settings.</div>
+  </div>
 
   <!-- ============================ PERSONAL ============================ -->
   <div class="group-title">Personal</div>
@@ -453,7 +481,7 @@ html.nosplash #devfit-splash{display:none!important}
 
   <div class="footer">
     DevFit · Dominance Through Discipline<br>
-    <a href="https://wa.me/60183679177">Contact trainer</a> · v4.25.1
+    <a href="https://wa.me/60183679177">Contact trainer</a> · v4.26.0
   </div>
 
 
@@ -1607,9 +1635,8 @@ paintThemeToggle();
       t.parentNode.insertBefore(body, el);
       t.classList.add('group-toggle');
       var chev=document.createElement('span'); chev.className='group-chev'; chev.textContent='▾'; t.appendChild(chev);
-      // First group (Personal) open, the rest collapsed for compactness.
-      var collapsed = idx!==0;
-      if(collapsed){ body.style.display='none'; t.classList.add('collapsed'); }
+      // All groups collapsed by default — tap a header to open it (max compact).
+      body.style.display='none'; t.classList.add('collapsed');
       t.addEventListener('click', function(){
         var hidden = body.style.display==='none';
         body.style.display = hidden ? '' : 'none';

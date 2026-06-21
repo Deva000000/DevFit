@@ -184,11 +184,13 @@
   body::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(900px 400px at 50% 50%,rgba(255,68,68,0.04),transparent 60%);z-index:-1}
 
   /* ── SLICER TABS ── */
-  .diet-slicer{display:flex;background:rgba(0,0,0,0.30);border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:5px;gap:6px;margin-bottom:12px;backdrop-filter:saturate(150%) blur(10px);-webkit-backdrop-filter:saturate(150%) blur(10px)}
-  /* Each tab a visible pill so active vs inactive stands out against the dark page */
-  .ds-tab{flex:1;background:rgba(255,255,255,0.08);border:none;color:rgba(255,255,255,0.92);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;padding:10px 6px;border-radius:8px;cursor:pointer;text-transform:uppercase;letter-spacing:.05em;transition:all .18s cubic-bezier(.2,.8,.2,1)}
-  .ds-tab:hover{background:rgba(255,255,255,0.14);color:#fff}
-  .ds-tab.active{background:#cc0000;color:#fff;box-shadow:0 6px 16px rgba(204,0,0,0.45)}
+  /* Underline tabs — active red line stands out on the dark page */
+  .diet-slicer{display:flex;background:transparent;border:none;border-bottom:1.5px solid rgba(255,255,255,0.10);border-radius:0;padding:0;gap:4px;margin-bottom:12px}
+  .ds-tab{flex:1;background:transparent;border:none;color:rgba(255,255,255,0.55);font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:700;padding:11px 6px;border-radius:0;cursor:pointer;text-transform:uppercase;letter-spacing:.04em;position:relative;transition:color .18s}
+  .ds-tab::after{content:'';position:absolute;left:10%;right:10%;bottom:-1.5px;height:3px;border-radius:3px 3px 0 0;background:transparent;transition:background .18s}
+  .ds-tab:hover{color:rgba(255,255,255,0.85)}
+  .ds-tab.active{color:#fff}
+  .ds-tab.active::after{background:linear-gradient(90deg,#cc0000,#ff5a5a)}
   .diet-pane[hidden]{display:none}
 
   /* ── MEAL DIARY (MyFitnessPal-style) ── */

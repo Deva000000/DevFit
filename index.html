@@ -46,11 +46,13 @@
   #week-tabs .wtab,#week-tabs .wtab-action{flex-shrink:0}
 
   /* PROGRESS SUB-TAB NAV (Daily / Weekly / Analytics) */
-  nav.prog-subnav{display:flex;gap:6px;background:rgba(0,0,0,0.30);border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:5px;margin-bottom:14px;backdrop-filter:saturate(150%) blur(10px);-webkit-backdrop-filter:saturate(150%) blur(10px)}
-  /* Each tab is a visible pill so active vs inactive is obvious against the dark page */
-  nav.prog-subnav button{flex:1 1 0;min-width:0;padding:10px 6px;border:none;border-radius:8px;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.92);font-family:'DM Sans',system-ui,sans-serif;font-size:12px;font-weight:700;letter-spacing:.03em;cursor:pointer;transition:all .18s cubic-bezier(.2,.8,.2,1);white-space:nowrap}
-  nav.prog-subnav button:hover{background:rgba(255,255,255,0.14);color:#fff}
-  nav.prog-subnav button.active{background:#cc0000;color:#fff;box-shadow:0 6px 16px rgba(204,0,0,0.45)}
+  /* Underline tabs — the active red line reads clearly on the dark page */
+  nav.prog-subnav{display:flex;gap:4px;background:transparent;border:none;border-bottom:1.5px solid rgba(255,255,255,0.10);border-radius:0;padding:0;margin-bottom:14px}
+  nav.prog-subnav button{flex:1 1 0;min-width:0;padding:11px 6px;border:none;border-radius:0;background:transparent;color:rgba(255,255,255,0.55);font-family:'DM Sans',system-ui,sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;position:relative;transition:color .18s;white-space:nowrap}
+  nav.prog-subnav button::after{content:'';position:absolute;left:10%;right:10%;bottom:-1.5px;height:3px;border-radius:3px 3px 0 0;background:transparent;transition:background .18s}
+  nav.prog-subnav button:hover{color:rgba(255,255,255,0.85)}
+  nav.prog-subnav button.active{color:#fff}
+  nav.prog-subnav button.active::after{background:linear-gradient(90deg,#cc0000,#ff5a5a)}
   .prog-section{display:none}
   .prog-section.active{display:block;animation:devfit-rise .35s cubic-bezier(.2,.8,.2,1) both}
 
@@ -69,24 +71,24 @@
   .dash-lbl{font-size:11px;font-weight:700;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
   .dash-val{font-family:'DM Sans',system-ui,sans-serif;font-size:34px;font-weight:800;line-height:1}
   .dash-sub{font-size:10px;color:rgba(255,255,255,0.45);margin-top:4px}
-  /* TRAINING STATUS — readiness + routine schedule (replaces recovery tile + muscle focus) */
-  .train-status{padding:14px}
-  .ts-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px}
-  .ts-pill{font-size:11px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;padding:5px 12px;border-radius:20px;white-space:nowrap}
-  .ts-week{display:flex;align-items:baseline;gap:8px;margin:8px 0 12px}
-  .ts-week-n{font-family:'DM Sans',system-ui,sans-serif;font-size:30px;font-weight:800;color:#2f9e57;line-height:1}
-  .ts-week-l{font-size:12px;color:rgba(255,255,255,0.55);font-weight:600}
-  .ts-next{font-size:13px;font-weight:700;color:#fff;margin-bottom:10px}
-  .ts-overdue{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-  .ts-overdue .ts-ol-lbl{font-size:11px;font-weight:700;color:rgba(255,255,255,0.5);margin-right:2px}
-  .ts-chips{display:flex;flex-wrap:wrap;gap:6px}
-  .ts-chip{font-size:11px;font-weight:700;padding:5px 11px;border-radius:14px;display:inline-flex;gap:6px;align-items:center}
-  .ts-chip .d{opacity:.85;font-weight:600}
+  /* TRAINING STATUS — glanceable readiness ring + next routine */
+  .train-status{padding:16px}
+  .ts-body{display:flex;align-items:center;gap:16px;margin-bottom:14px}
+  .ts-ring{position:relative;width:78px;height:78px;flex-shrink:0}
+  .ts-ring svg{width:78px;height:78px;transform:rotate(-90deg)}
+  .ts-ring circle{fill:none;stroke-width:7;stroke-linecap:round}
+  .ts-ring-bg{stroke:rgba(255,255,255,0.10)}
+  .ts-ring-fg{stroke-dasharray:220;stroke-dashoffset:220;transition:stroke-dashoffset .5s ease,stroke .3s}
+  .ts-ring-ic{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'DM Sans',system-ui,sans-serif;font-size:21px;font-weight:800;color:#fff}
+  .ts-info{flex:1;min-width:0}
+  .ts-status{font-size:18px;font-weight:800;color:#fff;line-height:1.15;letter-spacing:.01em}
+  .ts-reason{font-size:12px;color:rgba(255,255,255,0.55);margin-top:4px;line-height:1.4}
+  .ts-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid rgba(255,255,255,0.08);padding-top:13px;flex-wrap:wrap}
+  .ts-streak{font-size:13px;font-weight:600;color:rgba(255,255,255,0.85);display:flex;align-items:center;gap:7px}
+  .ts-streak b{color:#f59e0b;font-size:19px;font-weight:800}
+  .ts-nextline{font-size:13px;font-weight:700;color:#86efac;display:flex;align-items:center;gap:6px;min-width:0}
+  .ts-nextline span{color:#fff;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .ts-empty{font-size:12px;color:rgba(255,255,255,0.5)}
-  .ts-green{background:rgba(34,197,94,0.14);border:1px solid rgba(34,197,94,0.45);color:#86efac}
-  .ts-amber{background:rgba(245,158,11,0.14);border:1px solid rgba(245,158,11,0.45);color:#fcd34d}
-  .ts-red{background:rgba(204,0,0,0.16);border:1px solid rgba(204,0,0,0.5);color:#ff8a8a}
-  .ts-grey{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);color:rgba(255,255,255,0.72)}
   /* Empty-chart placeholder — cleaner than a blank graph */
   .chart-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;height:200px;color:#94a3b8;font-size:13px;font-weight:600;line-height:1.5;padding:0 24px}
   .chart-empty .ce-ic{font-size:26px;margin-bottom:8px;opacity:.6}
@@ -435,22 +437,6 @@ html.nosplash #devfit-splash{display:none!important}
     <a href="settings.html">Settings</a>
   </nav>
 
-  <!-- COUNTDOWN RING -->
-  <div id="countdown-wrap" style="display:none;" class="countdown-wrap">
-    <svg class="ring-svg" width="56" height="56" viewBox="0 0 56 56">
-      <circle cx="28" cy="28" r="24" fill="none" stroke="#2a2a2a" stroke-width="5"/>
-      <circle id="ring-progress" cx="28" cy="28" r="24" fill="none" stroke="#cc0000" stroke-width="5"
-        stroke-linecap="round" stroke-dasharray="150.8" stroke-dashoffset="150.8"
-        transform="rotate(-90 28 28)" style="transition:stroke-dashoffset .6s;"/>
-      <text id="ring-days" x="28" y="28" text-anchor="middle" dominant-baseline="middle"
-        font-family="'DM Sans',system-ui,sans-serif" font-size="11" font-weight="800" fill="#ffffff">—</text>
-    </svg>
-    <div class="countdown-info">
-      <div class="countdown-title" id="countdown-title">Program active</div>
-      <div class="countdown-sub" id="countdown-sub">Loading...</div>
-    </div>
-  </div>
-
   <!-- RENEWAL BANNER -->
   <div id="renewal-banner" style="display:none;" class="renewal-banner">
     <div class="renewal-text" id="renewal-text">Your program ends soon!</div>
@@ -486,15 +472,10 @@ html.nosplash #devfit-splash{display:none!important}
         <input style="width:100%;box-sizing:border-box;-webkit-appearance:none;appearance:none;font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 12px;border:1px solid #d1d5db;border-radius:var(--radius);background:#fff;color:#111;outline:none;" id="programStart" type="date" onchange="save();renderTabs();render()">
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-      <div>
-        <div class="section-label" style="margin-bottom:5px;">Daily step goal</div>
-        <input style="width:100%;font-family:'DM Sans',sans-serif;font-size:14px;padding:8px 12px;border:1px solid #d1d5db;border-radius:var(--radius);background:#fff;color:#111;outline:none;" id="targetSteps" placeholder="10000" type="number" step="500" inputmode="numeric" onblur="save();render()">
-      </div>
-      <div>
-        <div class="section-label" style="margin-bottom:5px;">Sleep goal (h)</div>
-        <input style="width:100%;font-family:'DM Sans',sans-serif;font-size:14px;padding:8px 12px;border:1px solid #d1d5db;border-radius:var(--radius);background:#fff;color:#111;outline:none;" id="targetSleep" placeholder="8" type="number" step="0.5" inputmode="decimal" onblur="save();render()">
-      </div>
+    <div style="margin-bottom:10px;">
+      <div class="section-label" style="margin-bottom:5px;">Daily step goal</div>
+      <input style="width:100%;box-sizing:border-box;font-family:'DM Sans',sans-serif;font-size:14px;padding:8px 12px;border:1px solid #d1d5db;border-radius:var(--radius);background:#fff;color:#111;outline:none;" id="targetSteps" placeholder="10000" type="number" step="500" inputmode="numeric" onblur="save();render()">
+      <div style="font-size:10.5px;color:#aaa;margin-top:5px;line-height:1.4">Sleep is scored against the medical optimal of 7–9 hours.</div>
     </div>
     <div>
       <div class="section-label" style="margin-bottom:5px;">Goal type</div>
@@ -555,13 +536,21 @@ html.nosplash #devfit-splash{display:none!important}
 
   <!-- TRAINING STATUS — readiness + your routine schedule -->
   <div class="card train-status" id="train-status">
-    <div class="ts-head">
-      <div class="section-label" style="margin:0">Training Status</div>
-      <div class="ts-pill ts-grey" id="ts-pill">—</div>
+    <div class="section-label" style="margin:0 0 12px">Training Status</div>
+    <div class="ts-body">
+      <div class="ts-ring">
+        <svg viewBox="0 0 78 78"><circle class="ts-ring-bg" cx="39" cy="39" r="35"/><circle class="ts-ring-fg" id="ts-ring-fg" cx="39" cy="39" r="35"/></svg>
+        <div class="ts-ring-ic" id="ts-ring-ic">—</div>
+      </div>
+      <div class="ts-info">
+        <div class="ts-status" id="ts-status">—</div>
+        <div class="ts-reason" id="ts-reason"></div>
+      </div>
     </div>
-    <div class="ts-week"><span class="ts-week-n" id="ts-week-n">0</span><span class="ts-week-l">days trained this week</span></div>
-    <div class="ts-next" id="ts-next"></div>
-    <div class="ts-overdue" id="ts-overdue"></div>
+    <div class="ts-foot">
+      <div class="ts-streak">🔥 <b id="ts-week-n">0</b> day streak</div>
+      <div class="ts-nextline" id="ts-nextline"></div>
+    </div>
   </div>
 
   <!-- PROGRESS SUB-TAB NAV -->
@@ -1408,64 +1397,63 @@ function renderTodayOverview(){
   if(stV!=null){ const p=Math.round(stV/stGoal*100); sub('ov-st-s', p+'% goal'); bar('ov-st-b', p); }
   else { sub('ov-st-s','no steps yet'); bar('ov-st-b',0); }
 
-  // SLEEP — today (or latest) hours + quality vs configurable goal
-  const slV=todayVal(appData.sleep||[]); const slGoal=Number(appData.targetSleep)>0?Number(appData.targetSleep):8;
+  // SLEEP — today (or latest) hours + quality on the MEDICAL optimal band (7–9h)
+  const slV=todayVal(appData.sleep||[]);
   set('ov-sl-v', slV!=null?(slV%1?slV.toFixed(1):String(slV)):'—');
   const slU=document.getElementById('ov-sl-u'); if(slU) slU.textContent=slV!=null?'h':'';
   if(slV!=null){
-    const q=slV>=slGoal?'Great':slV>=slGoal-1?'Good':slV>=slGoal-2?'Fair':'Low';
-    const qc=slV>=slGoal-1?'#c4b5fd':slV>=slGoal-2?'#fbbf24':'#f87171';
-    sub('ov-sl-s', q, qc); bar('ov-sl-b', slV/slGoal*100);
+    let q,qc;
+    if(slV>=7&&slV<=9){ q='Optimal'; qc='#c4b5fd'; }
+    else if((slV>=6&&slV<7)||(slV>9&&slV<=10)){ q='Good'; qc='#c4b5fd'; }
+    else if(slV>10){ q='Too long'; qc='#fbbf24'; }
+    else { q='Low'; qc='#f87171'; }
+    sub('ov-sl-s', q, qc); bar('ov-sl-b', Math.min(100, slV/8*100));
   } else { sub('ov-sl-s','not logged'); bar('ov-sl-b',0); }
 }
 
 function renderTrainingStatus(){
-  const pill=document.getElementById('ts-pill'); if(!pill) return;
+  const statusEl=document.getElementById('ts-status'); if(!statusEl) return;
+  const ringFg=document.getElementById('ts-ring-fg');
+  const ringIc=document.getElementById('ts-ring-ic');
+  const reasonEl=document.getElementById('ts-reason');
   const weekN=document.getElementById('ts-week-n');
-  const nextEl=document.getElementById('ts-next');
-  const overdueEl=document.getElementById('ts-overdue');
+  const nextLine=document.getElementById('ts-nextline');
   const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const chron=(arr)=>{const o=[];for(let w=0;w<(arr||[]).length;w++)for(let d=0;d<7;d++){const v=arr[w]&&arr[w][d];if(v!==''&&v!=null&&!isNaN(Number(v)))o.push(Number(v));}return o;};
+  const CIRC=220;
 
-  // Readiness pill from last night's sleep (the one signal worth surfacing up top)
+  // Readiness from last night's sleep — MEDICAL thresholds (7–9h is the optimal band)
   const sleepArr=chron(appData.sleep||[]);
-  const lastSleep=sleepArr.length?sleepArr[sleepArr.length-1]:null;
-  let pillTxt,pillCls;
-  if(lastSleep==null){ pillTxt='LOG SLEEP'; pillCls='ts-grey'; }
-  else if(lastSleep<4){ pillTxt='REST DAY'; pillCls='ts-red'; }
-  else if(lastSleep<6){ pillTxt='LOW INTENSITY'; pillCls='ts-amber'; }
-  else { pillTxt='READY TO TRAIN'; pillCls='ts-green'; }
-  pill.textContent=pillTxt; pill.className='ts-pill '+pillCls;
+  const s=sleepArr.length?sleepArr[sleepArr.length-1]:null;
+  const hTxt = s!=null ? (s%1?s.toFixed(1):s)+'h' : '—';
+  let label, reason, color, fill;
+  if(s==null){ label='LOG SLEEP'; reason='Track last night to see your readiness'; color='#9ca3af'; fill=0; }
+  else if(s<4){ label='REST DAY'; reason=hTxt+' sleep — under 4h, let your body recover'; color='#cc0000'; fill=s/8; }
+  else if(s<6){ label='LOW INTENSITY'; reason=hTxt+' sleep — below optimal, keep it light today'; color='#f59e0b'; fill=s/8; }
+  else if(s<7){ label='READY TO TRAIN'; reason=hTxt+' sleep — good to go'; color='#22c55e'; fill=s/8; }
+  else if(s<=9){ label='READY TO TRAIN'; reason=hTxt+' sleep — optimal range, well rested'; color='#22c55e'; fill=1; }
+  else { label='READY TO TRAIN'; reason=hTxt+' sleep — fully rested'; color='#22c55e'; fill=1; }
+  statusEl.textContent=label;
+  reasonEl.textContent=reason;
+  ringIc.textContent=hTxt;
+  if(ringFg){ ringFg.style.stroke=color; ringFg.style.strokeDashoffset=String(CIRC*(1-Math.max(0,Math.min(1,fill)))); }
 
-  // Days trained this week
+  // Day streak this week
   const days=(typeof calcTrainingStreak==='function')?calcTrainingStreak():0;
   if(weekN) weekN.textContent=days;
 
-  // Training schedule
+  // Next routine to train (most overdue / never trained, past the 48h window)
   let plan=[], sessions=[];
   try{ const t=JSON.parse(localStorage.getItem('devfitTrainingV1')||'{}'); plan=(t.plan&&t.plan.workouts)||[]; sessions=t.sessions||[]; }catch(e){}
-  const logged=l=>l.sets&&l.sets.some(s=>(Number(s.reps)||0)>0||(Number(s.weight)||0)>0||(Number(s.min)||0)>0||(Number(s.km)||0)>0);
-
-  if(!plan.length){
-    nextEl.innerHTML='<span class="ts-empty">Add workouts in <b style="color:#ff6b6b">Training</b> to see what to train next.</span>';
-    overdueEl.innerHTML=''; return;
-  }
-
+  const logged=l=>l.sets&&l.sets.some(x=>(Number(x.reps)||0)>0||(Number(x.weight)||0)>0||(Number(x.min)||0)>0||(Number(x.km)||0)>0);
+  if(!plan.length){ nextLine.innerHTML='<span class="ts-empty">Set up your plan in Training</span>'; return; }
   const today=new Date(); today.setHours(0,0,0,0);
-  const daysSince=(wid)=>{ let last=null; sessions.forEach(s=>{ if(s.workoutId===wid && s.logs && s.logs.some(logged)){ if(!last||s.date>last) last=s.date; } }); if(!last) return null; const d=new Date(last+'T00:00:00'); return Math.floor((today-d)/86400000); };
+  const daysSince=(wid)=>{ let last=null; sessions.forEach(se=>{ if(se.workoutId===wid && se.logs && se.logs.some(logged)){ if(!last||se.date>last) last=se.date; } }); if(!last) return null; const d=new Date(last+'T00:00:00'); return Math.floor((today-d)/86400000); };
   const items=plan.map(w=>({name:w.name||'(unnamed)', days:daysSince(w.id)}));
-
-  // What to train next: most overdue / never-trained that's past the 48h window
   const cand=items.filter(it=>it.days===null||it.days>=2);
   const next=cand.length?cand.slice().sort((a,b)=>((b.days===null?9999:b.days)-(a.days===null?9999:a.days)))[0]:null;
-  if(next) nextEl.innerHTML='<b style="color:#86efac">Next up:</b> '+esc(next.name)+(next.days===null?' · not trained yet':' · '+next.days+'d ago');
-  else nextEl.innerHTML='<b style="color:#86efac">Rest day</b> · everything trained in the last 48h';
-
-  // Only the routines overdue for 3+ days (the rest are fine — keep the card clean)
-  const overdue=items.filter(it=>it.days!==null&&it.days>=3).sort((a,b)=>b.days-a.days);
-  overdueEl.innerHTML = overdue.length
-    ? '<span class="ts-ol-lbl">Not trained:</span>'+overdue.map(it=>'<span class="ts-chip '+(it.days>=5?'ts-red':'ts-amber')+'"><b>'+esc(it.name)+'</b><span class="d">'+it.days+'d</span></span>').join('')
-    : '';
+  if(next) nextLine.innerHTML='▸ Next: <span>'+esc(next.name)+'</span>';
+  else nextLine.innerHTML='▸ <span>Rest day</span>';
 }
 
 const MEAS_FIELDS=['waist','chest','arms','thighs','hips'];
@@ -2285,7 +2273,9 @@ function logout(){
 }
 
 function showCountdown(){
-  try{
+  // Countdown card removed — kept as a no-op so existing call sites stay safe.
+  return;
+  try{ // eslint-disable-line no-unreachable
     const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
     if(!user.expiry) return;
     const today = new Date(); today.setHours(0,0,0,0);

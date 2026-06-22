@@ -426,7 +426,6 @@ html.nosplash #devfit-splash{display:none!important}
         <div class="app-sub" style="font-size:12px;margin-top:3px;">Dominance Through Discipline</div>
       </div>
     </div>
-    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-end;" id="week-tabs"></div>
   </div>
 
   <!-- SHARED TAB NAV -->
@@ -559,7 +558,10 @@ html.nosplash #devfit-splash{display:none!important}
     <button type="button" data-sec="weekly" onclick="showProgSection('weekly')">Weekly</button>
     <button type="button" data-sec="analytics" onclick="showProgSection('analytics')">Analytics</button>
   </nav>
-  <div id="week-range" style="text-align:center;font-family:'DM Sans',system-ui,sans-serif;font-size:12px;font-weight:600;color:#9a9a9a;margin:-6px 0 12px;letter-spacing:.02em;"></div>
+
+  <!-- WEEK SELECTOR — pick the week to view/log (moved here from the header) -->
+  <div class="week-tabs" id="week-tabs" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;margin:0 0 8px;"></div>
+  <div id="week-range" style="text-align:center;font-family:'DM Sans',system-ui,sans-serif;font-size:12px;font-weight:600;color:#9a9a9a;margin:0 0 12px;letter-spacing:.02em;"></div>
 
   <!-- ===== DAILY SECTION ===== -->
   <div class="prog-section active" id="sec-daily">
@@ -586,6 +588,23 @@ html.nosplash #devfit-splash{display:none!important}
 
   <!-- ===== WEEKLY SECTION ===== -->
   <div class="prog-section" id="sec-weekly">
+
+  <!-- TRUE PROGRESS SCORE (Pro) -->
+  <div class="pro-gate card">
+    <div class="section-label">True progress score — Week <span id="score-week-num">1</span></div>
+    <div class="score-big-wrap">
+      <div class="score-big-ring">
+        <canvas id="ring-overall" width="88" height="88"></canvas>
+        <div style="text-align:center;font-size:11px;color:var(--t2);margin-top:4px;">Overall</div>
+      </div>
+      <div class="score-breakdown" id="score-breakdown"></div>
+    </div>
+    <div style="margin-top:12px;font-size:11px;color:#e2e8f0;line-height:1.6;" id="score-legend">
+      Score weighted across 7 signals — Overload 22% · Diet 23% · Bodyweight 17% · Body fat 10% · Sleep 10% · Steps 10% · Stress 8%. Untracked signals are skipped and the rest re-normalise automatically. Recomp credit applies if body-fat drops while weight stalls.
+      <div style="margin-top:8px;opacity:.85;">Bodyweight is scored on weekly rate of change: <b>loss 0.5–1%/wk</b> (lean-mass sparing — Helms 2014), <b>lean gain 0.25–0.5%/wk</b> (Aragon &amp; Schoenfeld 2013), <b>maintain ±0.5%/wk</b>. Steps target 8–10k/day (Paluch 2022, Lancet); sleep 7–9h (AASM/NSF).</div>
+    </div>
+    <button class="wk-share-btn" id="wk-share-btn" type="button">Share Weekly Card</button>
+  </div>
 
   <!-- WEEKLY CHECK-IN -->
   <div class="card">
@@ -693,23 +712,6 @@ html.nosplash #devfit-splash{display:none!important}
     <div style="font-size:15px;font-weight:700;color:#f1f5f9;margin-bottom:6px;">Progress Analytics — Pro</div>
     <div style="font-size:12px;color:#94a3b8;margin-bottom:16px;line-height:1.6;">Unlock True Progress Score, weekly analysis,<br>bodyweight trend &amp; score charts.</div>
     <a href="pricing.html" style="display:inline-block;background:#2f9e57;color:#fff;font-weight:700;font-size:13px;padding:10px 24px;border-radius:20px;text-decoration:none;">Upgrade to Pro — RM19/month</a>
-  </div>
-
-  <!-- TRUE PROGRESS SCORE (Pro) -->
-  <div class="pro-gate card">
-    <div class="section-label">True progress score — Week <span id="score-week-num">1</span></div>
-    <div class="score-big-wrap">
-      <div class="score-big-ring">
-        <canvas id="ring-overall" width="88" height="88"></canvas>
-        <div style="text-align:center;font-size:11px;color:var(--t2);margin-top:4px;">Overall</div>
-      </div>
-      <div class="score-breakdown" id="score-breakdown"></div>
-    </div>
-    <div style="margin-top:12px;font-size:11px;color:#e2e8f0;line-height:1.6;" id="score-legend">
-      Score weighted across 7 signals — Overload 22% · Diet 23% · Bodyweight 17% · Body fat 10% · Sleep 10% · Steps 10% · Stress 8%. Untracked signals are skipped and the rest re-normalise automatically. Recomp credit applies if body-fat drops while weight stalls.
-      <div style="margin-top:8px;opacity:.85;">Bodyweight is scored on weekly rate of change: <b>loss 0.5–1%/wk</b> (lean-mass sparing — Helms 2014), <b>lean gain 0.25–0.5%/wk</b> (Aragon &amp; Schoenfeld 2013), <b>maintain ±0.5%/wk</b>. Steps target 8–10k/day (Paluch 2022, Lancet); sleep 7–9h (AASM/NSF).</div>
-    </div>
-    <button class="wk-share-btn" id="wk-share-btn" type="button">Share Weekly Card</button>
   </div>
 
   <!-- FEEDBACK (Pro) -->
@@ -1602,6 +1604,13 @@ function showProgSection(sec){
     b.classList.toggle('active', b.dataset.sec===sec);
   });
   try{ localStorage.setItem('devfit_progSection', sec); }catch(e){}
+  // The front dashboard (Today Overview + Training Status) is the Daily landing
+  // visual only — hide it on Weekly/Analytics so those focus on their own content.
+  const showDash = (sec==='daily');
+  ['today-overview','train-status'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.style.display = showDash ? '' : 'none';
+  });
   // Charts live in the Analytics section — Chart.js needs a visible container to size correctly
   if(sec==='analytics') setTimeout(updateChart, 30);
 }
@@ -1715,7 +1724,9 @@ function populateRangeDropdowns(){
   ['bw-chart-range','score-chart-range'].forEach(id=>{
     const sel=document.getElementById(id);
     if(!sel) return;
-    const cur=sel.value||'all';
+    // Default to the current program week (not "All weeks"); keep the user's
+    // pick once they change it. First populate has no value → follow the program.
+    const cur=sel.value||String(currentWeek);
     sel.innerHTML='<option value="all">All weeks</option>';
     for(let w=0;w<totalWeeks;w++){
       const opt=document.createElement('option');
@@ -1723,7 +1734,7 @@ function populateRangeDropdowns(){
       opt.textContent='Week '+(w+1);
       sel.appendChild(opt);
     }
-    sel.value=cur;
+    sel.value = [...sel.options].some(o=>o.value===cur) ? cur : String(currentWeek);
   });
   const progSel=document.getElementById('program-report-range');
   if(progSel){

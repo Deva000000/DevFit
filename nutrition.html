@@ -433,8 +433,19 @@ html.nosplash #devfit-splash{display:none!important}
           <div class="chips" id="c-goal">
             <div class="chip" data-v="lose">Lose fat<small>−20%</small></div>
             <div class="chip" data-v="maintain">Maintain<small>TDEE</small></div>
-            <div class="chip" data-v="gain">Build muscle<small>+10%</small></div>
+            <div class="chip" data-v="gain">Build muscle<small>surplus</small></div>
           </div>
+        </div>
+
+        <div class="calc-row" id="c-adjust-row" style="display:none">
+          <label class="clbl"><span id="c-adjust-lbl">Daily deficit</span> <span class="chint">drag to set how aggressive — research band shaded</span></label>
+          <input id="c-adjust" type="range" min="100" max="900" step="25" value="400" style="width:100%;accent-color:#cc0000;margin-top:4px">
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:#9aa;margin-top:2px">
+            <span>gentle 100</span>
+            <span id="c-adjust-val" style="color:#e2e8f0;font-weight:800;font-size:13px">−400 kcal</span>
+            <span>aggressive 900</span>
+          </div>
+          <div class="chint" id="c-adjust-hint" style="display:block;margin-top:6px">Research band for steady progress is ~300–500 kcal/day. Lower = slower & easier to sustain, higher = faster but harder.</div>
         </div>
 
         <button class="calc-go" id="calc-go" type="button">Calculate my targets</button>
@@ -679,12 +690,22 @@ Chart.register({
 
 document.getElementById('date-pick').value=currentDate;
 
-// Targets — bind 4 inputs
+// Targets — bind 4 inputs. Macros (p/c/f) are linked to calories:
+// editing any macro re-derives calories = 4·protein + 4·carbs + 9·fat,
+// so customising protein keeps the calorie total honest.
 ['cal','p','c','f'].forEach(k=>{
   const el=document.getElementById('t-'+k);
   el.value=data.targets[k]||'';
   el.addEventListener('input',e=>{
     data.targets[k]=e.target.value===''?'':Number(e.target.value);
+    if(k==='p'||k==='c'||k==='f'){
+      const p=Number(data.targets.p)||0, c=Number(data.targets.c)||0, f=Number(data.targets.f)||0;
+      if(p||c||f){
+        data.targets.cal=Math.round(p*4 + c*4 + f*9);
+        const calEl=document.getElementById('t-cal');
+        if(calEl) calEl.value=data.targets.cal;
+      }
+    }
     save();
     renderSummary();
     renderTrend();
@@ -693,9 +714,30 @@ document.getElementById('date-pick').value=currentDate;
 
 // ── MACRO CALCULATOR ──────────────────────────────────────────────
 (function(){
-  if(!data.calc) data.calc={age:'',ht:'',wt:'',bf:'',sex:'',job:'',days:'',int:'',goal:''};
+  if(!data.calc) data.calc={age:'',ht:'',wt:'',bf:'',sex:'',job:'',days:'',int:'',goal:'',adjust:''};
   const C=data.calc;
   if(C.bf===undefined) C.bf='';
+  if(C.adjust===undefined) C.adjust='';
+
+  // Deficit / surplus slider — user picks how aggressive the goal is.
+  const adjRow=document.getElementById('c-adjust-row');
+  const adjInput=document.getElementById('c-adjust');
+  const adjVal=document.getElementById('c-adjust-val');
+  const adjLbl=document.getElementById('c-adjust-lbl');
+  function syncAdjustUI(){
+    const isLose=C.goal==='lose', isGain=C.goal==='gain';
+    adjRow.style.display=(isLose||isGain)?'':'none';
+    if(!isLose&&!isGain) return;
+    if(C.adjust==='') C.adjust=400;
+    adjInput.value=C.adjust;
+    adjLbl.textContent=isLose?'Daily deficit':'Daily surplus';
+    adjVal.textContent=(isLose?'−':'+')+C.adjust+' kcal';
+  }
+  adjInput.addEventListener('input',e=>{
+    C.adjust=Number(e.target.value);
+    adjVal.textContent=(C.goal==='lose'?'−':'+')+C.adjust+' kcal';
+    save();
+  });
 
   // numeric inputs (bf is optional)
   [['age','c-age'],['ht','c-ht'],['wt','c-wt'],['bf','c-bf']].forEach(([k,id])=>{
@@ -716,12 +758,14 @@ document.getElementById('date-pick').value=currentDate;
         wrap.querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));
         ch.classList.add('active');
         C[key]=ch.dataset.v;
+        if(key==='goal') syncAdjustUI();
         save();
       });
     });
   }
   chipGroup('c-sex','sex'); chipGroup('c-job','job'); chipGroup('c-days','days');
   chipGroup('c-int','int'); chipGroup('c-goal','goal');
+  syncAdjustUI();
 
   let _calc=null;
   document.getElementById('calc-go').addEventListener('click',()=>{
@@ -750,11 +794,12 @@ document.getElementById('date-pick').value=currentDate;
     // research-backed 300–500 kcal/day band. (A flat % over-cuts heavier people:
     // 20% of a 3,500 TDEE = 700 kcal, too aggressive; clamping keeps it safe.)
     let adjust = 0, adjustTxt = 'Eating at maintenance (TDEE)';
+    const userAdj = Number(C.adjust)>0 ? Number(C.adjust) : 400;
     if(C.goal==='lose'){
-      adjust = -Math.round(Math.min(500, Math.max(300, tdee*0.20)));
-      adjustTxt = Math.abs(adjust)+' kcal deficit · ~'+(Math.abs(adjust)/1100).toFixed(1).replace('0.','0.')+' kg/week';
+      adjust = -userAdj;
+      adjustTxt = Math.abs(adjust)+' kcal deficit · ~'+(Math.abs(adjust)/1100).toFixed(1)+' kg/week';
     } else if(C.goal==='gain'){
-      adjust = Math.round(Math.min(500, Math.max(250, tdee*0.12)));
+      adjust = userAdj;
       adjustTxt = '+'+adjust+' kcal surplus · lean gain';
     }
     const target = tdee + adjust;

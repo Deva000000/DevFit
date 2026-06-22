@@ -6,7 +6,7 @@
    - Apps Script: network-only
 */
 
-const VERSION = 'devfit-v4.32.0';
+const VERSION = 'devfit-v4.33.0';
 const APP_SHELL = 'devfit-shell-' + VERSION;
 const RUNTIME = 'devfit-runtime-' + VERSION;
 
@@ -23,6 +23,7 @@ const SHELL_FILES = [
   './devfit-db.js',
   './pwa-update.js',
   './foods-local.js',
+  './foods-bulk.js',
   './scoring.js',
   './theme.css',
   './theme.js'

@@ -921,6 +921,55 @@ function isLongestThisWeek(dateStr,km){
   return km>=maxKm;
 }
 
+// Sport-identity glyph for the share-card header (mirrors the in-app sport feel).
+function cardioGlyph(name){
+  const n=(name||'').toLowerCase();
+  if(/box|kickbox|muay|mma|martial|judo|karate/.test(n))return '🥊';
+  if(/football|soccer|futsal/.test(n))return '⚽';
+  if(/basketball|netball/.test(n))return '🏀';
+  if(/badminton/.test(n))return '🏸';
+  if(/tennis|squash|pickle/.test(n))return '🎾';
+  if(/volleyball/.test(n))return '🏐';
+  if(/hockey/.test(n))return '🏑';
+  if(/cricket/.test(n))return '🏏';
+  if(/rugby/.test(n))return '🏉';
+  if(/yoga|pilates/.test(n))return '🧘';
+  if(/zumba|dance|dancing|aerobic/.test(n))return '💃';
+  if(/hiit|crossfit|cross\s?fit|circuit|bootcamp|hyrox/.test(n))return '🤸';
+  if(/swim/.test(n))return '🏊';
+  if(/cycl|bike|biking|spin/.test(n))return '🚴';
+  if(/row/.test(n))return '🚣';
+  if(/hike|hiking/.test(n))return '🥾';
+  if(/walk/.test(n))return '🚶';
+  if(/run|running|jog|jogging|sprint/.test(n))return '🏃';
+  if(/ski|skat/.test(n))return '⛷';
+  return '🔥';
+}
+// Earned achievement badge for the share card — grounded in real logged effort,
+// not random. Returns {text, tone, ic}; tone ∈ DEVFIT palette ('gold'|'crimson'|'sage').
+// First match wins, prestige-ordered.
+function cardioBadge(hero, distanceMode, cals, goalPct, dateStr){
+  const km=Number(hero.km)||0, min=Number(hero.min)||0;
+  // Prestige cues first.
+  if(distanceMode && km>0 && isLongestThisWeek(dateStr,km) && cardioDatesSet().size>1)
+    return {text:'PERSONAL BEST', tone:'gold', ic:'🏆'};
+  if(goalPct>=100) return {text:'GOAL COMPLETED', tone:'gold', ic:'✓'};
+  // Distance activities → grounded in km covered.
+  if(distanceMode){
+    if(km>=10) return {text:'BEAST MODE',    tone:'crimson', ic:'🔥'};
+    if(km>=5)  return {text:'STRONG EFFORT', tone:'sage',    ic:'💪'};
+    if(km>=2)  return {text:'GREAT SESSION', tone:'sage',    ic:'✓'};
+    return {text:'SESSION LOGGED', tone:'sage', ic:'✓'};
+  }
+  // Timed sports / classes → duration, with a true high-burn-rate cue.
+  const intensity=(cals&&min>0)?cals/min:0;
+  if(intensity>=8.5 && min>=20) return {text:'HIGH INTENSITY', tone:'crimson', ic:'🔥'};
+  if(min>=60) return {text:'BEAST MODE',    tone:'crimson', ic:'🔥'};
+  if(min>=30) return {text:'STRONG EFFORT', tone:'sage',    ic:'💪'};
+  if(min>=15) return {text:'GREAT SESSION', tone:'sage',    ic:'✓'};
+  return {text:'SESSION LOGGED', tone:'sage', ic:'✓'};
+}
+
 document.getElementById('log-date').value=todayStr();
 document.getElementById('log-date').addEventListener('change',renderLog);
 
@@ -1369,11 +1418,15 @@ function drawExportCard(canvas, workout, session, theme){
     const dim = theme==='light' ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.14)';
     let y = PAD + 4;
 
-    // --- Header: label + streak badge ---
+    // --- Header: sport glyph + label + streak badge ---
     ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-    setLS('3px'); ctx.font=F(TW,30); ctx.fillStyle=p.fg; ctx.fillText(headerLabel, PAD, y+30);
+    const glyph=cardioGlyph(hero.name);
+    ctx.font=F(TW,34); const glyphW=ctx.measureText(glyph).width+16;
+    ctx.fillText(glyph, PAD, y+31);
+    const labelX=PAD+glyphW;
+    setLS('3px'); ctx.font=F(TW,30); ctx.fillStyle=p.fg; ctx.fillText(headerLabel, labelX, y+30);
     const lblW=ctx.measureText(headerLabel).width; setLS('0px');
-    ctx.fillStyle=p.accent; roundRect(ctx,PAD,y+44,Math.min(lblW,300),6,3); ctx.fill();
+    ctx.fillStyle=p.accent; roundRect(ctx,labelX,y+44,Math.min(lblW,300),6,3); ctx.fill();
     const streak=cardioStreakDays(session.date);
     if(streak>=2){
       const bt='🔥 '+streak+'-DAY STREAK';
@@ -1454,6 +1507,32 @@ function drawExportCard(canvas, workout, session, theme){
     const grad=ctx.createLinearGradient(PAD,0,PAD+C,0);
     grad.addColorStop(0,'#cc0000'); grad.addColorStop(1,'#ff5a5a');
     ctx.fillStyle=grad; roundRect(ctx, PAD, y, fillW, trH, trR); ctx.fill();
+    y += trH;
+
+    // --- Earned achievement badge — fills the band above the footer and adds
+    //     the credibility/motivation cue, in DEVFIT's own palette (one red). ---
+    const badge=cardioBadge(hero, distanceMode, cals, pct, session.date);
+    const toneMap={
+      gold:    {fg:'#c6902f', bgL:'rgba(198,144,47,0.12)', bgD:'rgba(198,144,47,0.20)'},
+      crimson: {fg:p.accent,  bgL:'rgba(204,0,0,0.10)',     bgD:'rgba(255,58,58,0.18)'},
+      sage:    {fg:'#2f9e57', bgL:'rgba(47,158,87,0.12)',   bgD:'rgba(47,158,87,0.20)'}
+    };
+    const tn=toneMap[badge.tone]||toneMap.sage;
+    const badgeTxt=badge.ic+'  '+badge.text;
+    setLS('2px'); ctx.font=F(TW,38);
+    const btW=ctx.measureText(badgeTxt).width;
+    const padX=44, bH=92, bW=btW+padX*2;
+    const footerY = H - PAD - 6;
+    // centre the pill vertically in the gap between the goal bar and the footer
+    const gapTop=y+8, gapBot=footerY-78;
+    const bY=Math.max(gapTop, gapTop+(gapBot-gapTop-bH)/2);
+    const bX=(W-bW)/2;
+    ctx.fillStyle=theme==='light'?tn.bgL:tn.bgD;
+    roundRect(ctx,bX,bY,bW,bH,bH/2); ctx.fill();
+    ctx.strokeStyle=tn.fg; ctx.lineWidth=2.5; roundRect(ctx,bX,bY,bW,bH,bH/2); ctx.stroke();
+    ctx.fillStyle=tn.fg; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(badgeTxt, W/2, bY+bH/2+1);
+    ctx.textAlign='left'; ctx.textBaseline='alphabetic'; setLS('0px');
 
     // --- Footer: DEVFIT wordmark + @handle (identical lockup to every card) ---
     const fy = H - PAD - 6;

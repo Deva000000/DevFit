@@ -1324,33 +1324,6 @@ let logoImg=null;
   im.src='icon-192.png';
 })();
 
-// ---- Sport hero photos (bundled in /sports, same-origin → safe for canvas export).
-//      These give the share card its GPT-style photographic hero band. ----
-const sportImgs = {};
-const sportImgReady = {};
-['soccer','boxing','cycling','running','swimming','basketball','badminton','hiking','gym'].forEach(k=>{
-  sportImgReady[k] = new Promise(res=>{
-    const im=new Image();
-    im.onload=()=>{ sportImgs[k]=im; res(); };
-    im.onerror=()=>res();
-    im.src='sports/'+k+'.jpg';
-  });
-});
-// Map an activity name → the best-matching hero photo key.
-function cardioPhotoKey(name){
-  const n=(name||'').toLowerCase();
-  if(/football|soccer|futsal/.test(n)) return 'soccer';
-  if(/box|kickbox|muay|mma|martial|judo|karate/.test(n)) return 'boxing';
-  if(/cycl|bike|biking|spin/.test(n)) return 'cycling';
-  if(/run|running|jog|jogging|sprint/.test(n)) return 'running';
-  if(/swim/.test(n)) return 'swimming';
-  if(/basketball|netball/.test(n)) return 'basketball';
-  if(/badminton|tennis|squash|pickle|volleyball|table\s?tennis|hockey/.test(n)) return 'badminton';
-  if(/hike|hiking|walk|trek|treadmill|step/.test(n)) return 'hiking';
-  return 'gym';   // classes / hiit / yoga / dance / rowing / generic
-}
-function cardioPhoto(name){ return sportImgs[cardioPhotoKey(name)] || null; }
-
 // Preload the Inter Bold Italic wordmark font so the share card draws it correctly on first open
 (function preloadBrandFont(){
   try{
@@ -1380,8 +1353,6 @@ async function openShareModal(){
     const it=(pref==='elegant')?'italic ':'';
     await document.fonts.load(it+'700 60px '+fc); await document.fonts.load(it+'400 60px '+fc); await document.fonts.ready;
   }catch(e){}
-  // Ensure sport hero photos are decoded before the first draw (max ~800ms wait)
-  try{ await Promise.race([Promise.all(Object.values(sportImgReady)), new Promise(r=>setTimeout(r,800))]); }catch(e){}
   rerenderShareCard();
   document.getElementById('share-overlay').classList.add('show');
 }
@@ -1492,85 +1463,53 @@ function drawExportCard(canvas, workout, session, theme){
     const isTrans = (theme==='transparent');
     const glyph = cardioGlyph(hero.name);
     const cals  = cardioCalories(hero.name, hero.min);
-    let y = PAD + 4;
+    let y = PAD + 16;
 
     // =========================================================
-    //  TWO-ZONE CARD — bold visual hero band + clean stat panel
-    //  (GPT-style structure, DEVFIT "one red" palette)
+    //  CLEAN CARD — strong type, no photos. Matches the strength card.
     // =========================================================
-    const HB = 600;                       // hero-band height
-    const photo = cardioPhoto(hero.name);
-    const onWhite = !!(photo && theme==='light');     // white scrim ⇒ dark text
-    const scrimRGB = (theme==='light') ? '255,255,255' : '10,10,12';
 
-    // ---- HERO BAND: real sport photo + readability scrim (GPT-style) ----
-    if(photo){
-      const iw=photo.naturalWidth||photo.width, ih=photo.naturalHeight||photo.height;
-      const scale=Math.max(W/iw, HB/ih), dw=iw*scale, dh=ih*scale;
-      ctx.save();
-      ctx.beginPath(); ctx.rect(0,0,W,HB); ctx.clip();
-      ctx.drawImage(photo, (W-dw)/2, (HB-dh)/2, dw, dh);
-      // left scrim keeps the big number legible over the photo
-      const hg=ctx.createLinearGradient(0,0,W,0);
-      hg.addColorStop(0.00,'rgba('+scrimRGB+',1)');
-      hg.addColorStop(0.40,'rgba('+scrimRGB+',0.86)');
-      hg.addColorStop(0.80,'rgba('+scrimRGB+',0)');
-      ctx.fillStyle=hg; ctx.fillRect(0,0,W,HB);
-      // bottom fade blends the photo edge into the stat panel
-      const vg=ctx.createLinearGradient(0,HB-140,0,HB);
-      vg.addColorStop(0,'rgba('+scrimRGB+',0)'); vg.addColorStop(1,'rgba('+scrimRGB+',1)');
-      ctx.fillStyle=vg; ctx.fillRect(0,HB-140,W,140);
-      ctx.restore();
-    } else if(!isTrans){
-      // graceful fallback if the photo hasn't decoded yet: dark gradient band
-      const band=ctx.createLinearGradient(0,0,W,HB);
-      band.addColorStop(0, theme==='light'?'#23232b':'#1b1b22');
-      band.addColorStop(1, theme==='light'?'#0b0b0f':'#08080b');
-      ctx.fillStyle=band; ctx.fillRect(0,0,W,HB);
-      const glow=ctx.createRadialGradient(W-170,HB-110,0,W-170,HB-110,660);
-      glow.addColorStop(0,'rgba(204,0,0,0.5)'); glow.addColorStop(1,'rgba(204,0,0,0)');
-      ctx.fillStyle=glow; ctx.fillRect(0,0,W,HB);
-    }
+    // ---- Header eyebrow: small sport glyph + label + red underline ----
     ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-
-    // Content colours over the band
-    const onBand    = onWhite ? '#0b0b0d' : '#ffffff';
-    const bandAcc   = onWhite ? p.accent : '#ff5a5a';
-
-    // ---- Header eyebrow: glyph + label + red underline ----
-    ctx.font=F(TW,34); ctx.fillStyle=onBand;
+    ctx.font=F(TW,34); ctx.fillStyle=p.fg;
     const gW=ctx.measureText(glyph).width+16;
-    ctx.fillText(glyph, PAD, y+32);
+    ctx.fillText(glyph, PAD, y+31);
     const labelX=PAD+gW;
-    setLS('3px'); ctx.font=F(TW,30); ctx.fillStyle=onBand; ctx.fillText(headerLabel, labelX, y+30);
+    setLS('3px'); ctx.font=F(TW,30); ctx.fillStyle=p.fg; ctx.fillText(headerLabel, labelX, y+30);
     const lblW=ctx.measureText(headerLabel).width; setLS('0px');
-    ctx.fillStyle=bandAcc; roundRect(ctx,labelX,y+46,Math.min(lblW,320),6,3); ctx.fill();
-    // streak chip top-right — solid so it reads over the photo
+    ctx.fillStyle=p.accent; roundRect(ctx,labelX,y+46,Math.min(lblW,320),6,3); ctx.fill();
+    // streak chip top-right
     const streak=cardioStreakDays(session.date);
     if(streak>=2){
       const bt='🔥 '+streak+'-DAY STREAK';
-      ctx.font=F(TW,26); const tw=ctx.measureText(bt).width; const bh=50, bwid=tw+46, bx=W-PAD-bwid, by=y-2;
-      ctx.fillStyle = onWhite ? 'rgba(255,255,255,0.92)' : 'rgba(10,10,12,0.55)';
+      ctx.font=F(TW,26); const tw=ctx.measureText(bt).width; const bh=50, bwid=tw+46, bx=W-PAD-bwid, by=y-4;
+      ctx.fillStyle = theme==='light'?'rgba(204,0,0,0.08)':'rgba(255,58,58,0.16)';
       roundRect(ctx,bx,by,bwid,bh,bh/2); ctx.fill();
       ctx.strokeStyle=p.accent; ctx.lineWidth=2; roundRect(ctx,bx,by,bwid,bh,bh/2); ctx.stroke();
       ctx.fillStyle=p.accent; ctx.textBaseline='middle'; ctx.fillText(bt,bx+23,by+bh/2+1); ctx.textBaseline='alphabetic';
     }
+    y += 96;
 
-    // ---- Hero number, anchored near the bottom of the band ----
+    // ---- Hero number + unit + sport name ----
     const bigVal = distanceMode ? hero.km.toFixed(1) : String(Math.round(hero.min));
     const bigUnit = distanceMode ? 'KM' : 'MIN';
-    const heroBase = HB - 150;
-    ctx.font=F(TW,210); ctx.fillStyle=onBand;
-    ctx.fillText(bigVal, PAD, heroBase);
+    ctx.font=F(TW,205); ctx.fillStyle=p.fg;
+    const bm=vmet(bigVal,205);
+    ctx.fillText(bigVal, PAD, y+bm.a);
     const valW=ctx.measureText(bigVal).width;
-    ctx.font=F(TW,72); ctx.fillStyle=bandAcc; ctx.fillText(bigUnit, PAD+valW+20, heroBase);
-    ctx.font=F(NW,58); ctx.fillStyle=onBand;
-    ctx.fillText((hero.name||'Cardio').toUpperCase(), PAD, heroBase+74);
+    ctx.font=F(TW,72); ctx.fillStyle=p.accent; ctx.fillText(bigUnit, PAD+valW+20, y+bm.a);
+    y += bm.a + 14;
+    ctx.font=F(TW,62); ctx.fillStyle=p.fg;
+    ctx.fillText((hero.name||'Cardio').toUpperCase(), PAD, y+50);
+    y += 80;
+    // red brand underline accent (same mark as the strength card)
+    ctx.fillStyle=p.accent; roundRect(ctx, PAD, y, 130, 9, 4); ctx.fill();
+    y += 9 + 40;
 
-    // =========================================================
-    //  STAT PANEL (below the band) — 3 honest tiles
-    // =========================================================
-    let py = HB + 56;
+    // ---- Divider ----
+    ctx.fillStyle=p.divider; ctx.fillRect(PAD,y,C,1); y += 46;
+
+    // ---- 3 stat tiles ----
     const month=cardioMonthStats(session.date);
     const intensity=(cals&&hero.min>0)?Math.round(cals/hero.min):0;
     let tiles;
@@ -1590,20 +1529,37 @@ function drawExportCard(canvas, workout, session, theme){
     const colW=C/tiles.length;
     tiles.forEach((t,i)=>{
       const cx=PAD+colW*i+colW/2;
-      if(i>0){ ctx.fillStyle=p.divider; ctx.fillRect(PAD+colW*i, py+8, 1, 100); }
+      if(i>0){ ctx.fillStyle=p.divider; ctx.fillRect(PAD+colW*i, y+6, 1, 100); }
       ctx.textAlign='center';
-      ctx.font=F(TW,44); ctx.fillStyle=p.accent; ctx.fillText(t.ic, cx, py+48);
-      ctx.font=F(TW,56); ctx.fillStyle=p.fg; ctx.fillText(t.val, cx, py+108);
-      setLS('1px'); ctx.font=F(BW,23); ctx.fillStyle=p.sub; ctx.fillText(t.lbl, cx, py+142); setLS('0px');
+      ctx.font=F(TW,42); ctx.fillStyle=p.accent; ctx.fillText(t.ic, cx, y+46);
+      ctx.font=F(TW,56); ctx.fillStyle=p.fg; ctx.fillText(t.val, cx, y+106);
+      setLS('1px'); ctx.font=F(BW,23); ctx.fillStyle=p.sub; ctx.fillText(t.lbl, cx, y+140); setLS('0px');
     });
     ctx.textAlign='left';
-    py += 188;
+    y += 180;
 
-    // ---- Earned achievement badge (centred between tiles and footer) ----
-    let pct;
-    if(distanceMode){ pct=Math.round((month.km/cardioGoalKm())*100); }
-    else            { pct=Math.round((month.sessions/cardioSessionGoal())*100); }
-    pct=Math.max(0,Math.min(100,pct));
+    // ---- Monthly goal — sleek gradient bar ----
+    let goalLbl, pct, rightTxt;
+    if(distanceMode){
+      const goal=cardioGoalKm();
+      pct=Math.max(0,Math.min(100,Math.round((month.km/goal)*100)));
+      goalLbl='MONTHLY CARDIO GOAL'; rightTxt=month.km.toFixed(1)+' / '+goal+' KM';
+    } else {
+      const goal=cardioSessionGoal();
+      pct=Math.max(0,Math.min(100,Math.round((month.sessions/goal)*100)));
+      goalLbl='MONTHLY SESSIONS'; rightTxt=month.sessions+' / '+goal+' sessions';
+    }
+    setLS('2px'); ctx.font=F(BW,26); ctx.fillStyle=p.sub; ctx.fillText(goalLbl, PAD, y+22); setLS('0px');
+    ctx.textAlign='right'; ctx.font=F(BW,28); ctx.fillStyle=p.fg; ctx.fillText(rightTxt, W-PAD, y+22); ctx.textAlign='left';
+    y += 52;
+    const trH=24, trR=trH/2;
+    ctx.fillStyle=dim; roundRect(ctx, PAD, y, C, trH, trR); ctx.fill();
+    const grad=ctx.createLinearGradient(PAD,0,PAD+C,0);
+    grad.addColorStop(0,'#cc0000'); grad.addColorStop(1,'#ff5a5a');
+    ctx.fillStyle=grad; roundRect(ctx, PAD, y, Math.max(trH, C*(pct/100)), trH, trR); ctx.fill();
+    y += trH + 8;
+
+    // ---- Earned achievement badge (centred between bar and footer) ----
     const badge=cardioBadge(hero, distanceMode, cals, pct, session.date);
     const toneMap={
       gold:    {fg:'#c6902f', bgL:'rgba(198,144,47,0.12)', bgD:'rgba(198,144,47,0.20)'},
@@ -1615,8 +1571,8 @@ function drawExportCard(canvas, workout, session, theme){
     const footerY = H - PAD - 6;
     setLS('2px'); ctx.font=F(TW,40);
     const btW=ctx.measureText(badgeTxt).width;
-    const padX=46, bH=96, bW=btW+padX*2;
-    const gapTop=py, gapBot=footerY-72;
+    const padX=46, bH=92, bW=btW+padX*2;
+    const gapTop=y, gapBot=footerY-70;
     const bY=Math.max(gapTop, gapTop+(gapBot-gapTop-bH)/2);
     const bX=(W-bW)/2;
     ctx.fillStyle=(theme==='light')?tn.bgL:tn.bgD;

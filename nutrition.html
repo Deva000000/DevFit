@@ -2,6 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<!-- Canonical-host guard: bounce legacy hosts (old Netlify 404 / stale GitHub Pages
+     installs) to the live Vercel app so no client is ever stranded on an old build. -->
+<script>
+(function(){try{
+  var canon='devfitportal.vercel.app', h=location.hostname;
+  if(/\.netlify\.app$/i.test(h)||/\.github\.io$/i.test(h)){
+    var f=(location.pathname.split('/').pop()||'index.html');
+    if(!/\.html?$/i.test(f)) f='index.html';
+    location.replace('https://'+canon+'/'+f+location.search+location.hash);
+  }
+}catch(e){}})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>DevFit — Nutrition</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:ital,wght@1,700;1,800&family=Lora:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600;1,700&family=Anton&family=Righteous&display=swap" rel="stylesheet">

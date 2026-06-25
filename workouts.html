@@ -308,6 +308,7 @@ html.nosplash #devfit-splash{display:none!important}
       <div id="log-workout-chips" class="wk-chips"></div>
       <div id="log-area"></div>
       <button class="share-btn" id="share-btn" disabled>Share Workout Card</button>
+      <button class="reset-btn" id="del-session-btn" style="display:none">&#128465; Delete this day's log</button>
       <button class="reset-btn" id="reset-history-btn">&#8634; Reset session history</button>
     </div>
   </div>
@@ -442,7 +443,7 @@ document.querySelectorAll('.mode-btn').forEach(btn=>{
     document.getElementById('view-log').style.display     = currentMode==='log'?'':'none';
     document.getElementById('view-plan').style.display    = currentMode==='plan'?'':'none';
     document.getElementById('view-progress').style.display= currentMode==='progress'?'':'none';
-    if(currentMode==='log')      renderLog();
+    if(currentMode==='log')      renderLog(true);
     if(currentMode==='plan')   { renderPlan(); loadPlanMeta(); renderPlanLibrary(); }
     if(currentMode==='progress') renderProgressView();
   });
@@ -982,8 +983,39 @@ function cardioBadge(hero, distanceMode, cals, goalPct, dateStr){
   return {text:'SESSION LOGGED', tone:'sage', ic:'✓'};
 }
 
+// Per-sport accent colour for the share card's light gradient + sport-coloured
+// label/unit (gives the "aligned" GPT look). DEVFIT red is still the default.
+function sportColor(name){
+  const n=(name||'').toLowerCase();
+  if(/cycl|bike|biking|spin/.test(n)) return '#1f9d55';        // green
+  if(/football|soccer|futsal/.test(n)) return '#2f6fe0';        // blue
+  if(/badminton|tennis|squash|pickle|volleyball|table\s?tennis/.test(n)) return '#7a4fd0'; // purple
+  if(/hike|hiking|trek/.test(n)) return '#e0892b';              // orange
+  if(/walk|treadmill|step/.test(n)) return '#1f9d55';          // green
+  if(/swim/.test(n)) return '#2f8fe0';                         // blue
+  if(/basketball|netball/.test(n)) return '#e0712b';           // orange
+  return '#cc0000';                                            // run / boxing / hiit / default → brand red
+}
+// Sport-specific stats. `hero` (if set) becomes the big number (e.g. 2 GOALS,
+// 8 ROUNDS, 6 MATCHES) instead of duration; `fields` are extra optional inputs
+// shown in the logger; `tile` adds an extra share-card tile. All live on sets[0].
+function sportStats(name){
+  const n=(name||'').toLowerCase();
+  if(/football|soccer|futsal/.test(n))
+    return {hero:{key:'goals',unit:'GOALS'}, fields:[{key:'goals',label:'Goals'},{key:'assists',label:'Assists'}], tile:{key:'assists',lbl:'ASSISTS',ic:'🅰️'}};
+  if(/basketball|netball/.test(n))
+    return {hero:{key:'points',unit:'POINTS'}, fields:[{key:'points',label:'Points'},{key:'assists',label:'Assists'}], tile:{key:'assists',lbl:'ASSISTS',ic:'🅰️'}};
+  if(/box|kickbox|muay|mma/.test(n))
+    return {hero:{key:'rounds',unit:'ROUNDS'}, fields:[{key:'rounds',label:'Rounds'}], tile:null};
+  if(/badminton|tennis|squash|pickle|volleyball|table\s?tennis/.test(n))
+    return {hero:{key:'matches',unit:'MATCHES'}, fields:[{key:'matches',label:'Matches'},{key:'wins',label:'Wins'}], tile:{key:'wins',lbl:'WINS',ic:'🏆'}};
+  if(/hike|hiking|trek/.test(n))
+    return {hero:null, fields:[{key:'elev',label:'Elevation (m)'}], tile:{key:'elev',lbl:'ELEVATION (M)',ic:'⛰️'}};
+  return {hero:null, fields:[], tile:null};
+}
+
 document.getElementById('log-date').value=todayStr();
-document.getElementById('log-date').addEventListener('change',renderLog);
+document.getElementById('log-date').addEventListener('change',()=>renderLog(false));
 
 // Unified date anchor (shared with Progress page via progressLog2.programStart).
 function progStart(){
@@ -1057,12 +1089,27 @@ document.getElementById('reset-history-btn').addEventListener('click',()=>{
   toast('Session history cleared');
 });
 
-function renderLog(){
+// Delete ONLY the currently-viewed day's log (the clean way to remove a test entry).
+document.getElementById('del-session-btn').addEventListener('click',()=>{
+  const date=document.getElementById('log-date').value||todayStr();
+  const wId=selectedWorkoutId;
+  const idx=data.sessions.findIndex(s=>s.date===date && s.workoutId===wId);
+  if(idx<0){ toast('Nothing logged on this day'); return; }
+  const wName=(data.plan.workouts.find(w=>w.id===wId)||{}).name||'this workout';
+  if(!confirm('Delete the '+wName+' log for '+date+'?\n\nThis removes just this one day. It cannot be undone.')) return;
+  data.sessions.splice(idx,1);
+  currentSession=null;
+  save();
+  renderLog();
+  if(currentMode==='progress') renderProgressView();
+  toast('Log deleted');
+});
+
+function renderLog(jumpToLast){
   // Log session + share (light/dark) are FREE; transparent theme is locked elsewhere
   const chips=document.getElementById('log-workout-chips');
-  const date=document.getElementById('log-date').value||todayStr();
+  let date=document.getElementById('log-date').value||todayStr();
   const _lbl=document.getElementById('log-session-label');
-  if(_lbl){ const wk=weekOfDate(date); _lbl.textContent = wk===null ? "Today's session" : (wk<0 ? 'Session · before program start' : 'Session · Week '+(wk+1)); }
   const area=document.getElementById('log-area');
   const shareBtn=document.getElementById('share-btn');
   shareBtn.disabled=true;
@@ -1080,11 +1127,22 @@ function renderLog(){
   }
   const wId=selectedWorkoutId;
 
+  // When OPENING a workout, jump to its most recent logged date so reopening
+  // e.g. "Push Day" shows your last session instead of an empty today.
+  if(jumpToLast && !findSession(date,wId)){
+    const hasData=l=>l.sets&&l.sets.some(x=>(Number(x.reps)||0)>0||(Number(x.weight)||0)>0||(Number(x.min)||0)>0||(Number(x.km)||0)>0);
+    const latest=data.sessions
+      .filter(s=>s.workoutId===wId && s.logs && s.logs.some(hasData))
+      .map(s=>s.date).sort().pop();
+    if(latest){ document.getElementById('log-date').value=latest; date=latest; }
+  }
+  if(_lbl){ const wk=weekOfDate(date); _lbl.textContent = wk===null ? "Today's session" : (wk<0 ? 'Session · before program start' : 'Session · Week '+(wk+1)); }
+
   // Render workout chips (tap to switch — no dropdown)
   chips.innerHTML=data.plan.workouts.map(w=>
     `<button type="button" class="wk-chip${w.id===wId?' active':''}" data-wid="${w.id}">${escapeHTML(w.name||'(unnamed)')}</button>`
   ).join('');
-  chips.querySelectorAll('.wk-chip').forEach(b=>b.addEventListener('click',()=>{ selectedWorkoutId=b.dataset.wid; saveResume(); renderLog(); }));
+  chips.querySelectorAll('.wk-chip').forEach(b=>b.addEventListener('click',()=>{ selectedWorkoutId=b.dataset.wid; saveResume(); renderLog(true); }));
 
   const w=data.plan.workouts.find(x=>x.id===wId);
   if(!w){area.innerHTML='';return;}
@@ -1140,10 +1198,18 @@ function renderLog(){
                <input type="number" inputmode="decimal" step="0.1" placeholder="km" value="${cs.km??''}" data-ex="${ex.id}" data-cf="km"></div>
              <div class="cardio-pace" data-pace="${ex.id}">${cardioPace(cs.min,cs.km)}</div>
            </div>`;
+      // Sport-specific optional stats (goals / rounds / matches / elevation …)
+      const sp=sportStats(ex.name);
+      let extra='';
+      if(sp.fields.length){
+        extra='<div class="cardio-grid" style="grid-template-columns:repeat('+sp.fields.length+',1fr);margin-top:8px">'+
+          sp.fields.map(f=>`<div class="cardio-fld"><label>${f.label}</label><input type="number" inputmode="numeric" step="1" placeholder="0" value="${cs[f.key]??''}" data-ex="${ex.id}" data-cf="${f.key}"></div>`).join('')+
+          '</div>';
+      }
       card.innerHTML=`
         <div class="log-ex-name">${escapeHTML(ex.name||'(unnamed)')}</div>
         <div class="log-ex-meta">${metaParts.join(' ')}</div>
-        ${fields}`;
+        ${fields}${extra}`;
       area.appendChild(card);
       return;
     }
@@ -1234,11 +1300,14 @@ function renderLog(){
 
 function updateShareBtn(){
   const btn=document.getElementById('share-btn');
-  if(!currentSession || !currentSession.sess){btn.disabled=true;btn.style.display='none';return;}
+  const delBtn=document.getElementById('del-session-btn');
+  if(!currentSession || !currentSession.sess){btn.disabled=true;btn.style.display='none';if(delBtn)delBtn.style.display='none';return;}
   // Allow share if any set has reps/weight (strength) OR min/km (cardio) logged
   const hasData=currentSession.sess.logs.some(l=>l.sets.some(s=>(Number(s.reps)||0)>0||(Number(s.weight)||0)>0||(Number(s.min)||0)>0||(Number(s.km)||0)>0));
   btn.disabled=!hasData;
   btn.style.display=hasData?'block':'none';
+  // Show "delete this day's log" only once the session is actually saved with data.
+  if(delBtn) delBtn.style.display=(!currentSession.isNew && hasData)?'block':'none';
 }
 
 function refreshPill(exId,log,last){
@@ -1449,7 +1518,7 @@ function drawExportCard(canvas, workout, session, theme){
 
   // ===== CARDIO CARD — dedicated layout when the session is pure cardio =====
   const _meta = workout.exercises.map(ex=>({ex, log:session.logs.find(l=>l.exId===ex.id)})).filter(o=>o.log);
-  const _cardio = _meta.filter(o=>exIsCardio(o.ex)).map(o=>{ const cs=(o.log.sets&&o.log.sets[0])||{}; return {name:o.ex.name||'Cardio', min:Number(cs.min)||0, km:Number(cs.km)||0}; }).filter(c=>c.min>0||c.km>0);
+  const _cardio = _meta.filter(o=>exIsCardio(o.ex)).map(o=>{ const cs=(o.log.sets&&o.log.sets[0])||{}; return {name:o.ex.name||'Cardio', min:Number(cs.min)||0, km:Number(cs.km)||0, raw:cs}; }).filter(c=>c.min>0||c.km>0);
   const _strength = _meta.filter(o=>!exIsCardio(o.ex) && o.log.sets && o.log.sets.some(s=>(Number(s.reps)||0)>0||(Number(s.weight)||0)>0));
   if(_cardio.length && !_strength.length){
     const C = W - PAD*2;
@@ -1463,21 +1532,31 @@ function drawExportCard(canvas, workout, session, theme){
     const isTrans = (theme==='transparent');
     const glyph = cardioGlyph(hero.name);
     const cals  = cardioCalories(hero.name, hero.min);
+    const sp    = sportStats(hero.name);
+    const acc   = sportColor(hero.name);     // per-sport accent (red by default)
     let y = PAD + 16;
 
     // =========================================================
-    //  CLEAN CARD — strong type, no photos. Matches the strength card.
+    //  CLEAN CARD — strong type, no photos. Subtle per-sport gradient.
     // =========================================================
 
-    // ---- Header eyebrow: small sport glyph + label + red underline ----
+    // ---- Light per-sport gradient wash (the "aligned" GPT look, very subtle) ----
+    if(!isTrans){
+      const g=ctx.createLinearGradient(0,0,W,H);
+      g.addColorStop(0, acc+'00');
+      g.addColorStop(1, acc+(theme==='light'?'14':'24'));
+      ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    }
+
+    // ---- Header eyebrow: small sport glyph + label + sport underline ----
     ctx.textAlign='left'; ctx.textBaseline='alphabetic';
     ctx.font=F(TW,34); ctx.fillStyle=p.fg;
     const gW=ctx.measureText(glyph).width+16;
     ctx.fillText(glyph, PAD, y+31);
     const labelX=PAD+gW;
-    setLS('3px'); ctx.font=F(TW,30); ctx.fillStyle=p.fg; ctx.fillText(headerLabel, labelX, y+30);
+    setLS('3px'); ctx.font=F(TW,30); ctx.fillStyle=acc; ctx.fillText(headerLabel, labelX, y+30);
     const lblW=ctx.measureText(headerLabel).width; setLS('0px');
-    ctx.fillStyle=p.accent; roundRect(ctx,labelX,y+46,Math.min(lblW,320),6,3); ctx.fill();
+    ctx.fillStyle=acc; roundRect(ctx,labelX,y+46,Math.min(lblW,320),6,3); ctx.fill();
     // streak chip top-right
     const streak=cardioStreakDays(session.date);
     if(streak>=2){
@@ -1490,35 +1569,46 @@ function drawExportCard(canvas, workout, session, theme){
     }
     y += 96;
 
-    // ---- Hero number + unit + sport name ----
-    const bigVal = distanceMode ? hero.km.toFixed(1) : String(Math.round(hero.min));
-    const bigUnit = distanceMode ? 'KM' : 'MIN';
+    // ---- Hero number: sport-signature stat (goals/rounds/matches) when present,
+    //      else distance, else duration. ----
+    const heroStat = sp.hero ? (Number(hero.raw&&hero.raw[sp.hero.key])||0) : 0;
+    let bigVal, bigUnit;
+    if(sp.hero && heroStat>0){ bigVal=String(heroStat); bigUnit=sp.hero.unit; }
+    else if(distanceMode)    { bigVal=hero.km.toFixed(1); bigUnit='KM'; }
+    else                     { bigVal=String(Math.round(hero.min)); bigUnit='MIN'; }
     ctx.font=F(TW,205); ctx.fillStyle=p.fg;
     const bm=vmet(bigVal,205);
     ctx.fillText(bigVal, PAD, y+bm.a);
     const valW=ctx.measureText(bigVal).width;
-    ctx.font=F(TW,72); ctx.fillStyle=p.accent; ctx.fillText(bigUnit, PAD+valW+20, y+bm.a);
+    ctx.font=F(TW,72); ctx.fillStyle=acc; ctx.fillText(bigUnit, PAD+valW+20, y+bm.a);
     y += bm.a + 14;
     ctx.font=F(TW,62); ctx.fillStyle=p.fg;
     ctx.fillText((hero.name||'Cardio').toUpperCase(), PAD, y+50);
     y += 80;
-    // red brand underline accent (same mark as the strength card)
-    ctx.fillStyle=p.accent; roundRect(ctx, PAD, y, 130, 9, 4); ctx.fill();
+    // sport-coloured brand underline accent (same mark as the strength card)
+    ctx.fillStyle=acc; roundRect(ctx, PAD, y, 130, 9, 4); ctx.fill();
     y += 9 + 40;
 
     // ---- Divider ----
     ctx.fillStyle=p.divider; ctx.fillRect(PAD,y,C,1); y += 46;
 
-    // ---- 3 stat tiles ----
+    // ---- 3 stat tiles — sport-aware ----
     const month=cardioMonthStats(session.date);
     const intensity=(cals&&hero.min>0)?Math.round(cals/hero.min):0;
+    const tileVal=k=>Number(hero.raw&&hero.raw[k])||0;
     let tiles;
     if(distanceMode){
-      tiles=[
-        {ic:'⏱', val:fmtDuration(hero.min), lbl:'DURATION'},
-        {ic:'⚡', val:cardioPace(hero.min,hero.km).replace(' /km','')||'—', lbl:'AVG PACE /KM'},
-        {ic:'🔥', val: cals?String(cals):'—', lbl:'CALORIES'}
-      ];
+      tiles=[{ic:'⏱', val:fmtDuration(hero.min), lbl:'DURATION'}];
+      const elev=tileVal('elev');
+      if(sp.tile && sp.tile.key==='elev' && elev>0) tiles.push({ic:'⛰️', val:fmtNum(elev)+' m', lbl:'ELEVATION'});
+      else tiles.push({ic:'⚡', val:cardioPace(hero.min,hero.km).replace(' /km','')||'—', lbl:'AVG PACE /KM'});
+      tiles.push({ic:'🔥', val: cals?String(cals):'—', lbl:'CALORIES'});
+    } else if(sp.hero && heroStat>0){
+      // a sport signature stat is the hero → duration moves into a tile
+      tiles=[{ic:'⏱', val:fmtDuration(hero.min), lbl:'DURATION'},{ic:'🔥', val: cals?String(cals):'—', lbl:'CALORIES'}];
+      const t2=sp.tile?tileVal(sp.tile.key):0;
+      if(sp.tile && t2>0) tiles.push({ic:sp.tile.ic, val:String(t2), lbl:sp.tile.lbl});
+      else tiles.push({ic:'📅', val:String(month.sessions), lbl:'THIS MONTH'});
     } else {
       tiles=[
         {ic:'🔥', val: cals?String(cals):'—', lbl:'CALORIES'},
@@ -1531,7 +1621,7 @@ function drawExportCard(canvas, workout, session, theme){
       const cx=PAD+colW*i+colW/2;
       if(i>0){ ctx.fillStyle=p.divider; ctx.fillRect(PAD+colW*i, y+6, 1, 100); }
       ctx.textAlign='center';
-      ctx.font=F(TW,42); ctx.fillStyle=p.accent; ctx.fillText(t.ic, cx, y+46);
+      ctx.font=F(TW,42); ctx.fillStyle=acc; ctx.fillText(t.ic, cx, y+46);
       ctx.font=F(TW,56); ctx.fillStyle=p.fg; ctx.fillText(t.val, cx, y+106);
       setLS('1px'); ctx.font=F(BW,23); ctx.fillStyle=p.sub; ctx.fillText(t.lbl, cx, y+140); setLS('0px');
     });
@@ -1555,7 +1645,7 @@ function drawExportCard(canvas, workout, session, theme){
     const trH=24, trR=trH/2;
     ctx.fillStyle=dim; roundRect(ctx, PAD, y, C, trH, trR); ctx.fill();
     const grad=ctx.createLinearGradient(PAD,0,PAD+C,0);
-    grad.addColorStop(0,'#cc0000'); grad.addColorStop(1,'#ff5a5a');
+    grad.addColorStop(0,acc); grad.addColorStop(1,acc+'b3');
     ctx.fillStyle=grad; roundRect(ctx, PAD, y, Math.max(trH, C*(pct/100)), trH, trR); ctx.fill();
     y += trH + 8;
 
@@ -1635,9 +1725,14 @@ function drawExportCard(canvas, workout, session, theme){
     totalSets += setCount;
     validSets.forEach(s => { totalVolume += (Number(s.weight)||0) * (Number(s.reps)||0); });
 
-    // Right-side summary, mockup format: "35 kg × 2 sets" (top working weight).
+    // Right-side summary now includes REPS so the volume reads sensibly:
+    // "100 kg × 8 × 3 sets" (top working set's weight × reps × set count).
+    const top = validSets.reduce((a,b)=> (Number(b.weight)||0) > (Number(a.weight)||0) ? b : a);
+    const topW = Number(top.weight)||0, topR = Number(top.reps)||0;
     const setTxt = `${setCount} ${setCount>1?'sets':'set'}`;
-    const summary = hasWeight ? `${Math.max(...wtList)} kg × ${setTxt}` : setTxt;
+    let summary;
+    if(hasWeight) summary = topR>0 ? `${topW} kg × ${topR} × ${setTxt}` : `${topW} kg × ${setTxt}`;
+    else          summary = topR>0 ? `${topR} reps × ${setTxt}` : setTxt;
     lines.push({name: ex.name || 'Exercise', summary});
   });
 
@@ -1715,7 +1810,7 @@ function drawExportCard(canvas, workout, session, theme){
     ctx.textAlign = 'left';
     ctx.font = F(NW, 54); ctx.fillStyle = p.fg;
     let nameTxt = line.name;
-    const nameMaxW = (W - PAD) - nameX - 360;
+    const nameMaxW = (W - PAD) - nameX - 430;   // reserve room for "100 kg × 8 × 3 sets"
     while(ctx.measureText(nameTxt).width > nameMaxW && nameTxt.length > 3){ nameTxt = nameTxt.slice(0, -1); }
     if(nameTxt !== line.name) nameTxt = nameTxt.slice(0, -1) + '…';
     ctx.fillText(nameTxt, nameX, rowMid);
@@ -1839,7 +1934,7 @@ if('serviceWorker' in navigator){
   window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 }
 
-renderLog();
+renderLog(true);
 // Resume scroll position if the OS reloaded a backgrounded session (same day).
 (function(){
   const r=readResume();

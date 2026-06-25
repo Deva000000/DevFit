@@ -1540,12 +1540,19 @@ function drawExportCard(canvas, workout, session, theme){
     //  CLEAN CARD — strong type, no photos. Subtle per-sport gradient.
     // =========================================================
 
-    // ---- Light per-sport gradient wash (the "aligned" GPT look, very subtle) ----
+    // ---- Light per-sport gradient wash (the "aligned" GPT look) ----
     if(!isTrans){
+      // diagonal: clean top-left → soft sport tint toward the bottom-right
       const g=ctx.createLinearGradient(0,0,W,H);
-      g.addColorStop(0, acc+'00');
-      g.addColorStop(1, acc+(theme==='light'?'14':'24'));
+      g.addColorStop(0,   acc+'00');
+      g.addColorStop(0.45,acc+(theme==='light'?'12':'1e'));
+      g.addColorStop(1,   acc+(theme==='light'?'40':'55'));
       ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+      // soft colour glow up near the hero number for extra depth
+      const rg=ctx.createRadialGradient(W*0.80,H*0.30,0, W*0.80,H*0.30, W*0.72);
+      rg.addColorStop(0, acc+(theme==='light'?'2e':'3d'));
+      rg.addColorStop(1, acc+'00');
+      ctx.fillStyle=rg; ctx.fillRect(0,0,W,H);
     }
 
     // ---- Header eyebrow: small sport glyph + label + sport underline ----
@@ -1725,14 +1732,11 @@ function drawExportCard(canvas, workout, session, theme){
     totalSets += setCount;
     validSets.forEach(s => { totalVolume += (Number(s.weight)||0) * (Number(s.reps)||0); });
 
-    // Right-side summary: weight · sets · reps  →  "100 kg · 3 sets · 8 reps".
+    // Right-side summary: weight · sets  →  "100 kg · 3 sets" (clean, no reps clutter).
     const top = validSets.reduce((a,b)=> (Number(b.weight)||0) > (Number(a.weight)||0) ? b : a);
-    const topW = Number(top.weight)||0, topR = Number(top.reps)||0;
+    const topW = Number(top.weight)||0;
     const setTxt = `${setCount} ${setCount>1?'sets':'set'}`;
-    const repTxt = topR>0 ? `${topR} ${topR>1?'reps':'rep'}` : '';
-    let summary;
-    if(hasWeight) summary = repTxt ? `${topW} kg · ${setTxt} · ${repTxt}` : `${topW} kg · ${setTxt}`;
-    else          summary = repTxt ? `${setTxt} · ${repTxt}` : setTxt;
+    const summary = hasWeight ? `${topW} kg · ${setTxt}` : setTxt;
     lines.push({name: ex.name || 'Exercise', summary});
   });
 
@@ -1810,7 +1814,7 @@ function drawExportCard(canvas, workout, session, theme){
     ctx.textAlign = 'left';
     ctx.font = F(NW, 54); ctx.fillStyle = p.fg;
     let nameTxt = line.name;
-    const nameMaxW = (W - PAD) - nameX - 470;   // reserve room for "100 kg · 3 sets · 8 reps"
+    const nameMaxW = (W - PAD) - nameX - 360;   // reserve room for "100 kg · 3 sets"
     while(ctx.measureText(nameTxt).width > nameMaxW && nameTxt.length > 3){ nameTxt = nameTxt.slice(0, -1); }
     if(nameTxt !== line.name) nameTxt = nameTxt.slice(0, -1) + '…';
     ctx.fillText(nameTxt, nameX, rowMid);

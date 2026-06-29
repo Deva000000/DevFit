@@ -1,16 +1,25 @@
 /* DevFit Service Worker — v3.0.0
-   Strategy (FIXED):
-   - HTML pages: NETWORK-FIRST (no more stale UI / dead buttons after deploys)
+   Strategy:
+   - HTML pages: NETWORK-FIRST with cache fallback (instant offline from any page)
+   - All core HTML precached at install → app works offline after first SW install
    - Icons / manifest / static: cache-first
    - CDN assets (Chart.js, jsPDF, fonts): stale-while-revalidate
-   - Apps Script: network-only
+   - Apps Script / /api/*: network-only (never cached)
 */
 
-const VERSION = 'devfit-v4.41.0';
+const VERSION = 'devfit-v4.42.0';
 const APP_SHELL = 'devfit-shell-' + VERSION;
 const RUNTIME = 'devfit-runtime-' + VERSION;
 
 const SHELL_FILES = [
+  // ── Core HTML pages — precached so the whole app works offline ──────
+  './login.html',
+  './index.html',
+  './nutrition.html',
+  './workouts.html',
+  './settings.html',
+  './landing.html',
+  // ── Manifest + icons ────────────────────────────────────────────────
   './manifest.json',
   './icon-touch.png',
   './icon-192.png',
@@ -20,6 +29,7 @@ const SHELL_FILES = [
   './logo-white.png',
   './favicon.svg',
   './favicon.ico',
+  // ── App JS / CSS ─────────────────────────────────────────────────────
   './devfit-db.js',
   './pwa-update.js',
   './foods-local.js',

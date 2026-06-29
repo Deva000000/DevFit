@@ -650,6 +650,34 @@
   a('Coconut Sugar (1 tsp)', 5, 375, 0, 100, 0, 'coconut sugar gula kelapa 1 tsp natural sweetener');
   a('Gula Melaka / Palm Sugar (1 tbsp)', 15, 380, 0.5, 93, 0.3, 'gula melaka palm sugar 1 tbsp natural sweet malaysian traditional');
 
+  // ── COMMON MILKS & DAIRY DRINKS (human glass servings) ──────────────
+  // m(name, cal/100ml, p, c, f, tags, brand) — default 250ml glass + box sizes
+  const m = (n, cal, p, c, f, tg, br) => F.push({
+    name: n, serving: 250, cal, p, c, f, tags: tg || '', brand: br || '',
+    servings: [{ n: '1 glass (250ml)', g: 250 }, { n: '1 cup (200ml)', g: 200 },
+               { n: '1 small box (125ml)', g: 125 }, { n: '100ml', g: 100 }]
+  });
+  m('HL Low Fat Milk', 47, 3.6, 5, 1.2, 'hl milk low fat low lactose dutch lady marigold susu rendah lemak', 'Marigold HL');
+  m('Full Cream Milk (fresh)', 64, 3.2, 4.8, 3.6, 'full cream milk fresh susu penuh whole milk', '');
+  m('Low Fat Milk (fresh)', 47, 3.4, 5, 1.5, 'low fat milk fresh susu rendah lemak skim', '');
+  m('Skim / Non-Fat Milk', 35, 3.4, 5, 0.1, 'skim milk non fat fat free skimmed susu tanpa lemak', '');
+  m('Farm Fresh Full Cream Milk', 65, 3.3, 4.8, 3.7, 'farm fresh full cream milk fresh susu', 'Farm Fresh');
+  m('Farm Fresh Low Fat Milk', 46, 3.4, 5, 1.3, 'farm fresh low fat milk fresh susu', 'Farm Fresh');
+  m('Dutch Lady Full Cream Milk', 64, 3.2, 4.9, 3.5, 'dutch lady full cream milk susu', 'Dutch Lady');
+  m('Dutch Lady Low Fat Milk', 46, 3.4, 5.1, 1.3, 'dutch lady low fat milk susu', 'Dutch Lady');
+  m('Goodday Full Cream Milk', 64, 3.2, 4.8, 3.6, 'good day goodday full cream milk susu', 'Goodday');
+  m('Goodday Chocolate Milk', 74, 3, 12, 1.6, 'good day goodday chocolate milk susu coklat', 'Goodday');
+  m('Marigold UHT Full Cream', 64, 3.2, 4.8, 3.6, 'marigold uht full cream milk susu', 'Marigold');
+  m('Magnolia Low Fat Milk', 46, 3.4, 5, 1.3, 'magnolia low fat milk susu f&n', 'Magnolia');
+  m('Soy Milk (unsweetened)', 33, 3.3, 1.8, 1.8, 'soy milk soya susu soya unsweetened plain vsoy', '');
+  m('Soy Milk (sweetened)', 54, 3, 6.5, 1.8, 'soy milk soya susu soya sweetened vsoy yeo', '');
+  m('Vsoy Soy Milk', 56, 3.5, 6.8, 1.7, 'vsoy soy milk soya protein susu', 'Vsoy');
+  m('Oat Milk (barista)', 59, 1, 9, 1.5, 'oat milk barista plant based susu oat', '');
+  m('Almond Milk (unsweetened)', 15, 0.5, 0.6, 1.2, 'almond milk unsweetened plant based susu badam', '');
+  m('Fresh Milk (Greenfields)', 61, 3.2, 4.6, 3.3, 'greenfields fresh milk full cream susu', 'Greenfields');
+  m('Evaporated Milk (F&N, per 100ml)', 134, 6.7, 10, 7.6, 'evaporated milk susu cair f&n carnation teh tarik', 'F&N');
+  m('Condensed Milk (sweetened, per 100ml)', 321, 7.9, 54, 8.7, 'condensed milk susu pekat manis sweetened teh tarik kopi', '');
+
   console.log('[DevFit] foods-bulk.js loaded — added ' +
     (F.length) + ' total foods now in local DB.');
 })();

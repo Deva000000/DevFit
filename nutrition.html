@@ -19,8 +19,8 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:ital,wght@1,700;1,800&family=Lora:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600;1,700&family=Anton&family=Righteous&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="foods-local.js?v=4.33"></script>
-<script src="foods-bulk.js?v=4.33" defer></script>
+<script src="foods-local.js?v=4.41"></script>
+<script src="foods-bulk.js?v=4.41" defer></script>
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
@@ -1874,7 +1874,7 @@ applyNutritionTierGates();
   .qa-cell input{width:100%;background:transparent;border:none;color:#fff;font-family:'DM Sans',system-ui,sans-serif;font-size:20px;font-weight:700;text-align:center;outline:none}
   .qa-cell input::placeholder{color:#444}
   .qa-cell .qa-unit{font-size:9px;color:#666;margin-top:2px}
-  .food-results-wrap{overflow-y:auto;flex:1;min-height:0}
+  .food-results-wrap{overflow-y:auto;flex:1;min-height:0;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
   .food-item{padding:12px 14px;border-radius:10px;border:1px solid #242428;margin-bottom:7px;cursor:pointer;transition:background .12s,border-color .12s;background:#161618}
   .food-item:hover,.food-item:focus{background:#1e1e24;border-color:#cc0000;outline:none}
   .food-item-name{font-family:'DM Sans',system-ui,sans-serif;font-size:14px;font-weight:700;color:#fff;margin-bottom:3px}
@@ -1886,6 +1886,7 @@ applyNutritionTierGates();
   .src-off{background:rgba(59,130,246,0.18);color:#60a5fa}
   .src-local{background:rgba(204,0,0,0.20);color:#ff6b6b}
   .src-kalori{background:rgba(255,165,0,0.20);color:#ffa500}
+  .src-recent{background:rgba(168,85,247,0.20);color:#c084fc}
   .food-loading,.food-empty{padding:28px 16px;text-align:center;font-family:'DM Sans',system-ui,sans-serif;font-size:13px;color:#555}
   .scanner-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.97);z-index:10100;display:none;align-items:center;justify-content:center;flex-direction:column;padding:1.2rem}
   .scanner-overlay.show{display:flex}
@@ -1900,7 +1901,7 @@ applyNutritionTierGates();
   .scanner-hint{font-family:'DM Sans',system-ui,sans-serif;font-size:12px;color:#555;text-align:center;margin-top:12px}
   .serving-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:10200;display:none;align-items:flex-end;justify-content:center;padding:0}
   .serving-overlay.show{display:flex}
-  .serving-modal{background:#111;border:1px solid #2a2a2a;border-top:3px solid #2f9e57;border-radius:20px 20px 0 0;padding:22px 20px 36px;width:100%;max-width:480px;max-height:92vh;overflow-y:auto}
+  .serving-modal{background:#111;border:1px solid #2a2a2a;border-top:3px solid #2f9e57;border-radius:20px 20px 0 0;padding:22px 20px 36px;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
   .serving-food-name{font-family:'DM Sans',system-ui,sans-serif;font-size:16px;font-weight:800;color:#fff;margin-bottom:4px}
   .serving-per100{font-family:'DM Sans',system-ui,sans-serif;font-size:12px;color:#555;margin-bottom:14px;line-height:1.5}
   .sv-size-lbl{font-family:'DM Sans',sans-serif;font-size:10px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
@@ -2085,9 +2086,12 @@ applyNutritionTierGates();
     };
   }
 
+  // Network search with hard timeout — a slow/unreachable API can't hang the UI.
+  function tFetch(url,ms){ return fetch(url,{signal:AbortSignal.timeout(ms||7000)}); }
+
   async function offSearch(q){
     const url=OFF_SEARCH+'?search_terms='+encodeURIComponent(q)+'&json=1&page_size=50&fields=code,product_name,brands,nutriments,serving_size,serving_quantity&sort_by=unique_scans_n';
-    const r=await fetch(url);
+    const r=await tFetch(url,8000);
     const j=await r.json();
     return(j.products||[])
       .filter(p=>p.product_name&&p.nutriments&&(p.nutriments['energy-kcal_100g']||p.nutriments['energy-kcal']||p.nutriments['energy_100g']))
@@ -2096,7 +2100,7 @@ applyNutritionTierGates();
 
   async function usdaSearch(q){
     const url=USDA_PROXY+'?query='+encodeURIComponent(q)+'&pageSize=50';
-    const r=await fetch(url);
+    const r=await tFetch(url,7000);
     if(!r.ok) throw new Error('usda '+r.status);
     const j=await r.json();
     return(j.foods||[]).map(parseUSDA).filter(f=>f.cal100>0);
@@ -2116,7 +2120,7 @@ applyNutritionTierGates();
   }
   async function kaloriSearch(q){
     const url = KALORI_PROXY + '?q=' + encodeURIComponent(q);
-    const r = await fetch(url);
+    const r = await tFetch(url,7000);
     if(!r.ok) throw new Error('kalori ' + r.status);
     const j = await r.json();
     return (j.data || []).filter(i => i && (i.calories || i.energy || i.cal)).map(parseKalori);
@@ -2141,15 +2145,47 @@ applyNutritionTierGates();
     }).map(f=>({
       name:f.name, brand:f.brand||'',
       cal100:f.cal, p100:f.p, c100:f.c, f100:f.f,
-      sq:f.serving||100, serving_size:(f.serving||100)+'g', source:'LOCAL'
+      sq:f.serving||100, serving_size:(f.serving||100)+'g', source:'LOCAL',
+      servings:Array.isArray(f.servings)?f.servings:null   // carry human portions through
     }));
+  }
+
+  // ── Recent foods ─────────────────────────────────────────────────────
+  // Every food the user logs is remembered locally so it's ALWAYS findable
+  // again instantly — even if the API it originally came from is slow/down.
+  const RECENT_KEY='devfit_recent_foods';
+  function getRecents(){
+    try{return JSON.parse(localStorage.getItem(RECENT_KEY))||[];}catch(e){return [];}
+  }
+  function pushRecent(f){
+    try{
+      if(!f||!f.name)return;
+      const rec={name:f.name,brand:f.brand||'',cal100:f.cal100,p100:f.p100,c100:f.c100,f100:f.f100,
+        sq:f.sq||100,serving_size:f.serving_size||((f.sq||100)+'g'),
+        servings:Array.isArray(f.servings)?f.servings:null};
+      const key=(rec.name+'|'+rec.brand).toLowerCase();
+      let list=getRecents().filter(x=>((x.name+'|'+(x.brand||'')).toLowerCase())!==key);
+      list.unshift(rec);
+      localStorage.setItem(RECENT_KEY,JSON.stringify(list.slice(0,80)));
+    }catch(e){}
+  }
+  function recentSearch(q){
+    const ql=q.toLowerCase().trim();
+    const toks=ql.split(/\s+/).filter(Boolean);
+    if(!toks.length)return [];
+    return getRecents().filter(f=>{
+      const hay=(f.name+' '+(f.brand||'')).toLowerCase();
+      return toks.every(t=>hay.includes(t));
+    }).map(f=>({...f,source:'RECENT'}));
   }
 
   function renderResults(items){
     const el=document.getElementById('food-results');
     if(!items.length){el.innerHTML='<div class="food-empty">No results found. Try different keywords.</div>';return;}
     el.innerHTML=items.map((f,i)=>{
-      const badge=f.source==='LOCAL'
+      const badge=f.source==='RECENT'
+        ? '<span class="src-badge src-recent">Recent</span>'
+        : f.source==='LOCAL'
         ? '<span class="src-badge src-local">DevFit</span>'
         : f.source==='KALORI'
           ? '<span class="src-badge src-kalori">MY</span>'
@@ -2157,9 +2193,15 @@ applyNutritionTierGates();
             ? '<span class="src-badge src-usda">USDA</span>'
             : '<span class="src-badge src-off">Branded</span>';
       const brand=f.brand?('<span class="food-item-brand">'+esc(f.brand)+'</span> &middot; '):'';
+      // Show the natural portion (e.g. "1 medium") so lay users aren't stuck on per-100g
+      let svLabel='per 100g', svG=100;
+      if(Array.isArray(f.servings)&&f.servings.length){ svLabel=f.servings[0].n; svG=f.servings[0].g; }
+      else if(f.sq&&f.sq!==100){ svLabel='1 serving ('+f.sq+'g)'; svG=f.sq; }
+      const r=svG/100;
+      const perTxt=(svLabel==='per 100g')?'per 100g':('per '+esc(svLabel));
       return '<div class="food-item" data-idx="'+i+'" tabindex="0">'+
         '<div class="food-item-name">'+esc(f.name)+badge+'</div>'+
-        '<div class="food-item-macros">'+brand+Math.round(f.cal100)+' kcal &middot; P:'+Math.round(f.p100)+'g &middot; C:'+Math.round(f.c100)+'g &middot; F:'+Math.round(f.f100)+'g <span class="food-item-per">per 100g</span></div>'+
+        '<div class="food-item-macros">'+brand+Math.round(f.cal100*r)+' kcal &middot; P:'+Math.round(f.p100*r)+'g &middot; C:'+Math.round(f.c100*r)+'g &middot; F:'+Math.round(f.f100*r)+'g <span class="food-item-per">'+perTxt+'</span></div>'+
         '</div>';
     }).join('');
     el.querySelectorAll('.food-item').forEach((el2,i)=>{
@@ -2284,6 +2326,7 @@ applyNutritionTierGates();
       const meal=findMeal(currentDate,_targetMealId)||ensureDay(currentDate).meals[0];
       item.id=uid(); meal.items.push(item);
     }
+    pushRecent(_sel);   // remember so it's always findable again, even if its API is down
     save();
     if(typeof renderDay==='function') renderDay();
     document.getElementById('serving-overlay').classList.remove('show');
@@ -2400,6 +2443,9 @@ applyNutritionTierGates();
       const meal=findMeal(currentDate,_targetMealId)||ensureDay(currentDate).meals[0];
       item.id=uid(); meal.items.push(item);
     }
+    // Remember quick-adds too (stored as a fixed "1 serving" so re-adding is one tap)
+    pushRecent({name,brand:'',cal100:cal,p100:p,c100:c,f100:f,sq:100,serving_size:'1 serving',
+      servings:[{n:'1 serving',g:100}]});
     save();
     if(typeof renderDay==='function') renderDay();
     document.getElementById('quick-overlay').classList.remove('show');
@@ -2407,27 +2453,13 @@ applyNutritionTierGates();
     _editRef=null;
   });
 
-  async function doSearch(){
-    const q=(document.getElementById('food-search-input').value||'').trim();
-    if(!q)return;
-    const el=document.getElementById('food-results');
-    el.innerHTML='<div class="food-loading">Searching food databases…</div>';
-    const local=localSearch(q);                  // instant, offline, curated
-    const [usda,off,kalori]=await Promise.allSettled([usdaSearch(q),offSearch(q),kaloriSearch(q)]);
-    const u=usda.status==='fulfilled'?usda.value:[];
-    const o=off.status==='fulfilled'?off.value:[];
-    const k=kalori.status==='fulfilled'?kalori.value:[];
-    if(!local.length&&!u.length&&!o.length&&!k.length){
-      if(usda.status==='rejected'&&off.status==='rejected')
-        el.innerHTML='<div class="food-empty">Search failed. Check your connection and try again.</div>';
-      else el.innerHTML='<div class="food-empty">No results found. Try different keywords.</div>';
-      return;
-    }
-    // Rank: curated local first, then Kalori MY, then exact/prefix matches
+  let _searchToken=0;
+  function rankFoods(items,q){
     const ql=q.toLowerCase();
     function score(f){
       const n=f.name.toLowerCase();
       let s=0;
+      if(f.source==='RECENT')s+=70;    // things you've logged before, top priority
       if(f.source==='LOCAL')s+=50;     // curated local always near top
       if(f.source==='KALORI')s+=30;    // Malaysian DB second priority
       if(n===ql)s+=100; else if(n.startsWith(ql))s+=60; else if(n.includes(ql))s+=30;
@@ -2436,14 +2468,70 @@ applyNutritionTierGates();
       return s;
     }
     const seen=new Set();
-    const merged=local.concat(k).concat(u).concat(o).filter(f=>{
+    return items.filter(f=>{
       const key=f.name.toLowerCase()+'|'+Math.round(f.cal100);
       if(seen.has(key))return false; seen.add(key); return true;
     }).sort((a,b)=>score(b)-score(a)).slice(0,60);
-    renderResults(merged);
+  }
+
+  async function doSearch(){
+    const q=(document.getElementById('food-search-input').value||'').trim();
+    if(!q)return;
+    const token=++_searchToken;
+    const el=document.getElementById('food-results');
+
+    // 1. INSTANT: recents + curated local render immediately, no waiting on network
+    const instant=recentSearch(q).concat(localSearch(q));
+    if(instant.length) renderResults(rankFoods(instant,q));
+    else el.innerHTML='<div class="food-loading">Searching food databases…</div>';
+
+    // 2. PROGRESSIVE: merge each network source in as it arrives (whichever is fastest)
+    let pool=instant.slice();
+    let anyResolved=false;                         // a network source returned (even if empty)
+    const sources=[usdaSearch(q),kaloriSearch(q),offSearch(q)];
+    await Promise.all(sources.map(pr=>pr.then(res=>{
+      if(token!==_searchToken) return;            // a newer search started — discard
+      anyResolved=true;
+      if(Array.isArray(res)&&res.length){ pool=pool.concat(res); renderResults(rankFoods(pool,q)); }
+    }).catch(()=>{})));
+
+    if(token!==_searchToken) return;
+    if(!pool.length){
+      el.innerHTML=anyResolved
+        ? '<div class="food-empty">No results found. Try different keywords.</div>'
+        : '<div class="food-empty">Search timed out — check your connection and try again.</div>';
+    }
   }
   document.getElementById('food-search-btn').addEventListener('click',doSearch);
   document.getElementById('food-search-input').addEventListener('keydown',e=>{if(e.key==='Enter')doSearch();});
+
+  // ── Body scroll-lock while a sheet is open ───────────────────────────
+  // Fixes iOS scroll-chaining: without this, scrolling the sheet (or touching
+  // the gram field) scrolls the homepage behind it instead. The only reliable
+  // cross-browser fix is to pin <body> while any overlay is shown.
+  (function(){
+    let lockY=0, locked=false;
+    function lock(){
+      if(locked)return; locked=true;
+      lockY=window.scrollY||window.pageYOffset||0;
+      const b=document.body.style;
+      b.position='fixed'; b.top=(-lockY)+'px'; b.left='0'; b.right='0';
+      b.width='100%'; b.overflow='hidden';
+    }
+    function unlock(){
+      if(!locked)return; locked=false;
+      const b=document.body.style;
+      b.position=''; b.top=''; b.left=''; b.right=''; b.width=''; b.overflow='';
+      window.scrollTo(0,lockY);
+    }
+    function sync(){
+      const open=document.querySelector('.food-overlay.show,.serving-overlay.show,.scanner-overlay.show,.ds-overlay.show');
+      if(open)lock(); else unlock();
+    }
+    const obs=new MutationObserver(sync);
+    document.querySelectorAll('.food-overlay,.serving-overlay,.scanner-overlay,.ds-overlay')
+      .forEach(o=>obs.observe(o,{attributes:true,attributeFilter:['class']}));
+  })();
 
   // Barcode scanner — uses ZXing (works on iOS Safari + Android + desktop)
   // BarcodeDetector is Chrome/Android only; ZXing is the universal fallback.

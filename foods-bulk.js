@@ -7,8 +7,26 @@
   const F = window.DEVFIT_LOCAL_FOODS;
   if (!Array.isArray(F)) return;
 
+  // Self-healing de-dupe. foods-local.js loads first and is the curated source
+  // (better human servings). Step 1: strip any duplicate names already inside
+  // the base array (keep first/curated). Step 2: skip names this file repeats.
+  // Guarantees no food ever appears twice in search.
+  const _seen = new Set();
+  let _baseDropped = 0;
+  for (let i = 0; i < F.length; i++) {
+    const key = String(F[i] && F[i].name || '').toLowerCase().trim();
+    if (_seen.has(key)) { F.splice(i, 1); i--; _baseDropped++; }
+    else _seen.add(key);
+  }
+  let _skipped = 0;
+  function _dedupe(obj) {
+    const key = String(obj.name || '').toLowerCase().trim();
+    if (_seen.has(key)) { _skipped++; return; }
+    _seen.add(key); F.push(obj);
+  }
+
   // a(name, servingG, cal/100g, p/100g, c/100g, f/100g, tags, brand)
-  const a = (n, sv, cal, p, c, f, tg, br) => F.push({
+  const a = (n, sv, cal, p, c, f, tg, br) => _dedupe({
     name: n, serving: sv, cal, p, c, f,
     tags: tg || '', brand: br || '',
     servings: [{ n: '100g', g: 100 }, ...(sv !== 100 ? [{ n: sv + 'g', g: sv }] : [])]
@@ -652,7 +670,7 @@
 
   // ── COMMON MILKS & DAIRY DRINKS (human glass servings) ──────────────
   // m(name, cal/100ml, p, c, f, tags, brand) — default 250ml glass + box sizes
-  const m = (n, cal, p, c, f, tg, br) => F.push({
+  const m = (n, cal, p, c, f, tg, br) => _dedupe({
     name: n, serving: 250, cal, p, c, f, tags: tg || '', brand: br || '',
     servings: [{ n: '1 glass (250ml)', g: 250 }, { n: '1 cup (200ml)', g: 200 },
                { n: '1 small box (125ml)', g: 125 }, { n: '100ml', g: 100 }]
@@ -678,6 +696,6 @@
   m('Evaporated Milk (F&N, per 100ml)', 134, 6.7, 10, 7.6, 'evaporated milk susu cair f&n carnation teh tarik', 'F&N');
   m('Condensed Milk (sweetened, per 100ml)', 321, 7.9, 54, 8.7, 'condensed milk susu pekat manis sweetened teh tarik kopi', '');
 
-  console.log('[DevFit] foods-bulk.js loaded — added ' +
-    (F.length) + ' total foods now in local DB.');
+  console.log('[DevFit] foods-bulk.js loaded — ' + F.length + ' total foods (' +
+    _baseDropped + ' base dupes removed, ' + _skipped + ' bulk dupes skipped).');
 })();

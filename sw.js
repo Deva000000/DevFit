@@ -7,7 +7,7 @@
    - Apps Script / /api/*: network-only (never cached)
 */
 
-const VERSION = 'devfit-v4.42.0';
+const VERSION = 'devfit-v4.43.0';
 const APP_SHELL = 'devfit-shell-' + VERSION;
 const RUNTIME = 'devfit-runtime-' + VERSION;
 
@@ -45,7 +45,16 @@ const APPS_SCRIPT_HOST = 'script.google.com';
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(APP_SHELL)
-      .then((cache) => cache.addAll(SHELL_FILES).catch((err) => console.warn('[SW] partial precache:', err)))
+      // Cache each file independently — addAll() is atomic, so one 404 would
+      // wipe the WHOLE offline cache. Individual puts keep offline working
+      // even if a single asset is missing/renamed.
+      .then((cache) => Promise.allSettled(
+        SHELL_FILES.map((f) =>
+          fetch(f, { cache: 'no-store' })
+            .then((r) => { if (r && r.ok) return cache.put(f, r); throw new Error(r && r.status); })
+            .catch((e) => console.warn('[SW] precache skip', f, String(e)))
+        )
+      ))
       .then(() => self.skipWaiting())
   );
 });

@@ -19,8 +19,8 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:ital,wght@1,700;1,800&family=Lora:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600;1,700&family=Anton&family=Righteous&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="foods-local.js?v=4.41"></script>
-<script src="foods-bulk.js?v=4.41" defer></script>
+<script src="foods-local.js?v=4.43"></script>
+<script src="foods-bulk.js?v=4.43" defer></script>
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
@@ -621,7 +621,20 @@ function load(){
   }catch(e){}
   return {targets:{cal:'',p:'',c:'',f:''},days:{}};
 }
-function save(){ try{localStorage.setItem(KEY,JSON.stringify(data));}catch(e){} if(typeof DevFitDB!=='undefined') DevFitDB.cloudSave('nutrition',data); }
+let _saveWarned=false;
+function save(){
+  try{
+    localStorage.setItem(KEY,JSON.stringify(data));
+  }catch(e){
+    // Storage full or blocked (private mode) — never fail silently, or the user
+    // logs food, sees it, then loses it on reload. Warn once.
+    if(!_saveWarned){
+      _saveWarned=true;
+      try{ alert('Could not save your changes — device storage may be full or private browsing is blocking it. Your latest entry might not be kept after closing the app.'); }catch(_){}
+    }
+  }
+  if(typeof DevFitDB!=='undefined') DevFitDB.cloudSave('nutrition',data);
+}
 
 function todayStr(){
   const d=new Date();
@@ -1119,157 +1132,182 @@ function generateNutritionPDF(){
   if(!(dm.cal>0||dm.p>0||dm.c>0||dm.f>0)){ alert('Log some food first.'); return; }
 
   const doc=new jsPDFlib({orientation:'p',unit:'mm',format:'a4'});
-  const PW=210,M=14,CW=PW-M*2;
-  let y=15;
+  const W=doc.internal.pageSize.getWidth();   // 210
+  const H=doc.internal.pageSize.getHeight();  // 297
+  const M=14;
+  const CW=W-M*2;
 
-  // Header bar
-  doc.setFillColor(204,0,0); doc.rect(0,0,PW,13,'F');
-  doc.setFontSize(17); doc.setFont('helvetica','bolditalic'); doc.setTextColor(255,255,255);
-  doc.text('DEV',M,10);
-  const dw=doc.getTextWidth('DEV');
-  doc.setTextColor(255,200,200); doc.text('FIT',M+dw,10);
-  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(255,255,255);
-  doc.text(' · Nutrition Report',M+dw+doc.getTextWidth('FIT'),10);
+  // Shared palette — IDENTICAL to the training-program PDF
+  const RED=[204,0,0], DARK=[17,17,17], GREY=[120,120,120];
+  const INK=[21,21,26], SLATE=[74,101,114], GOLD=[198,144,47];
+  const MUTE=[148,148,158], LINE=[228,228,232], CARD=[247,247,249];
 
-  y=20;
-  const dateLabel=new Date(currentDate+'T12:00:00').toLocaleDateString(undefined,{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const dateLabel=new Date(currentDate+'T12:00:00').toLocaleDateString('en-MY',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
   let handle='';
   try{
     const cn=(localStorage.getItem('devfit_displayName')||'').trim();
     handle=cn||(JSON.parse(localStorage.getItem('devfit_user')||'{}').email||'');
   }catch(e){}
 
-  doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.setTextColor(30,30,30);
-  doc.text(dateLabel,M,y+8); y+=14;
-  if(handle){ doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(120,120,120); doc.text(handle,M,y); y+=7; }
-  doc.setDrawColor(204,0,0); doc.setLineWidth(0.5); doc.line(M,y,PW-M,y); y+=6;
+  // ---- HEADER (mirrors training program PDF exactly) ----
+  function header(first){
+    const HH=first?38:20;
+    doc.setFillColor(...INK); doc.rect(0,0,W,HH,'F');
+    doc.setFillColor(...RED); doc.rect(0,HH,W,1.4,'F');
+    // DEVFIT wordmark — bold ITALIC lockup, DEV white + FIT pure red
+    doc.setFont('helvetica','bolditalic'); doc.setFontSize(first?23:16);
+    const wy=first?14:13;
+    doc.setTextColor(255,255,255); doc.text('DEV',M,wy);
+    const dW=doc.getTextWidth('DEV');
+    doc.setTextColor(...RED); doc.text('FIT',M+dW,wy);
+    if(first){
+      doc.setFont('helvetica','normal'); doc.setFontSize(6.2); doc.setTextColor(120,120,132);
+      doc.text('DOMINANCE THROUGH DISCIPLINE',M,19,{charSpace:0.5});
+      // Document title top-right
+      doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(255,255,255);
+      doc.text('NUTRITION REPORT',W-M,16,{align:'right',charSpace:0.3});
+      // subtitle (date · handle)
+      doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(165,165,178);
+      const sub=dateLabel+(handle?('   ·   '+handle):'');
+      doc.text(sub,W-M,23,{align:'right'});
+    } else {
+      doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...MUTE);
+      doc.text('NUTRITION REPORT',W-M,13,{align:'right',charSpace:0.6});
+    }
+  }
 
-  // Calorie summary box
+  header(true);
+  let y=50;
+  function ensureSpace(need){ if(y+need>H-20){ doc.addPage(); header(false); y=30; } }
+
+  // ---- CALORIE SUMMARY CARD ----
   const tCal=Number(data.targets.cal)||0;
   const hasTgt=tCal>0;
   const remain=hasTgt?Math.round(tCal-dm.cal):0;
-  doc.setFillColor(248,248,250); doc.roundedRect(M,y,CW,22,3,3,'F');
-  doc.setFontSize(22); doc.setFont('helvetica','bold'); doc.setTextColor(30,30,30);
-  doc.text(dm.cal.toLocaleString(),M+4,y+15);
-  doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(120,120,120);
-  doc.text('kcal logged',M+4,y+21);
+  doc.setFillColor(...CARD); doc.setDrawColor(...LINE); doc.setLineWidth(0.4);
+  doc.roundedRect(M,y,CW,24,2.5,2.5,'FD');
+  doc.setFillColor(...RED); doc.rect(M,y,1.8,24,'F');   // crimson left accent
+  doc.setFontSize(23); doc.setFont('helvetica','bold'); doc.setTextColor(...DARK);
+  doc.text(dm.cal.toLocaleString(),M+7,y+15);
+  doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(...MUTE);
+  doc.text('KCAL LOGGED',M+7,y+20,{charSpace:0.4});
   if(hasTgt){
-    doc.setFontSize(10); doc.setFont('helvetica','bold');
-    doc.setTextColor(80,80,80); doc.text('Target: '+tCal.toLocaleString()+' kcal',M+CW/3+4,y+9);
-    const rc=remain>=0?[47,159,87]:[204,0,0];
-    doc.setTextColor(rc[0],rc[1],rc[2]);
-    doc.text((remain>=0?'−':'+')+Math.abs(remain).toLocaleString()+' kcal '+(remain>=0?'remaining':'over'),M+CW/3+4,y+18);
+    doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(80,80,85);
+    doc.text('Target  '+tCal.toLocaleString()+' kcal',M+CW/2.6,y+10);
+    const rc=remain>=0?[47,159,87]:RED;
+    doc.setTextColor(...rc);
+    doc.text((remain>=0?'−':'+')+Math.abs(remain).toLocaleString()+' kcal '+(remain>=0?'remaining':'over'),M+CW/2.6,y+18);
     const pct=Math.min(1,dm.cal/tCal);
-    const fc=dm.cal>tCal?[204,0,0]:[47,159,87];
-    doc.setFillColor(220,220,225); doc.roundedRect(M,y+22,CW,3,1,1,'F');
-    doc.setFillColor(fc[0],fc[1],fc[2]); doc.roundedRect(M,y+22,CW*pct,3,1,1,'F');
-    y+=27;
-  } else { y+=24; }
-  y+=4;
+    const fc=dm.cal>tCal?RED:[47,159,87];
+    doc.setFillColor(222,222,226); doc.roundedRect(M+CW/2.6,y+20.5,CW-CW/2.6-7,2.6,1,1,'F');
+    doc.setFillColor(...fc); doc.roundedRect(M+CW/2.6,y+20.5,(CW-CW/2.6-7)*pct,2.6,1,1,'F');
+  }
+  y+=30;
 
-  // Macro tiles (3 side by side)
+  // ---- MACRO TILES (3 side by side) ----
   const macros=[
-    {label:'Protein',val:dm.p+'g',tgtStr:Number(data.targets.p)?data.targets.p+'g':'—',col:[74,101,114]},
-    {label:'Carbs',  val:dm.c+'g',tgtStr:Number(data.targets.c)?data.targets.c+'g':'—',col:[198,144,47]},
-    {label:'Fat',    val:dm.f+'g',tgtStr:Number(data.targets.f)?data.targets.f+'g':'—',col:[204,0,0]}
+    {label:'Protein',val:dm.p+'g',tgtStr:Number(data.targets.p)?data.targets.p+'g':'—',col:SLATE},
+    {label:'Carbs',  val:dm.c+'g',tgtStr:Number(data.targets.c)?data.targets.c+'g':'—',col:GOLD},
+    {label:'Fat',    val:dm.f+'g',tgtStr:Number(data.targets.f)?data.targets.f+'g':'—',col:RED}
   ];
   const mw=(CW-8)/3;
   macros.forEach((mac,i)=>{
     const mx=M+i*(mw+4);
-    doc.setFillColor(245,245,247); doc.roundedRect(mx,y,mw,20,2,2,'F');
-    doc.setFillColor(mac.col[0],mac.col[1],mac.col[2]); doc.rect(mx,y,3,20,'F');
-    doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(120,120,120);
-    doc.text(mac.label.toUpperCase(),mx+5,y+6);
-    doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.setTextColor(30,30,30);
-    doc.text(mac.val,mx+5,y+15);
-    doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(150,150,150);
+    doc.setFillColor(...CARD); doc.setDrawColor(...LINE); doc.setLineWidth(0.4);
+    doc.roundedRect(mx,y,mw,20,2,2,'FD');
+    doc.setFillColor(...mac.col); doc.rect(mx,y,2.4,20,'F');
+    doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(...MUTE);
+    doc.text(mac.label.toUpperCase(),mx+6,y+6,{charSpace:0.3});
+    doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.setTextColor(...DARK);
+    doc.text(mac.val,mx+6,y+15);
+    doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(160,160,165);
     doc.text('/ '+mac.tgtStr,mx+mw-3,y+15,{align:'right'});
   });
-  y+=24;
+  y+=26;
 
-  // Macro split bar
+  // ---- MACRO SPLIT BAR ----
   const totMacCal=(dm.p*4)+(dm.c*4)+(dm.f*9);
   if(totMacCal>0){
     let bx=M;
-    const segs=[['p',dm.p*4,[74,101,114]],['c',dm.c*4,[198,144,47]],['f',dm.f*9,[204,0,0]]].filter(s=>s[1]>0);
+    const segs=[['p',dm.p*4,SLATE],['c',dm.c*4,GOLD],['f',dm.f*9,RED]].filter(s=>s[1]>0);
     segs.forEach(([,v,col],i)=>{
       const sw=CW*(v/totMacCal);
-      doc.setFillColor(col[0],col[1],col[2]);
+      doc.setFillColor(...col);
       doc.rect(bx,y,i<segs.length-1?Math.max(sw-1,0.5):sw,5,'F');
       bx+=sw;
     });
     y+=8;
-    doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(120,120,120);
+    doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(...GREY);
     doc.text('Protein '+Math.round(dm.p*4/totMacCal*100)+'%',M,y);
     doc.text('Carbs '+Math.round(dm.c*4/totMacCal*100)+'%',M+CW/2,y,{align:'center'});
     doc.text('Fat '+Math.round(dm.f*9/totMacCal*100)+'%',M+CW,y,{align:'right'});
-    y+=6;
+    y+=8;
   }
-  y+=4;
+  y+=2;
 
-  // Meals table header
+  // ---- MEALS (each meal = a dark INK card header like training day-cards) ----
   const dayObj=data.days[currentDate];
   const meals=(dayObj&&Array.isArray(dayObj.meals))?dayObj.meals:[];
+  const cG=W-M-58, cKcal=W-M-43, cP=W-M-30, cC=W-M-18, cF=W-M-6;
   if(meals.some(m=>m.items&&m.items.length)){
-    doc.setFillColor(30,30,35); doc.rect(M,y,CW,7,'F');
-    doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
-    doc.text('MEAL / FOOD ITEM',M+2,y+5);
-    doc.text('G',M+CW-58,y+5,{align:'right'});
-    doc.text('KCAL',M+CW-43,y+5,{align:'right'});
-    doc.text('P',M+CW-30,y+5,{align:'right'});
-    doc.text('C',M+CW-18,y+5,{align:'right'});
-    doc.text('F',M+CW-6,y+5,{align:'right'});
-    y+=9;
-
     meals.forEach(meal=>{
       if(!meal.items||!meal.items.length) return;
-      if(y>265){ doc.addPage(); y=20; }
-      // Meal header
-      doc.setFillColor(244,238,238); doc.roundedRect(M,y,CW,6.5,1,1,'F');
-      doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(150,0,0);
-      doc.text(meal.name,M+2,y+4.8);
-      doc.setFontSize(7.5); doc.text(mealKcal(meal)+' kcal',M+CW-2,y+4.8,{align:'right'});
-      y+=7.5;
-      // Items
+      ensureSpace(22);
+      // meal header bar — dark INK rounded (matches training day-card header)
+      const barH=10;
+      doc.setFillColor(...INK); doc.roundedRect(M,y,CW,barH,2,2,'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(10.5); doc.setTextColor(255,255,255);
+      doc.text(String(meal.name||'Meal').toUpperCase(),M+5,y+6.6);
+      doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(180,180,190);
+      doc.text(mealKcal(meal)+' kcal',W-M-4,y+6.6,{align:'right'});
+      y+=barH;
+      // column header strip
+      doc.setFillColor(238,238,241); doc.rect(M,y,CW,6,'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...MUTE);
+      doc.text('FOOD ITEM',M+5,y+4,{charSpace:0.3});
+      doc.text('G',cG,y+4,{align:'right'}); doc.text('KCAL',cKcal,y+4,{align:'right'});
+      doc.text('P',cP,y+4,{align:'right'}); doc.text('C',cC,y+4,{align:'right'}); doc.text('F',cF,y+4,{align:'right'});
+      y+=6;
+      // items
       meal.items.forEach((it,idx)=>{
-        if(y>265){ doc.addPage(); y=20; }
-        if(idx%2===0){ doc.setFillColor(250,250,252); doc.rect(M,y,CW,6.5,'F'); }
-        doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40);
-        const nm=doc.splitTextToSize(String(it.name||''),80)[0];
+        ensureSpace(7);
+        if(idx%2===1){ doc.setFillColor(250,250,251); doc.rect(M,y,CW,6.4,'F'); }
+        doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(...DARK);
+        const nm=doc.splitTextToSize(String(it.name||''),78)[0];
         doc.text(nm,M+5,y+4.4);
-        if(it.grams){ doc.setTextColor(100,100,100); doc.text(String(it.grams),M+CW-58,y+4.4,{align:'right'}); }
-        doc.setFont('helvetica','bold'); doc.setTextColor(30,30,30);
-        doc.text(String(Math.round(it.cal||0)),M+CW-43,y+4.4,{align:'right'});
+        if(it.grams){ doc.setTextColor(...GREY); doc.setFontSize(8.5); doc.text(String(it.grams),cG,y+4.4,{align:'right'}); }
+        doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...DARK);
+        doc.text(String(Math.round(it.cal||0)),cKcal,y+4.4,{align:'right'});
         doc.setFont('helvetica','normal');
-        doc.setTextColor(74,101,114); doc.text(String(Math.round(it.p||0)),M+CW-30,y+4.4,{align:'right'});
-        doc.setTextColor(198,144,47); doc.text(String(Math.round(it.c||0)),M+CW-18,y+4.4,{align:'right'});
-        doc.setTextColor(204,0,0);     doc.text(String(Math.round(it.f||0)),M+CW-6,y+4.4,{align:'right'});
-        y+=6.5;
+        doc.setTextColor(...SLATE); doc.text(String(Math.round(it.p||0)),cP,y+4.4,{align:'right'});
+        doc.setTextColor(...GOLD);  doc.text(String(Math.round(it.c||0)),cC,y+4.4,{align:'right'});
+        doc.setTextColor(...RED);   doc.text(String(Math.round(it.f||0)),cF,y+4.4,{align:'right'});
+        y+=6.4;
       });
-      y+=2;
+      doc.setDrawColor(...LINE); doc.setLineWidth(0.3); doc.line(M,y,W-M,y);
+      y+=7;
     });
 
-    // Totals row
-    if(y>265){ doc.addPage(); y=20; }
-    doc.setFillColor(30,30,35); doc.roundedRect(M,y,CW,8,2,2,'F');
-    doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
-    doc.text('TOTAL',M+2,y+5.5);
-    doc.text(dm.cal.toLocaleString()+' kcal',M+CW-43,y+5.5,{align:'right'});
-    doc.setTextColor(180,210,230); doc.text('P '+dm.p+'g',M+CW-30,y+5.5,{align:'right'});
-    doc.setTextColor(220,195,130); doc.text('C '+dm.c+'g',M+CW-18,y+5.5,{align:'right'});
-    doc.setTextColor(255,140,140); doc.text('F '+dm.f+'g',M+CW-6,y+5.5,{align:'right'});
-    y+=10;
+    // ---- TOTAL row (dark INK card, like training) ----
+    ensureSpace(12);
+    doc.setFillColor(...INK); doc.roundedRect(M,y,CW,9,2,2,'F');
+    doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
+    doc.text('DAY TOTAL',M+5,y+6);
+    doc.text(dm.cal.toLocaleString()+' kcal',cKcal,y+6,{align:'right'});
+    doc.setTextColor(150,180,200); doc.text('P '+dm.p,cP+2,y+6,{align:'right'});
+    doc.setTextColor(220,190,120); doc.text('C '+dm.c,cC+1,y+6,{align:'right'});
+    doc.setTextColor(255,140,140); doc.text('F '+dm.f,cF,y+6,{align:'right'});
+    y+=13;
   }
 
-  // Footer on every page
-  const pages=doc.getNumberOfPages();
-  for(let pn=1;pn<=pages;pn++){
-    doc.setPage(pn);
-    doc.setFillColor(204,0,0); doc.rect(0,287,PW,10,'F');
-    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(255,255,255);
-    doc.text('DevFit · Dominance Through Discipline',M,293);
-    doc.setTextColor(255,200,200);
-    doc.text('Page '+pn+'/'+pages+' · devfitportal.vercel.app',PW-M,293,{align:'right'});
+  // ---- FOOTER on every page (matches training exactly) ----
+  const pages=doc.internal.getNumberOfPages();
+  for(let p=1;p<=pages;p++){
+    doc.setPage(p);
+    doc.setDrawColor(230,230,230); doc.setLineWidth(0.3); doc.line(M,H-14,W-M,H-14);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...GREY);
+    doc.text('Generated by DevFit · Dominance Through Discipline',M,H-9);
+    doc.text('Page '+p+' of '+pages,W-M,H-9,{align:'right'});
   }
 
   doc.save('DevFit_Nutrition_'+currentDate.replace(/-/g,'')+'.pdf');
@@ -1901,6 +1939,15 @@ applyNutritionTierGates();
   .scanner-hint{font-family:'DM Sans',system-ui,sans-serif;font-size:12px;color:#555;text-align:center;margin-top:12px}
   .serving-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:10200;display:none;align-items:flex-end;justify-content:center;padding:0}
   .serving-overlay.show{display:flex}
+  /* High-end bottom-sheet motion: backdrop fades, sheet slides up (transform = GPU) */
+  @keyframes devfit-sheet-up{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  @keyframes devfit-backdrop{from{opacity:0}to{opacity:1}}
+  .food-overlay.show,.serving-overlay.show{animation:devfit-backdrop .16s ease both}
+  .food-overlay.show .food-modal,.serving-overlay.show .serving-modal{animation:devfit-sheet-up .28s cubic-bezier(.2,.85,.25,1) both;will-change:transform}
+  @media (prefers-reduced-motion: reduce){
+    .food-overlay.show,.serving-overlay.show,
+    .food-overlay.show .food-modal,.serving-overlay.show .serving-modal{animation:none}
+  }
   .serving-modal{background:#111;border:1px solid #2a2a2a;border-top:3px solid #2f9e57;border-radius:20px 20px 0 0;padding:22px 20px 36px;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
   .serving-food-name{font-family:'DM Sans',system-ui,sans-serif;font-size:16px;font-weight:800;color:#fff;margin-bottom:4px}
   .serving-per100{font-family:'DM Sans',system-ui,sans-serif;font-size:12px;color:#555;margin-bottom:14px;line-height:1.5}
@@ -2193,9 +2240,14 @@ applyNutritionTierGates();
             ? '<span class="src-badge src-usda">USDA</span>'
             : '<span class="src-badge src-off">Branded</span>';
       const brand=f.brand?('<span class="food-item-brand">'+esc(f.brand)+'</span> &middot; '):'';
-      // Show the natural portion (e.g. "1 medium") so lay users aren't stuck on per-100g
+      // Show the food's DEFAULT portion (matches what the serving picker opens
+      // at) so the card and the next screen agree — not raw per-100g.
       let svLabel='per 100g', svG=100;
-      if(Array.isArray(f.servings)&&f.servings.length){ svLabel=f.servings[0].n; svG=f.servings[0].g; }
+      if(Array.isArray(f.servings)&&f.servings.length){
+        // prefer the serving whose grams match the default (sq); else the first
+        const def=(f.sq&&f.servings.find(s=>s.g===f.sq))||f.servings[0];
+        svLabel=def.n; svG=def.g;
+      }
       else if(f.sq&&f.sq!==100){ svLabel='1 serving ('+f.sq+'g)'; svG=f.sq; }
       const r=svG/100;
       const perTxt=(svLabel==='per 100g')?'per 100g':('per '+esc(svLabel));
@@ -2260,9 +2312,10 @@ applyNutritionTierGates();
     document.getElementById('serving-overlay').classList.add('show');
   }
 
+  const MAX_GRAMS=5000;   // 5kg — more than any real single portion; blocks fat-finger 9999999g
   function calcPreview(){
     if(!_sel)return;
-    const g=Math.max(1,Number(document.getElementById('serving-grams').value)||100);
+    const g=Math.max(1,Math.min(MAX_GRAMS,Number(document.getElementById('serving-grams').value)||100));
     const r=g/100;
     const cal=Math.round(_sel.cal100*r),p=Math.round(_sel.p100*r),c=Math.round(_sel.c100*r),f=Math.round(_sel.f100*r);
     document.getElementById('serving-preview').innerHTML=
@@ -2310,7 +2363,7 @@ applyNutritionTierGates();
 
   document.getElementById('serving-add').addEventListener('click',()=>{
     if(!_sel)return;
-    const g=Math.max(1,Number(document.getElementById('serving-grams').value)||100);
+    const g=Math.max(1,Math.min(MAX_GRAMS,Number(document.getElementById('serving-grams').value)||100));
     const r=g/100;
     const item={
       name:_sel.name, brand:_sel.brand||'', source:_sel.source||'',
@@ -2429,10 +2482,11 @@ applyNutritionTierGates();
   });
   document.getElementById('qa-add').addEventListener('click',()=>{
     const name=(document.getElementById('qa-name').value||'').trim()||'Quick add';
-    const cal=Math.max(0,Number(document.getElementById('qa-cal').value)||0);
-    const p=Math.max(0,Number(document.getElementById('qa-p').value)||0);
-    const c=Math.max(0,Number(document.getElementById('qa-c').value)||0);
-    const f=Math.max(0,Number(document.getElementById('qa-f').value)||0);
+    // Cap manual entries to sane maxima so a typo can't blow up the day's totals
+    const cal=Math.min(20000,Math.max(0,Number(document.getElementById('qa-cal').value)||0));
+    const p=Math.min(2000,Math.max(0,Number(document.getElementById('qa-p').value)||0));
+    const c=Math.min(2000,Math.max(0,Number(document.getElementById('qa-c').value)||0));
+    const f=Math.min(2000,Math.max(0,Number(document.getElementById('qa-f').value)||0));
     if(cal===0&&p===0&&c===0&&f===0){ alert('Enter at least calories or a macro.'); return; }
     const item={name,brand:'',source:'manual',grams:null,base:null,cal:Math.round(cal),p:Math.round(p),c:Math.round(c),f:Math.round(f)};
     if(_editRef){
@@ -2474,16 +2528,22 @@ applyNutritionTierGates();
     }).sort((a,b)=>score(b)-score(a)).slice(0,60);
   }
 
-  async function doSearch(){
-    const q=(document.getElementById('food-search-input').value||'').trim();
-    if(!q)return;
-    const token=++_searchToken;
-    const el=document.getElementById('food-results');
-
-    // 1. INSTANT: recents + curated local render immediately, no waiting on network
+  // Instant offline results (recents + curated local) — synchronous, sub-ms
+  function renderInstant(q,el){
     const instant=recentSearch(q).concat(localSearch(q));
     if(instant.length) renderResults(rankFoods(instant,q));
-    else el.innerHTML='<div class="food-loading">Searching food databases…</div>';
+    return instant;
+  }
+
+  async function doSearch(){
+    const q=(document.getElementById('food-search-input').value||'').trim();
+    const el=document.getElementById('food-results');
+    if(!q){ el.innerHTML=''; return; }
+    const token=++_searchToken;
+
+    // 1. INSTANT: recents + curated local render immediately, no waiting on network
+    const instant=renderInstant(q,el);
+    if(!instant.length) el.innerHTML='<div class="food-loading">Searching food databases…</div>';
 
     // 2. PROGRESSIVE: merge each network source in as it arrives (whichever is fastest)
     let pool=instant.slice();
@@ -2502,8 +2562,27 @@ applyNutritionTierGates();
         : '<div class="food-empty">Search timed out — check your connection and try again.</div>';
     }
   }
-  document.getElementById('food-search-btn').addEventListener('click',doSearch);
-  document.getElementById('food-search-input').addEventListener('keydown',e=>{if(e.key==='Enter')doSearch();});
+
+  // ── Search-as-you-type ───────────────────────────────────────────────
+  // Two tiers: instant local/recent results render almost immediately (110ms),
+  // then the online DBs fill in once typing pauses (520ms) — so it feels
+  // instant without hammering the APIs on every keystroke.
+  let _liveTimer=null,_netTimer=null;
+  function onTypeSearch(){
+    const el=document.getElementById('food-results');
+    const q=(document.getElementById('food-search-input').value||'').trim();
+    clearTimeout(_liveTimer); clearTimeout(_netTimer);
+    if(!q){ ++_searchToken; el.innerHTML=''; return; }
+    _liveTimer=setTimeout(()=>{
+      const instant=renderInstant(q,el);
+      if(!instant.length) el.innerHTML='<div class="food-loading">Searching food databases…</div>';
+    },110);
+    if(q.length>=2) _netTimer=setTimeout(doSearch,520);
+  }
+  function runSearchNow(){ clearTimeout(_liveTimer); clearTimeout(_netTimer); doSearch(); }
+  document.getElementById('food-search-btn').addEventListener('click',runSearchNow);
+  document.getElementById('food-search-input').addEventListener('input',onTypeSearch);
+  document.getElementById('food-search-input').addEventListener('keydown',e=>{if(e.key==='Enter')runSearchNow();});
 
   // ── Body scroll-lock while a sheet is open ───────────────────────────
   // Fixes iOS scroll-chaining: without this, scrolling the sheet (or touching

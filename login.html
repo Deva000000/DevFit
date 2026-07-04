@@ -218,8 +218,14 @@ function hideSpinner(){ document.getElementById('spinner').style.display='none';
 // ─── Shared approval check (used by both email + Google paths) ───────────────
 // Layer 1: try the signed-token backend first (/api/session). It verifies the
 // provider token server-side and returns a signed session that can't be forged.
-// If the backend isn't configured yet (501) we fall back to the legacy Sheet
-// check below, so the live app keeps working during rollout.
+//
+// TRANSITION SAFETY: while DevFitAuth.strict is false, a denial from the new
+// backend is NOT trusted on its own — the Supabase subscriber table may still
+// be mid-migration (empty or partial) while the Google Sheet remains the real
+// source of truth. So during transition we always fall through to the legacy
+// Sheet check on any non-approval, and only show denied/pending if the SHEET
+// also denies. Once every client is migrated into devfit_subscribers and you
+// flip STRICT=true in devfit-auth.js, the new backend's answer becomes final.
 async function checkApproval(email, name, provider, providerToken){
   showSpinner(); hideAll(); show('status-checking');
 
@@ -232,12 +238,13 @@ async function checkApproval(email, name, provider, providerToken){
         window.location.href = 'index.html';
         return;
       }
-      if(r && (r.status==='pending' || r.status==='denied')){
+      if(DevFitAuth.strict && r && (r.status==='pending' || r.status==='denied')){
         hideSpinner(); hideAll();
         show(r.status==='pending' ? 'status-pending' : 'status-denied');
         return;
       }
-      // r.notConfigured (501) or unexpected → fall through to legacy Sheet path
+      // Not strict yet, or notConfigured/transport error → fall through to Sheet,
+      // which stays authoritative until every client is migrated.
     }catch(e){ /* transport error → fall through to legacy */ }
   }
 

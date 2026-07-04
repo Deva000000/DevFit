@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="robots" content="noindex,nofollow">
+<title>DevFit — Trainer Admin</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#0a0a0b;color:#e8e8ea;min-height:100vh;padding:20px 14px 60px}
+  .wrap{max-width:640px;margin:0 auto}
+  .brand{font-weight:800;font-size:22px;font-style:italic;margin-bottom:2px}
+  .brand b{color:#cc0000}
+  .sub{font-size:12px;color:#777;margin-bottom:22px;letter-spacing:.04em;text-transform:uppercase;font-weight:600}
+  .card{background:#111;border:1px solid #262626;border-radius:14px;padding:18px;margin-bottom:16px}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#9a9a9a;margin-bottom:12px;font-weight:700}
+  label{display:block;font-size:11px;color:#888;font-weight:600;margin:10px 0 5px;text-transform:uppercase;letter-spacing:.05em}
+  input,select{width:100%;padding:11px 13px;background:#1a1a1a;border:1px solid #2e2e2e;border-radius:9px;color:#fff;font-size:14px;outline:none;font-family:inherit}
+  input:focus,select:focus{border-color:#cc0000}
+  .row{display:flex;gap:10px}.row>*{flex:1}
+  button{cursor:pointer;font-family:inherit;font-weight:700;border:none;border-radius:9px;transition:all .15s}
+  .btn{width:100%;padding:12px;background:#cc0000;color:#fff;font-size:14px;margin-top:14px}
+  .btn:hover{background:#aa0000}
+  .btn.ghost{background:#1e1e1e;border:1px solid #333;color:#ccc}
+  .btn.ghost:hover{background:#252525;color:#fff}
+  .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+  .actions button{padding:11px 8px;font-size:13px}
+  .b-green{background:#166534;color:#fff}.b-green:hover{background:#15803d}
+  .b-blue{background:#1e40af;color:#fff}.b-blue:hover{background:#1d4ed8}
+  .b-amber{background:#92400e;color:#fff}.b-amber:hover{background:#b45309}
+  .b-red{background:#7f1d1d;color:#fff}.b-red:hover{background:#991b1b}
+  .msg{margin-top:14px;padding:11px 13px;border-radius:9px;font-size:13px;line-height:1.5;display:none}
+  .msg.ok{display:block;background:#052e16;border:1px solid #166534;color:#86efac}
+  .msg.err{display:block;background:#2a0a0a;border:1px solid #7f1d1d;color:#fca5a5}
+  .list{margin-top:8px}
+  .sub-row{display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid #262626;border-radius:10px;margin-bottom:7px;background:#151515}
+  .sub-row .em{flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pill{font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;letter-spacing:.05em}
+  .pill.pro{background:#7f1d1d;color:#fff}.pill.free{background:#333;color:#aaa}.pill.exp{background:#3a2a00;color:#fbbf24}
+  .exp-date{font-size:11px;color:#888}
+  .hide{display:none}
+  .hint{font-size:11px;color:#666;margin-top:8px;line-height:1.5}
+  .tap{color:#60a5fa;cursor:pointer;text-decoration:underline;font-size:11px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">DEV<b>FIT</b> Admin</div>
+  <div class="sub">Trainer activation panel</div>
+
+  <!-- LOGIN -->
+  <div class="card" id="login-card">
+    <h2>Sign in</h2>
+    <label>Admin password</label>
+    <input type="password" id="pw" placeholder="••••••••" autocomplete="current-password">
+    <button class="btn" id="login-btn">Unlock</button>
+    <div class="msg" id="login-msg"></div>
+    <div class="hint">Set the password in Vercel as <code>DEVFIT_ADMIN_PASSWORD</code>. Nothing is stored in this page.</div>
+  </div>
+
+  <!-- PANEL -->
+  <div id="panel" class="hide">
+    <div class="card">
+      <h2>Activate / manage a client</h2>
+      <label>Client email (Gmail they log in with)</label>
+      <input type="email" id="email" placeholder="client@gmail.com" autocomplete="off">
+      <div class="row">
+        <div>
+          <label>Days</label>
+          <input type="number" id="days" value="30" min="1">
+        </div>
+        <div>
+          <label>Display name (optional)</label>
+          <input type="text" id="name" placeholder="Client name">
+        </div>
+      </div>
+      <div class="actions">
+        <button class="b-green" data-act="activate">✓ Activate Pro</button>
+        <button class="b-blue" data-act="extend">+ Extend days</button>
+        <button class="b-amber" data-act="deactivate">↓ To Free</button>
+        <button class="b-red" data-act="revoke">✕ Revoke access</button>
+      </div>
+      <div class="msg" id="act-msg"></div>
+      <div class="hint">
+        <b>Activate</b> = Pro for <i>Days</i> from today. <b>Extend</b> = add days to current expiry.
+        <b>To Free</b> = downgrade but keep login. <b>Revoke</b> = block login entirely (data kept).
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>All subscribers <span class="tap" id="refresh">refresh</span></h2>
+      <div class="list" id="list"><div class="hint">Loading…</div></div>
+    </div>
+
+    <button class="btn ghost" id="logout-btn">Lock panel</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+var API = '/api/admin';
+var pw = '';
+
+function $(id){ return document.getElementById(id); }
+function msg(el, text, ok){ el.textContent = text; el.className = 'msg ' + (ok ? 'ok' : 'err'); }
+
+async function call(action, extra){
+  var body = Object.assign({ password: pw, action: action }, extra || {});
+  var res = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  var data = await res.json().catch(function(){ return {}; });
+  return { status: res.status, data: data };
+}
+
+async function doLogin(){
+  pw = $('pw').value;
+  if(!pw){ return; }
+  $('login-btn').textContent = 'Checking…';
+  var r = await call('list');
+  $('login-btn').textContent = 'Unlock';
+  if(r.status === 200){
+    $('login-card').classList.add('hide');
+    $('panel').classList.remove('hide');
+    renderList(r.data.subscribers || []);
+  } else if(r.status === 501){
+    msg($('login-msg'), 'Backend not configured yet — set the Vercel env vars (see SETUP_AUTH.md).', false);
+  } else if(r.status === 429){
+    msg($('login-msg'), 'Too many attempts. Wait ~15 minutes and try again.', false);
+  } else {
+    pw = '';
+    msg($('login-msg'), 'Wrong password.', false);
+  }
+}
+
+function tierPill(s){
+  if(!s.approved) return '<span class="pill exp">REVOKED</span>';
+  var exp = s.expiry ? new Date(s.expiry) : null;
+  var expired = exp && !isNaN(exp) && (new Date(exp).setHours(24,0,0,0) <= Date.now());
+  if(String(s.tier).toLowerCase() === 'pro' && !expired) return '<span class="pill pro">PRO</span>';
+  if(expired) return '<span class="pill exp">EXPIRED</span>';
+  return '<span class="pill free">FREE</span>';
+}
+
+function renderList(subs){
+  var box = $('list');
+  if(!subs.length){ box.innerHTML = '<div class="hint">No subscribers yet.</div>'; return; }
+  box.innerHTML = subs.map(function(s){
+    return '<div class="sub-row">' +
+      '<span class="em" title="'+s.email+'">'+s.email+'</span>' +
+      (s.expiry ? '<span class="exp-date">'+s.expiry+'</span>' : '') +
+      tierPill(s) +
+      '<span class="tap" data-fill="'+encodeURIComponent(s.email)+'">edit</span>' +
+    '</div>';
+  }).join('');
+  Array.prototype.forEach.call(box.querySelectorAll('[data-fill]'), function(el){
+    el.addEventListener('click', function(){ $('email').value = decodeURIComponent(el.getAttribute('data-fill')); $('email').scrollIntoView({behavior:'smooth'}); });
+  });
+}
+
+async function refreshList(){
+  var r = await call('list');
+  if(r.status === 200) renderList(r.data.subscribers || []);
+}
+
+async function doAction(action){
+  var email = ($('email').value || '').trim().toLowerCase();
+  if(!email || email.indexOf('@') < 0){ msg($('act-msg'), 'Enter a valid email first.', false); return; }
+  var extra = { email: email, days: $('days').value, name: $('name').value };
+  var r = await call(action, extra);
+  if(r.status === 200 && r.data.ok){
+    var s = r.data.subscriber || {};
+    msg($('act-msg'), '✓ ' + email + ' → ' + String(s.tier || '').toUpperCase() + (s.expiry ? ' until ' + s.expiry : '') + (s.approved ? '' : ' (revoked)'), true);
+    refreshList();
+  } else if(r.status === 429){
+    msg($('act-msg'), 'Rate limited — wait a few minutes.', false);
+  } else {
+    msg($('act-msg'), 'Failed: ' + (r.data.error || r.status), false);
+  }
+}
+
+$('login-btn').addEventListener('click', doLogin);
+$('pw').addEventListener('keydown', function(e){ if(e.key === 'Enter') doLogin(); });
+$('logout-btn').addEventListener('click', function(){ pw=''; $('pw').value=''; $('panel').classList.add('hide'); $('login-card').classList.remove('hide'); });
+$('refresh').addEventListener('click', refreshList);
+Array.prototype.forEach.call(document.querySelectorAll('[data-act]'), function(b){
+  b.addEventListener('click', function(){ doAction(b.getAttribute('data-act')); });
+});
+</script>
+</body>
+</html>

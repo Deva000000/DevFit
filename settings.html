@@ -266,6 +266,7 @@ html.nosplash #devfit-splash{display:none!important}
 <script>try{if(localStorage.getItem('devfit_theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
 <link rel="stylesheet" href="theme.css">
 <script defer src="theme.js"></script>
+<script src="devfit-auth.js"></script>
 </head>
 <body>
 <div id="devfit-splash"><div class="si"><img src="icon-192.png" alt="DevFit"><div class="w">DEV<b>FIT</b></div><div class="t">DOMINANCE THROUGH DISCIPLINE</div><div class="bar"><i></i></div></div></div>
@@ -369,11 +370,11 @@ html.nosplash #devfit-splash{display:none!important}
       </div>
     </div>
 
-    <a href="pricing.html" id="renew-btn" class="upgrade-btn">Renew Pro — RM19/month</a>
+    <a href="pricing.html" id="renew-btn" class="upgrade-btn">Renew Pro — RM16.90/month</a>
 
     <!-- How billing works -->
     <div class="bill-steps" id="bill-steps">
-      <div class="bill-step"><div class="n">1</div><div class="tx"><b>Pay RM19</b> via DuitNow QR on the activation page, then WhatsApp the receipt with your Gmail.</div></div>
+      <div class="bill-step"><div class="n">1</div><div class="tx"><b>Pay RM16.90</b> via DuitNow QR on the activation page, then WhatsApp the receipt with your Gmail.</div></div>
       <div class="bill-step"><div class="n">2</div><div class="tx"><b>Activated within 24 hours.</b> Your plan turns Pro and the end date above is set to 30 days out.</div></div>
       <div class="bill-step"><div class="n">3</div><div class="tx"><b>Full access until the end date.</b> Everything unlocks — history, charts, reports, share cards.</div></div>
       <div class="bill-step"><div class="n">4</div><div class="tx"><b>Reverts to Free automatically</b> when the date passes. Your logged data is never deleted — it's safe and waiting.</div></div>
@@ -527,54 +528,46 @@ html.nosplash #devfit-splash{display:none!important}
 // ---------- AUTH GATE ----------
 const SHEET_URL = 'https://script.google.com/macros/s/AKfycbzHTJOANyp1JJ-k2PmRuMjxpTz03G30ThTyV1thlMJ4QMIOvS8HRN4xW3VsHbzI7YXc/exec';
 
-(function authGate(){
-  try{
-    const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
-    if(!user.email || !user.approved){
-      window.location.href = 'login.html';
-    }
-  }catch(e){
-    window.location.href = 'login.html';
-  }
-})();
+// Layer 1: signed-token gate replaces the plain-localStorage check + Sheet
+// reverify. DevFitAuth.gate() redirects if unauthenticated, re-verifies via the
+// signed token against /api/verify, and reloads on any tier/expiry change.
+// Legacy Sheet path kept as a fallback for the pre-backend transition window.
+if(window.DevFitAuth){
+  DevFitAuth.gate();
+} else {
+  (function authGate(){
+    try{
+      const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+      if(!user.email || !user.approved){ window.location.href = 'login.html'; }
+    }catch(e){ window.location.href = 'login.html'; }
+  })();
 
-// ---------- BACKGROUND RE-VERIFY (auto-syncs tier/expiry from sheet, no logout needed) ----------
-async function reverifyAccess(){
-  try{
-    const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
-    if(!user.email) return;
-    const url = SHEET_URL + '?action=checkAccess&email=' + encodeURIComponent(user.email) + '&_=' + Date.now();
-    const res = await fetch(url, {cache:'no-store'});
-    const data = await res.json();
-    if(!data || !data.approved){
-      // Lost access — kick to login
-      localStorage.removeItem('devfit_user');
-      localStorage.removeItem('devfit_lastVerified');
-      window.location.href = 'login.html';
-      return;
-    }
-    // Update local with fresh sheet values
-    const fresh = {
-      email: user.email,
-      name: user.name,
-      approved: true,
-      plan: data.plan || '',
-      expiry: data.expiry || '',
-      startDate: data.startDate || '',
-      tier: (data.tier || 'pro').toLowerCase()
-    };
-    const changed = (fresh.tier !== (user.tier||'').toLowerCase()) ||
-                    (fresh.expiry !== (user.expiry||''));
-    localStorage.setItem('devfit_user', JSON.stringify(fresh));
-    localStorage.setItem('devfit_lastVerified', String(Date.now()));
-    if(changed){
-      // Tier or expiry changed — reload to apply new gating
-      setTimeout(()=>window.location.reload(), 50);
-    }
-  }catch(e){ /* offline — keep using cached */ }
+  async function reverifyAccess(){
+    try{
+      const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+      if(!user.email) return;
+      const url = SHEET_URL + '?action=checkAccess&email=' + encodeURIComponent(user.email) + '&_=' + Date.now();
+      const res = await fetch(url, {cache:'no-store'});
+      const data = await res.json();
+      if(!data || !data.approved){
+        localStorage.removeItem('devfit_user');
+        localStorage.removeItem('devfit_lastVerified');
+        window.location.href = 'login.html';
+        return;
+      }
+      const fresh = {
+        email: user.email, name: user.name, approved: true,
+        plan: data.plan || '', expiry: data.expiry || '', startDate: data.startDate || '',
+        tier: (data.tier || 'pro').toLowerCase()
+      };
+      const changed = (fresh.tier !== (user.tier||'').toLowerCase()) || (fresh.expiry !== (user.expiry||''));
+      localStorage.setItem('devfit_user', JSON.stringify(fresh));
+      localStorage.setItem('devfit_lastVerified', String(Date.now()));
+      if(changed){ setTimeout(()=>window.location.reload(), 50); }
+    }catch(e){ /* offline — keep using cached */ }
+  }
+  setTimeout(reverifyAccess, 600);
 }
-// Run in background ~600ms after page settles, so UI paints first
-setTimeout(reverifyAccess, 600);
 
 // ---------- SHARE CARD PREFERENCES ----------
 (function bindSharePrefs(){
@@ -743,7 +736,7 @@ function fmtDate(d){ try{ const x=new Date(d); if(isNaN(x)) return '—'; return
         fillBar();
         bar.className = 'sub-bar' + (daysLeft<=7?' danger':daysLeft<=14?' warn':'');
         renew.style.display = '';
-        renew.textContent = daysLeft<=7 ? 'Renew Pro — RM19/month' : 'Extend Pro — RM19/month';
+        renew.textContent = daysLeft<=7 ? 'Renew Pro — RM16.90/month' : 'Extend Pro — RM16.90/month';
       }
     } else {
       // FREE — either never upgraded, or Pro period ended and auto-reverted.
@@ -763,7 +756,7 @@ function fmtDate(d){ try{ const x=new Date(d); if(isNaN(x)) return '—'; return
         barWrap.style.display = 'none';
       }
       renew.style.display = '';
-      renew.textContent = 'Upgrade to Pro — RM19/month';
+      renew.textContent = 'Upgrade to Pro — RM16.90/month';
     }
 
     // ---------- USAGE ----------
@@ -842,8 +835,9 @@ function getCurrentWeight(){
 // ---------- LOGOUT ----------
 function logout(){
   if(!confirm('Logout from DevFit?')) return;
-  localStorage.removeItem('devfit_user');
-  localStorage.removeItem('devfit_lastVerified');
+  if(window.DevFitAuth){ DevFitAuth.clearSession(); }
+  else { localStorage.removeItem('devfit_user'); localStorage.removeItem('devfit_lastVerified'); }
+  localStorage.removeItem('devfit_token');
   window.location.href = 'login.html';
 }
 

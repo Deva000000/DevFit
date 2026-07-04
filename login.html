@@ -136,6 +136,7 @@ html.nosplash #devfit-splash{display:none!important}
 <script>try{if(localStorage.getItem('devfit_theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
 <link rel="stylesheet" href="theme.css">
 <script defer src="theme.js"></script>
+<script src="devfit-auth.js"></script>
 </head>
 <body>
 <div id="devfit-splash"><div class="si"><img src="icon-192.png" alt="DevFit"><div class="w">DEV<b>FIT</b></div><div class="t">DOMINANCE THROUGH DISCIPLINE</div><div class="bar"><i></i></div></div></div>
@@ -215,8 +216,31 @@ function showSpinner(){ document.getElementById('spinner').style.display='block'
 function hideSpinner(){ document.getElementById('spinner').style.display='none'; }
 
 // ─── Shared approval check (used by both email + Google paths) ───────────────
-async function checkApproval(email, name){
+// Layer 1: try the signed-token backend first (/api/session). It verifies the
+// provider token server-side and returns a signed session that can't be forged.
+// If the backend isn't configured yet (501) we fall back to the legacy Sheet
+// check below, so the live app keeps working during rollout.
+async function checkApproval(email, name, provider, providerToken){
   showSpinner(); hideAll(); show('status-checking');
+
+  if(window.DevFitAuth && providerToken){
+    try{
+      const r = await DevFitAuth.startSession(provider || 'supabase', providerToken, name);
+      if(r && r.approved){
+        hideSpinner(); hideAll();
+        document.cookie='devfit_email='+encodeURIComponent(email)+';max-age=31536000;path=/;SameSite=Lax';
+        window.location.href = 'index.html';
+        return;
+      }
+      if(r && (r.status==='pending' || r.status==='denied')){
+        hideSpinner(); hideAll();
+        show(r.status==='pending' ? 'status-pending' : 'status-denied');
+        return;
+      }
+      // r.notConfigured (501) or unexpected → fall through to legacy Sheet path
+    }catch(e){ /* transport error → fall through to legacy */ }
+  }
+
   try{
     const url = SHEET_URL+'?action=checkAccess&email='+encodeURIComponent(email)+'&_='+Date.now();
     const res  = await fetch(url,{cache:'no-store'});
@@ -310,7 +334,7 @@ async function handleMagicLinkReturn(){
     const name  = session.user.user_metadata?.full_name || email.split('@')[0];
     // Clear the hash so it doesn't stay in the URL bar
     history.replaceState(null,'',window.location.pathname);
-    checkApproval(email, name);
+    checkApproval(email, name, 'supabase', session.access_token);
   }catch(e){
     hideSpinner(); hideAll(); show('status-denied');
   }
@@ -333,7 +357,7 @@ function signInWithGoogle(){
         const userInfo = await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{
           headers:{ Authorization:'Bearer '+response.access_token }
         }).then(r=>r.json());
-        checkApproval(userInfo.email, userInfo.name);
+        checkApproval(userInfo.email, userInfo.name, 'google', response.access_token);
       }catch(e){
         hideSpinner(); hideAll(); show('status-denied');
         document.getElementById('google-signin-btn').style.display='flex';

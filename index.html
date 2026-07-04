@@ -421,6 +421,7 @@ html.nosplash #devfit-splash{display:none!important}
 <script>try{if(localStorage.getItem('devfit_theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
 <link rel="stylesheet" href="theme.css">
 <script defer src="theme.js"></script>
+<script src="devfit-auth.js"></script>
 </head>
 <body>
 <div id="devfit-splash"><div class="si"><img src="icon-192.png" alt="DevFit"><div class="w">DEV<b>FIT</b></div><div class="t">DOMINANCE THROUGH DISCIPLINE</div><div class="bar"><i></i></div></div></div>
@@ -723,7 +724,7 @@ html.nosplash #devfit-splash{display:none!important}
     <div style="font-size:22px;margin-bottom:8px;">🔒</div>
     <div style="font-size:15px;font-weight:700;color:#f1f5f9;margin-bottom:6px;">Progress Analytics — Pro</div>
     <div style="font-size:12px;color:#94a3b8;margin-bottom:16px;line-height:1.6;">Unlock True Progress Score, weekly analysis,<br>bodyweight trend &amp; score charts.</div>
-    <a href="pricing.html" style="display:inline-block;background:#2f9e57;color:#fff;font-weight:700;font-size:13px;padding:10px 24px;border-radius:20px;text-decoration:none;">Upgrade to Pro — RM19/month</a>
+    <a href="pricing.html" style="display:inline-block;background:#2f9e57;color:#fff;font-weight:700;font-size:13px;padding:10px 24px;border-radius:20px;text-decoration:none;">Upgrade to Pro — RM16.90/month</a>
   </div>
 
   <!-- FEEDBACK (Pro) -->
@@ -924,45 +925,46 @@ html.nosplash #devfit-splash{display:none!important}
 // LOGIN CHECK — verify with server every time page loads
 const SHEET_URL_AUTH = 'https://script.google.com/macros/s/AKfycbzHTJOANyp1JJ-k2PmRuMjxpTz03G30ThTyV1thlMJ4QMIOvS8HRN4xW3VsHbzI7YXc/exec';
 
-(function(){
-  try{
-    const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
-    if(!user.email){
-      window.location.href='login.html';
-      return;
-    }
-    // Verify on every page load with cache-bust — sheet edits propagate within seconds (no 5-min cache)
-    const url = SHEET_URL_AUTH+'?action=checkAccess&email='+encodeURIComponent(user.email)+'&_='+Date.now();
-    fetch(url, {cache:'no-store'})
-      .then(r=>r.json())
-      .then(data=>{
-        if(data.approved){
-          try{
-            const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
-            const oldTier = (u.tier||'').toLowerCase();
-            const newTier = (data.tier||'pro').toLowerCase();
-            if(data.expiry) u.expiry = data.expiry;
-            if(data.startDate) u.startDate = data.startDate;
-            if(data.plan) u.plan = data.plan;
-            if(data.name) u.name = data.name;
-            u.tier = newTier;
-            localStorage.setItem('devfit_user', JSON.stringify(u));
-            localStorage.setItem('devfit_lastVerified', String(Date.now()));
-            // Tier changed (e.g. pro→free or free→pro) — reload so gating applies immediately
-            if(oldTier && oldTier !== newTier){ setTimeout(()=>window.location.reload(), 50); return; }
-          }catch(e){}
-          if(typeof showCountdown==='function') showCountdown();
-        } else {
-          localStorage.removeItem('devfit_user');
-          localStorage.removeItem('devfit_lastVerified');
-          window.location.href='login.html';
-        }
-      })
-      .catch(()=>{ /* offline — trust local session */ });
-  }catch(e){
-    window.location.href='login.html';
-  }
-})();
+// Layer 1: signed-token gate. Redirects if no session, re-verifies against the
+// server (/api/verify) so a forged localStorage session is corrected on load,
+// and reloads if the tier changed. Falls back to trusting the cached session
+// when the backend isn't live yet or the device is offline.
+if(window.DevFitAuth){
+  DevFitAuth.gate(function(){ if(typeof showCountdown==='function') showCountdown(); });
+} else {
+  (function(){
+    try{
+      const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+      if(!user.email){ window.location.href='login.html'; return; }
+      const url = SHEET_URL_AUTH+'?action=checkAccess&email='+encodeURIComponent(user.email)+'&_='+Date.now();
+      fetch(url, {cache:'no-store'})
+        .then(r=>r.json())
+        .then(data=>{
+          if(data.approved){
+            try{
+              const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
+              const oldTier = (u.tier||'').toLowerCase();
+              const newTier = (data.tier||'pro').toLowerCase();
+              if(data.expiry) u.expiry = data.expiry;
+              if(data.startDate) u.startDate = data.startDate;
+              if(data.plan) u.plan = data.plan;
+              if(data.name) u.name = data.name;
+              u.tier = newTier;
+              localStorage.setItem('devfit_user', JSON.stringify(u));
+              localStorage.setItem('devfit_lastVerified', String(Date.now()));
+              if(oldTier && oldTier !== newTier){ setTimeout(()=>window.location.reload(), 50); return; }
+            }catch(e){}
+            if(typeof showCountdown==='function') showCountdown();
+          } else {
+            localStorage.removeItem('devfit_user');
+            localStorage.removeItem('devfit_lastVerified');
+            window.location.href='login.html';
+          }
+        })
+        .catch(()=>{ /* offline — trust local session */ });
+    }catch(e){ window.location.href='login.html'; }
+  })();
+}
 
 setInterval(()=>{
   try{
@@ -1050,20 +1052,41 @@ function isoWeekKey(d){
   return dt.getFullYear() + '-W' + String(Math.ceil(((dt - new Date(dt.getFullYear(),0,1))/86400000 + 1)/7)).padStart(2,'0');
 }
 
-function maybeResetForFreeWeek(){
+// FREE TIER: exactly one week of logging, auto-rolling every Monday (ISO-week
+// anchored). The current week's data is STAMPED with its ISO week in
+// appData.freeWeekOf. Because the stamp travels with the data (localStorage AND
+// cloud), a cloud re-sync that restores last week's copy is detected here and
+// rolled over to a fresh blank week — the old bug where stale data kept coming
+// back after sync (and the week never renewed) is fixed by comparing the stamp,
+// not a one-shot localStorage flag. Must run after EVERY appData replacement.
+function normalizeFreeTierWeeks(){
   if(isPro()) return;
   const currentWk = isoWeekKey(new Date());
-  const lastWk = localStorage.getItem('devfit_freeWeekKey');
-  if(lastWk !== currentWk){
-    // New week — clear current data on Monday
+  // Free tier only ever shows one week — collapse any multi-week history to the
+  // most recent week (preserves whatever the user last entered).
+  if(appData.bw && appData.bw.length > 1){
+    const li = appData.bw.length - 1;
+    appData.bw = [appData.bw[li]];
+    appData.steps = [(appData.steps && appData.steps[li]) || Array(7).fill('')];
+    appData.sleep = [(appData.sleep && appData.sleep[li]) || Array(7).fill('')];
+    appData.weeklyCheckin = [(appData.weeklyCheckin && appData.weeklyCheckin[li]) || freshCheckin()];
+  }
+  totalWeeks = 1;
+  currentWeek = 0;
+  // New calendar week (or data stamped for a past week) → start fresh on Monday.
+  if(appData.freeWeekOf !== currentWk){
     appData.bw = [Array(7).fill('')];
     appData.steps = [Array(7).fill('')];
     appData.sleep = [Array(7).fill('')];
     appData.weeklyCheckin = [freshCheckin()];
-    totalWeeks = 1;
-    currentWeek = 0;
-    try { localStorage.setItem('progressLog2', JSON.stringify(appData)); } catch(e){}
+    appData.freeWeekOf = currentWk;
+    // Anchor the single visible week to THIS calendar week's Monday so the date
+    // labels, "today" highlight and reminder mapping all point at the real week.
+    const mon = mondayOf(new Date());
+    if(mon){ appData.programStart = ymd(mon); const ps=document.getElementById('programStart'); if(ps) ps.value=appData.programStart; }
     localStorage.setItem('devfit_freeWeekKey', currentWk);
+    try { localStorage.setItem('progressLog2', JSON.stringify(appData)); } catch(e){}
+    if(typeof DevFitDB!=='undefined' && DevFitDB.cloudSave) DevFitDB.cloudSave('progress',appData);
   }
 }
 
@@ -1071,19 +1094,8 @@ function loadData(){
   try{
     const s=localStorage.getItem('progressLog2');
     if(s){ appData=JSON.parse(s); totalWeeks=appData.bw.length||4; }
-    // Free-tier: force single current week and reset weekly on Monday
-    if(!isPro()){
-      // Trim to last week only (preserve any data the user just entered)
-      if(totalWeeks > 1){
-        appData.bw = [appData.bw[totalWeeks-1]];
-        appData.steps = [appData.steps[totalWeeks-1]];
-        appData.sleep = [appData.sleep[totalWeeks-1]];
-        appData.weeklyCheckin = [appData.weeklyCheckin[totalWeeks-1] || freshCheckin()];
-        totalWeeks = 1;
-      }
-      currentWeek = 0;
-      maybeResetForFreeWeek();
-    }
+    // Free-tier: force single current week and auto-roll weekly on Monday
+    if(!isPro()) normalizeFreeTierWeeks();
     // Null-safe: some inputs (e.g. clientName) may not exist on every layout, and a
     // single missing element must not abort populating the rest of the profile fields.
     const setVal=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v; };
@@ -2297,7 +2309,9 @@ function exportProgramPDF(){
 }
 
 function logout(){
-  localStorage.removeItem('devfit_user');
+  if(window.DevFitAuth){ DevFitAuth.clearSession(); }
+  else { localStorage.removeItem('devfit_user'); }
+  localStorage.removeItem('devfit_token');
   window.location.href='login.html';
 }
 
@@ -2455,7 +2469,7 @@ function startFirstRun(){
       if(decided) return;
       decided=true; clearTimeout(fallback);
       if(localHasProgress()){
-        try{ appData=JSON.parse(localStorage.getItem('progressLog2')); totalWeeks=(appData.bw&&appData.bw.length)||4; currentWeek=Math.min(currentWeek,totalWeeks-1); }catch(e){}
+        try{ appData=JSON.parse(localStorage.getItem('progressLog2')); totalWeeks=(appData.bw&&appData.bw.length)||4; currentWeek=Math.min(currentWeek,totalWeeks-1); if(!isPro()) normalizeFreeTierWeeks(); }catch(e){}
         onbMarkDone();
         try{ renderTabs(); render(); applyTierGates(); }catch(e){}
         showWelcomeScreen();
@@ -2591,6 +2605,9 @@ function runProgressSync(){
     appData=d;
     totalWeeks=appData.bw.length||4;
     currentWeek=Math.min(currentWeek,totalWeeks-1);
+    // Re-apply the free-tier single-week rollover — the cloud copy may hold last
+    // week's (or multi-week) data, which must be collapsed/rolled here too.
+    if(!isPro()) normalizeFreeTierWeeks();
     renderTabs();render();applyTierGates();
   });
 }

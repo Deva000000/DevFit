@@ -268,6 +268,7 @@ html.nosplash #devfit-splash{display:none!important}
 <script>try{if(localStorage.getItem('devfit_theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
 <link rel="stylesheet" href="theme.css">
 <script defer src="theme.js"></script>
+<script src="devfit-auth.js"></script>
 </head>
 <body>
 <div id="devfit-splash"><div class="si"><img src="icon-192.png" alt="DevFit"><div class="w">DEV<b>FIT</b></div><div class="t">DOMINANCE THROUGH DISCIPLINE</div><div class="bar"><i></i></div></div></div>
@@ -535,17 +536,17 @@ html.nosplash #devfit-splash{display:none!important}
 <script>
 'use strict';
 
-// LOGIN CHECK — redirect to login if no session
-(function(){
+// LOGIN CHECK — Layer 1: signed-token gate (redirects if no session, then
+// re-verifies against the server so a forged localStorage session is corrected).
+// Falls back to trusting the cached session if the backend isn't live yet.
+if(window.DevFitAuth){
+  DevFitAuth.gate();
+} else {
   try{
     const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
-    if(!user.email || !user.approved){
-      window.location.href = 'login.html';
-    }
-  }catch(e){
-    window.location.href = 'login.html';
-  }
-})();
+    if(!user.email || !user.approved){ window.location.href = 'login.html'; }
+  }catch(e){ window.location.href = 'login.html'; }
+}
 
 // TIER HELPERS
 function getUserTier(){

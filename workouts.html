@@ -268,6 +268,7 @@ html.nosplash #devfit-splash{display:none!important}
 <script>try{if(localStorage.getItem('devfit_theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
 <link rel="stylesheet" href="theme.css">
 <script defer src="theme.js"></script>
+<script src="devfit-auth.js"></script>
 </head>
 <body>
 <div id="devfit-splash"><div class="si"><img src="icon-192.png" alt="DevFit"><div class="w">DEV<b>FIT</b></div><div class="t">DOMINANCE THROUGH DISCIPLINE</div><div class="bar"><i></i></div></div></div>
@@ -378,17 +379,17 @@ html.nosplash #devfit-splash{display:none!important}
 <script>
 'use strict';
 
-// LOGIN CHECK — redirect to login if no session
-(function(){
+// LOGIN CHECK — Layer 1: signed-token gate (redirects if no session, then
+// re-verifies against the server so a forged localStorage session is corrected).
+// Falls back to trusting the cached session if the backend isn't live yet.
+if(window.DevFitAuth){
+  DevFitAuth.gate();
+} else {
   try{
     const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
-    if(!user.email || !user.approved){
-      window.location.href = 'login.html';
-    }
-  }catch(e){
-    window.location.href = 'login.html';
-  }
-})();
+    if(!user.email || !user.approved){ window.location.href = 'login.html'; }
+  }catch(e){ window.location.href = 'login.html'; }
+}
 
 // TIER HELPERS
 function getUserTier(){
@@ -796,12 +797,22 @@ function lastSessionFor(wId,exId,beforeDate){
   }
   return null;
 }
+// Estimated 1-rep max (Epley). Captures BOTH weight and reps so that e.g.
+// 30kg×10 correctly scores higher than 32.5kg×4. Bodyweight sets (no weight)
+// fall back to rep count so more reps still reads as progress.
+function e1rm(w,r){
+  w=Number(w)||0; r=Number(r)||0;
+  if(w>0&&r>0) return w*(1+r/30);
+  if(w>0) return w;
+  return r; // bodyweight: rank by reps
+}
 function bestSet(sets){
   let best=null;
   for(const s of sets){
     const w=Number(s.weight)||0,r=Number(s.reps)||0;
     if(w===0&&r===0) continue;
-    if(!best||w>best.w||(w===best.w&&r>best.r)) best={w,r};
+    const e=e1rm(w,r);
+    if(!best||e>best.e) best={w,r,e};
   }
   return best;
 }
@@ -1318,17 +1329,23 @@ function refreshPill(exId,log,last){
   if(!last){el.innerHTML='<span class="progress-pill new">First time logged</span>';return;}
   const lb=bestSet(last.log.sets);
   if(!lb){el.innerHTML='<span class="progress-pill new">First time logged</span>';return;}
+  // Compare estimated 1-rep max (weight AND reps), not raw weight, so trading
+  // weight for reps is judged fairly. Volume is the tie-breaker.
   const curVol=totalVolume(log.sets), lastVol=totalVolume(last.log.sets);
-  const wDiff=cur.w-lb.w, volDiff=curVol-lastVol;
-  if(wDiff>0||(wDiff===0&&volDiff>0&&lb.w>0)){
-    const pct=lastVol?Math.round((volDiff/lastVol)*100):0;
-    el.innerHTML=`<span class="progress-pill up">▲ Progressed ${wDiff>0?'+'+wDiff+'kg':'+'+pct+'% volume'}</span>`;
-  } else if(wDiff===0&&volDiff===0){
-    el.innerHTML=`<span class="progress-pill flat">— Maintained</span>`;
-  } else if(wDiff<0){
-    el.innerHTML=`<span class="progress-pill down">▼ Down ${Math.abs(wDiff)}kg</span>`;
+  const ePct=lb.e?((cur.e-lb.e)/lb.e)*100:0;
+  const volPct=lastVol?((curVol-lastVol)/lastVol)*100:0;
+  const TOL=1.5; // within ±1.5% est-1RM counts as maintained
+  const tip=`This ${cur.w}kg×${cur.r} vs last ${lb.w}kg×${lb.r} — compared by estimated 1-rep max`;
+  if(ePct>TOL){
+    el.innerHTML=`<span class="progress-pill up" title="${tip}">▲ Stronger +${Math.round(ePct)}%</span>`;
+  } else if(ePct<-TOL){
+    el.innerHTML=`<span class="progress-pill down" title="${tip}">▼ Down ${Math.round(Math.abs(ePct))}%</span>`;
+  } else if(volPct>TOL){
+    el.innerHTML=`<span class="progress-pill up" title="More total volume (sets×reps×kg)">▲ More volume +${Math.round(volPct)}%</span>`;
+  } else if(volPct<-TOL){
+    el.innerHTML=`<span class="progress-pill flat" title="Less total volume (sets×reps×kg)">— Volume ${Math.round(volPct)}%</span>`;
   } else {
-    el.innerHTML=`<span class="progress-pill flat">— ${volDiff>0?'+':''}${lastVol?Math.round((volDiff/lastVol)*100)+'%':'0%'}</span>`;
+    el.innerHTML=`<span class="progress-pill flat">— Maintained</span>`;
   }
 }
 
@@ -1360,26 +1377,26 @@ function drawProgressChart(){
     const log=s.logs.find(l=>l.exId===exId);
     if(!log) return;
     const best=bestSet(log.sets), vol=totalVolume(log.sets);
-    if(best) points.push({date:s.date,w:best.w,r:best.r,vol});
+    if(best) points.push({date:s.date,w:best.w,r:best.r,e:Math.round(best.e),vol});
   });
   points.sort((a,b)=>a.date.localeCompare(b.date));
   if(points.length===0){content.innerHTML='<div class="empty-msg">No sessions logged for this exercise yet.</div>';return;}
-  const pr=points.reduce((a,b)=>a.w>b.w?a:b);
+  const pr=points.reduce((a,b)=>b.e>a.e?b:a);
   const first=points[0], last=points[points.length-1];
-  const change=last.w-first.w;
+  const change=last.e-first.e;
   content.innerHTML=`
     <div class="stat-row">
-      <div class="stat-card"><div class="stat-lbl">PR</div><div class="stat-val">${pr.w}kg × ${pr.r}</div></div>
+      <div class="stat-card"><div class="stat-lbl">Best set</div><div class="stat-val">${pr.w}kg × ${pr.r}</div></div>
       <div class="stat-card"><div class="stat-lbl">Sessions</div><div class="stat-val">${points.length}</div></div>
       <div class="stat-card"><div class="stat-lbl">Change</div><div class="stat-val" style="color:${change>0?'#2f9e57':change<0?'#cc0000':'#666'}">${change>0?'+':''}${change}kg</div></div>
     </div>
     <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;height:230px"><canvas id="progChart"></canvas></div>
-    <div style="font-size:11px;color:#666;margin-top:8px">Best set weight per session.</div>`;
+    <div style="font-size:11px;color:#666;margin-top:8px">Estimated 1-rep max per session (accounts for weight × reps).</div>`;
   if(progChart){progChart.destroy();progChart=null;}
   progChart=new Chart(document.getElementById('progChart'),{
     type:'line',
-    data:{labels:points.map(p=>p.date.slice(5)),datasets:[{label:'Best set (kg)',data:points.map(p=>p.w),borderColor:'#cc0000',backgroundColor:'rgba(204,0,0,0.12)',fill:true,tension:0.25,pointRadius:4,pointBackgroundColor:'#cc0000'}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>points[c.dataIndex].w+'kg × '+points[c.dataIndex].r+' reps'}}},scales:{y:{beginAtZero:false,ticks:{font:{size:10}}},x:{ticks:{font:{size:10}},grid:{display:false}}}}
+    data:{labels:points.map(p=>p.date.slice(5)),datasets:[{label:'Est. 1RM (kg)',data:points.map(p=>p.e),borderColor:'#cc0000',backgroundColor:'rgba(204,0,0,0.12)',fill:true,tension:0.25,pointRadius:4,pointBackgroundColor:'#cc0000'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'Est. 1RM '+points[c.dataIndex].e+'kg ('+points[c.dataIndex].w+'kg × '+points[c.dataIndex].r+' reps)'}}},scales:{y:{beginAtZero:false,ticks:{font:{size:10}}},x:{ticks:{font:{size:10}},grid:{display:false}}}}
   });
 }
 

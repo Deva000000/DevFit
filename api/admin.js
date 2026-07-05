@@ -13,7 +13,7 @@
 
 import {
   haveServerConfig, sbSelect, sbUpsert, getSubscriber,
-  rateLimit, clientIp, readJsonBody
+  rateLimit, clientIp, readJsonBody, listLogins
 } from './_lib.js';
 
 const ADMIN_PW = process.env.DEVFIT_ADMIN_PASSWORD || '';
@@ -43,6 +43,12 @@ export default async function handler(req, res) {
       return;
     }
 
+    if (action === 'logins') {
+      // Every login/device across all users — who signed in, how many devices, when.
+      res.status(200).json({ logins: await listLogins() });
+      return;
+    }
+
     if (action === 'get') {
       if (!email) { res.status(400).json({ error: 'missing_email' }); return; }
       res.status(200).json({ subscriber: await getSubscriber(email) });
@@ -53,16 +59,27 @@ export default async function handler(req, res) {
     const existing = await getSubscriber(email);
     const now = new Date();
 
+    const isDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')) && !isNaN(new Date(s));
+
     let row;
     if (action === 'activate') {
-      const days = Math.max(1, parseInt(body.days || '30', 10) || 30);
+      // Calendar window the trainer picks. start_date = first day of access,
+      // expiry = last day of access (inclusive). Falls back to days if no end.
+      let start = String(body.start || '').slice(0, 10);
+      let end = String(body.end || '').slice(0, 10);
+      if (!isDate(start)) start = ymd(now);
+      if (!isDate(end)) {
+        const days = Math.max(1, parseInt(body.days || '30', 10) || 30);
+        end = ymd(addDays(new Date(start), days - 1)); // inclusive span
+      }
+      if (new Date(end) < new Date(start)) { res.status(400).json({ error: 'end_before_start' }); return; }
       row = {
         email,
         name: body.name || (existing && existing.name) || email.split('@')[0],
         tier: 'pro',
         approved: true,
-        expiry: ymd(addDays(now, days)),
-        start_date: (existing && existing.start_date) || ymd(now),
+        start_date: start,
+        expiry: end,
         plan: body.plan || (existing && existing.plan) || 'Pro',
         updated_at: now.toISOString()
       };

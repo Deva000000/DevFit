@@ -29,6 +29,21 @@
   }
   function getToken() { try { return localStorage.getItem('devfit_token') || ''; } catch (e) { return ''; } }
 
+  // Stable per-device id so the trainer can see how many devices an email uses
+  // (two phones, phone+tablet+laptop). Persists in localStorage; regenerated only
+  // if storage is wiped. Data itself is shared across devices via email cloud-sync.
+  function deviceId() {
+    try {
+      var d = localStorage.getItem('devfit_device_id');
+      if (!d) {
+        d = (self.crypto && crypto.randomUUID) ? crypto.randomUUID()
+          : (Date.now().toString(36) + Math.random().toString(16).slice(2));
+        localStorage.setItem('devfit_device_id', d);
+      }
+      return d;
+    } catch (e) { return 'unknown'; }
+  }
+
   function setSession(u, token) {
     try {
       localStorage.setItem('devfit_user', JSON.stringify(u));
@@ -50,12 +65,20 @@
     try {
       var u = getUser();
       var t = (u.tier || 'pro').toLowerCase();
-      if (t === 'pro' && u.expiry) {
+      if (t === 'pro') {
         var today = new Date(); today.setHours(0, 0, 0, 0);
-        var exp = new Date(u.expiry);
-        if (!isNaN(exp)) {
-          var end = new Date(exp); end.setHours(0, 0, 0, 0); end.setDate(end.getDate() + 1);
-          if (end <= today) t = 'free';
+        // Not started yet → Free until the plan's start date.
+        if (u.startDate) {
+          var st = new Date(u.startDate);
+          if (!isNaN(st)) { st.setHours(0, 0, 0, 0); if (st > today) t = 'free'; }
+        }
+        // Past the end (expiry) day → Free.
+        if (t === 'pro' && u.expiry) {
+          var exp = new Date(u.expiry);
+          if (!isNaN(exp)) {
+            var end = new Date(exp); end.setHours(0, 0, 0, 0); end.setDate(end.getDate() + 1);
+            if (end <= today) t = 'free';
+          }
         }
       }
       return t;
@@ -68,7 +91,7 @@
   async function startSession(provider, providerToken, name) {
     var res = await fetch(SESSION_API, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store',
-      body: JSON.stringify({ provider: provider, token: providerToken })
+      body: JSON.stringify({ provider: provider, token: providerToken, deviceId: deviceId() })
     });
     if (res.status === 501) return { notConfigured: true };
     var data = await res.json();
@@ -90,7 +113,7 @@
     try {
       var res = await fetch(VERIFY_API, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store',
-        body: JSON.stringify({ token: getToken(), email: u.email })
+        body: JSON.stringify({ token: getToken(), email: u.email, deviceId: deviceId() })
       });
       if (res.status === 501) return 'skip'; // not configured yet → trust cache
       var data = await res.json();

@@ -12,7 +12,7 @@
 //       { approved:false, reason }
 
 import {
-  haveServerConfig, verifyToken, getSubscriber, computeTier, signToken, readJsonBody
+  haveServerConfig, verifyToken, getSubscriber, computeTier, signToken, readJsonBody, recordLogin
 } from './_lib.js';
 
 export default async function handler(req, res) {
@@ -36,8 +36,11 @@ export default async function handler(req, res) {
     return;
   }
 
+  // Refresh this device's last-seen (does not bump the login count).
+  await recordLogin(payload.email, body.deviceId, req.headers['user-agent'], false);
+
   const tier = computeTier(sub);
-  const signed = signToken({ email: payload.email, tier, expiry: sub.expiry || '' });
+  const signed = signToken({ email: payload.email, tier, expiry: sub.expiry || '', startDate: sub.start_date || '' });
 
   res.status(200).json({
     approved: true,

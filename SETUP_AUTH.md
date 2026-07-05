@@ -60,9 +60,21 @@ create table if not exists devfit_rate (
   reset_at bigint not null default 0
 );
 
--- Lock both tables down: only the server (service-role key) may touch them.
+-- Login / device tracking (who signed in, from how many devices, when)
+create table if not exists devfit_logins (
+  email       text not null,
+  device_id   text not null,
+  user_agent  text,
+  first_seen  timestamptz default now(),
+  last_seen   timestamptz default now(),
+  login_count int not null default 1,
+  primary key (email, device_id)
+);
+
+-- Lock all tables down: only the server (service-role key) may touch them.
 alter table devfit_subscribers enable row level security;
 alter table devfit_rate        enable row level security;
+alter table devfit_logins      enable row level security;
 -- No policies = the public anon key cannot read or write. Service key bypasses RLS.
 ```
 

@@ -12,7 +12,7 @@
 
 import {
   haveServerConfig, emailFromSupabaseToken, emailFromGoogleToken,
-  getSubscriber, computeTier, signToken, rateLimit, clientIp, readJsonBody
+  getSubscriber, computeTier, signToken, rateLimit, clientIp, readJsonBody, recordLogin
 } from './_lib.js';
 
 export default async function handler(req, res) {
@@ -37,12 +37,17 @@ export default async function handler(req, res) {
   else email = await emailFromSupabaseToken(token);
   if (!email) { res.status(401).json({ error: 'invalid_identity' }); return; }
 
+  // Record the login for every verified identity — including people who aren't
+  // subscribers yet — so the trainer has full visibility of who signed in and
+  // from which device (two phones / phone+tablet+laptop all show up).
+  await recordLogin(email, body.deviceId, req.headers['user-agent'], true);
+
   const sub = await getSubscriber(email);
   if (!sub) { res.status(200).json({ approved: false, status: 'denied' }); return; }
   if (!sub.approved) { res.status(200).json({ approved: false, status: 'pending' }); return; }
 
   const tier = computeTier(sub);
-  const signed = signToken({ email, tier, expiry: sub.expiry || '' });
+  const signed = signToken({ email, tier, expiry: sub.expiry || '', startDate: sub.start_date || '' });
 
   res.status(200).json({
     approved: true,

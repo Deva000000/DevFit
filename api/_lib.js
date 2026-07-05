@@ -111,21 +111,59 @@ export async function getSubscriber(email) {
   return (Array.isArray(rows) && rows[0]) ? rows[0] : null;
 }
 
-// Authoritative tier: Free unless approved AND (no expiry OR expiry not passed).
-// Access runs through the whole expiry day (same rule as the client).
+// Authoritative tier: Free unless approved AND today is within [start_date, expiry].
+// The plan is a calendar window the trainer sets. Access begins on start_date and
+// runs through the WHOLE expiry day (ends exactly at the start of the next day —
+// not early, not late). Dates are UTC-day compared so it's identical everywhere.
 export function computeTier(sub) {
   if (!sub || !sub.approved) return 'free';
   const t = String(sub.tier || 'free').toLowerCase();
   if (t !== 'pro') return t;
+
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+
+  // Not started yet → still Free until the start date arrives.
+  if (sub.start_date) {
+    const st = new Date(sub.start_date);
+    if (!isNaN(st)) { st.setHours(0, 0, 0, 0); if (st > today) return 'free'; }
+  }
+  // Past the end (expiry) day → expired. accessEnd = expiry + 1 day (inclusive end).
   if (sub.expiry) {
     const exp = new Date(sub.expiry);
     if (!isNaN(exp)) {
       const accessEnd = new Date(exp); accessEnd.setHours(0, 0, 0, 0); accessEnd.setDate(accessEnd.getDate() + 1);
-      const today = new Date(); today.setHours(0, 0, 0, 0);
       if (accessEnd <= today) return 'free';
     }
   }
   return 'pro';
+}
+
+// ── Login / device tracking ──────────────────────────────────────────────────
+// One row per (email, device) so the trainer can see who logged in and on how
+// many devices. isLogin=true (a real sign-in) bumps login_count; isLogin=false
+// (a background page-load re-verify) only refreshes last_seen so the count stays
+// meaningful. Non-fatal: a tracking failure never blocks auth.
+export async function recordLogin(email, deviceId, userAgent, isLogin = true) {
+  try {
+    if (!email) return;
+    const dev = String(deviceId || 'unknown').slice(0, 80);
+    const ua = String(userAgent || '').slice(0, 300);
+    const now = new Date().toISOString();
+    const rows = await sbSelect('devfit_logins',
+      'email=eq.' + encodeURIComponent(email) + '&device_id=eq.' + encodeURIComponent(dev) + '&select=*');
+    const existing = (Array.isArray(rows) && rows[0]) ? rows[0] : null;
+    const row = {
+      email, device_id: dev, user_agent: ua, last_seen: now,
+      first_seen: existing ? existing.first_seen : now,
+      login_count: existing ? ((existing.login_count || 1) + (isLogin ? 1 : 0)) : 1
+    };
+    await sbUpsert('devfit_logins', row, 'email,device_id');
+  } catch (e) { /* tracking is best-effort */ }
+}
+
+export async function listLogins() {
+  const rows = await sbSelect('devfit_logins', 'select=*&order=last_seen.desc');
+  return rows || [];
 }
 
 // ── Rate limiter (Supabase-backed; reliable across serverless instances) ─────

@@ -2076,6 +2076,10 @@ applyNutritionTierGates();
   // Open Food Facts — branded/packaged products + barcodes (Open Database License)
   const OFF_SEARCH='https://world.openfoodfacts.org/cgi/search.pl';
   const OFF_PRODUCT='https://world.openfoodfacts.org/api/v0/product/';
+  // Search goes through our proxy (api/off.js → OFF's modern search engine) because
+  // the legacy search.pl endpoint is chronically down. Barcode lookups still hit
+  // OFF_PRODUCT directly (that endpoint is reliable).
+  const OFF_PROXY='/api/off';
   // USDA FoodData Central — generic/whole foods, lab-accurate (US public domain).
   // Queried through our own serverless proxy (api/usda.js) so the API key stays
   // server-side. Set USDA_KEY in Vercel env to lift the rate limit; until then it
@@ -2138,8 +2142,11 @@ applyNutritionTierGates();
   function tFetch(url,ms){ return fetch(url,{signal:AbortSignal.timeout(ms||7000)}); }
 
   async function offSearch(q){
-    const url=OFF_SEARCH+'?search_terms='+encodeURIComponent(q)+'&json=1&page_size=50&fields=code,product_name,brands,nutriments,serving_size,serving_quantity&sort_by=unique_scans_n';
-    const r=await tFetch(url,8000);
+    // Proxied through api/off.js, which uses OFF's modern search engine
+    // (search.openfoodfacts.org) — the old cgi/search.pl endpoint is chronically
+    // down and was silently dropping branded foods (Chobani, MyProtein, etc.).
+    const r=await tFetch(OFF_PROXY+'?query='+encodeURIComponent(q)+'&pageSize=40',9000);
+    if(!r.ok) throw new Error('off '+r.status);
     const j=await r.json();
     return(j.products||[])
       .filter(p=>p.product_name&&p.nutriments&&(p.nutriments['energy-kcal_100g']||p.nutriments['energy-kcal']||p.nutriments['energy_100g']))

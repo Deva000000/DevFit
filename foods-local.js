@@ -28,6 +28,19 @@
     {name:'Chicken (whole, roasted, with skin)', serving:120, cal:239, p:27, c:0, f:14,
      servings:[{n:'1 palm-size',g:100},{n:'1 small piece',g:150},{n:'1 large piece',g:200}],
      tags:'poultry ayam'},
+    // ── Malaysian cooked chicken dishes (recipe estimates, with sauce) ──
+    {name:'Kam Heong Chicken', serving:180, cal:221, p:18, c:8, f:13,
+     servings:[{n:'small plate',g:150},{n:'1 plate',g:200},{n:'large plate',g:260}],
+     tags:'poultry ayam kam heong dried shrimp curry leaf malaysian dish'},
+    {name:'Ayam Masak Merah', serving:180, cal:184, p:16, c:9, f:9,
+     servings:[{n:'small plate',g:150},{n:'1 plate',g:200},{n:'large plate',g:260}],
+     tags:'poultry ayam masak merah tomato malaysian dish'},
+    {name:'Ayam Kicap (Soy Sauce Chicken)', serving:180, cal:192, p:20, c:6, f:9,
+     servings:[{n:'small plate',g:150},{n:'1 plate',g:200},{n:'large plate',g:260}],
+     tags:'poultry ayam kicap soy sauce malaysian dish'},
+    {name:'Butter Chicken (Malaysian style)', serving:180, cal:242, p:15, c:8, f:16,
+     servings:[{n:'small plate',g:150},{n:'1 plate',g:200},{n:'large plate',g:260}],
+     tags:'poultry ayam butter milk curry leaf malaysian dish'},
 
     // ════════ PROTEINS — eggs ════════
     {name:'Egg (whole, boiled / half-boiled)', serving:50, cal:155, p:13, c:1.1, f:11,

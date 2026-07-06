@@ -1329,24 +1329,26 @@ function refreshPill(exId,log,last){
   if(!last){el.innerHTML='<span class="progress-pill new">First time logged</span>';return;}
   const lb=bestSet(last.log.sets);
   if(!lb){el.innerHTML='<span class="progress-pill new">First time logged</span>';return;}
-  // Compare estimated 1-rep max (weight AND reps), not raw weight, so trading
-  // weight for reps is judged fairly. Volume is the tie-breaker.
+  // PRIMARY metric = TOTAL VOLUME (sets × reps × kg) — the honest measure of work
+  // done. So 30kg×12 (360) correctly beats last week's 34kg×1 (34) instead of
+  // reading as "down 4kg". Falls back to estimated 1-rep max only for bodyweight
+  // sets (no weight to multiply), where more reps still counts as progress.
   const curVol=totalVolume(log.sets), lastVol=totalVolume(last.log.sets);
-  const ePct=lb.e?((cur.e-lb.e)/lb.e)*100:0;
-  const volPct=lastVol?((curVol-lastVol)/lastVol)*100:0;
-  const TOL=1.5; // within ±1.5% est-1RM counts as maintained
-  const tip=`This ${cur.w}kg×${cur.r} vs last ${lb.w}kg×${lb.r} — compared by estimated 1-rep max`;
-  if(ePct>TOL){
-    el.innerHTML=`<span class="progress-pill up" title="${tip}">▲ Stronger +${Math.round(ePct)}%</span>`;
-  } else if(ePct<-TOL){
-    el.innerHTML=`<span class="progress-pill down" title="${tip}">▼ Down ${Math.round(Math.abs(ePct))}%</span>`;
-  } else if(volPct>TOL){
-    el.innerHTML=`<span class="progress-pill up" title="More total volume (sets×reps×kg)">▲ More volume +${Math.round(volPct)}%</span>`;
-  } else if(volPct<-TOL){
-    el.innerHTML=`<span class="progress-pill flat" title="Less total volume (sets×reps×kg)">— Volume ${Math.round(volPct)}%</span>`;
-  } else {
-    el.innerHTML=`<span class="progress-pill flat">— Maintained</span>`;
+  const TOL=1.5;
+  if(curVol>0 && lastVol>0){
+    const volPct=((curVol-lastVol)/lastVol)*100;
+    const tip=`This ${Math.round(curVol)}kg total volume vs last ${Math.round(lastVol)}kg (sets×reps×kg)`;
+    if(volPct>TOL)      el.innerHTML=`<span class="progress-pill up"   title="${tip}">▲ More volume +${Math.round(volPct)}%</span>`;
+    else if(volPct<-TOL)el.innerHTML=`<span class="progress-pill down" title="${tip}">▼ Less volume ${Math.round(volPct)}%</span>`;
+    else                el.innerHTML=`<span class="progress-pill flat" title="${tip}">— Same volume</span>`;
+    return;
   }
+  // Bodyweight / no-weight sets → rank by estimated 1-rep max (reps-driven).
+  const ePct=lb.e?((cur.e-lb.e)/lb.e)*100:0;
+  const tip=`This ${cur.w}kg×${cur.r} vs last ${lb.w}kg×${lb.r}`;
+  if(ePct>TOL)       el.innerHTML=`<span class="progress-pill up"   title="${tip}">▲ Stronger +${Math.round(ePct)}%</span>`;
+  else if(ePct<-TOL) el.innerHTML=`<span class="progress-pill down" title="${tip}">▼ Down ${Math.round(Math.abs(ePct))}%</span>`;
+  else               el.innerHTML=`<span class="progress-pill flat">— Maintained</span>`;
 }
 
 // ---------- PROGRESS VIEW ----------

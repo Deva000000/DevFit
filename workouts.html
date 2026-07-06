@@ -107,8 +107,8 @@
   .ex-head:first-child{text-align:left}
   .del-mini{background:transparent;border:none;color:#cbd5e1;font-size:18px;cursor:pointer;line-height:1;padding:0}
   .del-mini:hover{color:#cc0000}
-  /* Cardio exercise row in plan editor — name + CARDIO tag (no sets/reps) */
-  .ex-row-cardio{grid-template-columns:1.6fr 1.1fr 28px}
+  /* Cardio exercise row in plan editor — name + target min + target km */
+  .ex-row-cardio{grid-template-columns:1.6fr 0.8fr 0.8fr 28px}
   .ex-cardio-tag{display:inline-flex;align-items:center;justify-content:center;background:#fef2f2;color:#cc0000;border:1px solid #fecaca;border-radius:8px;font-size:9px;font-weight:800;letter-spacing:.06em;padding:4px 0}
   .add-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
   .add-row .add-btn{margin-top:0}
@@ -476,11 +476,12 @@ function renderPlan(){
     w.exercises.forEach(ex=>{
       const row=document.createElement('div');
       if(exIsCardio(ex)){
-        // Cardio exercise — no sets/reps targets, just a name + tag
+        // Cardio exercise — prescribe a target duration (min) and optional distance (km)
         row.className='ex-row ex-row-cardio';
         row.innerHTML=`
           <input class="ex-name" type="text" placeholder="e.g. Running, Cycling, Swimming" value="${escapeHTML(ex.name)}" data-w="${w.id}" data-ex="${ex.id}" data-f="name">
-          <div class="ex-cardio-tag">CARDIO</div>
+          <input class="ex-num" type="number" inputmode="numeric" placeholder="min" value="${ex.tMin??''}" data-w="${w.id}" data-ex="${ex.id}" data-f="tMin">
+          <input class="ex-num" type="number" inputmode="decimal" placeholder="km" value="${ex.tKm??''}" data-w="${w.id}" data-ex="${ex.id}" data-f="tKm">
           <button class="del-mini" data-del-ex="${w.id}|${ex.id}" aria-label="Delete exercise">×</button>`;
       } else {
         row.className='ex-row';
@@ -502,7 +503,7 @@ function renderPlan(){
       if(exId){
         const ex=w.exercises.find(x=>x.id===exId);
         if(!ex) return;
-        if(f==='tSets'||f==='tReps') ex[f]=e.target.value===''?'':Number(e.target.value);
+        if(f==='tSets'||f==='tReps'||f==='tMin'||f==='tKm') ex[f]=e.target.value===''?'':Number(e.target.value);
         else ex[f]=e.target.value;
       } else {
         w[f]=e.target.value;
@@ -538,7 +539,7 @@ function renderPlan(){
     b.addEventListener('click',()=>{
       const w=data.plan.workouts.find(x=>x.id===b.dataset.addCardio);
       if(!w) return;
-      w.exercises.push({id:uid(),name:'',type:'cardio'});
+      w.exercises.push({id:uid(),name:'',type:'cardio',tMin:'',tKm:''});
       save(); renderPlan();
     });
   });
@@ -1190,6 +1191,11 @@ function renderLog(jumpToLast){
       const timed=cat!=='distance';   // sports/classes → duration only
       const catLabel = cat==='sport'?'Sport':cat==='class'?'Activity':'Cardio';
       let metaParts=['<span class="log-ex-target">'+catLabel+'</span>'];
+      // Prescribed target from the plan (e.g. "Target 30 min · 5 km")
+      if((Number(ex.tMin)||0)>0 || (Number(ex.tKm)||0)>0){
+        const tp=[]; if(Number(ex.tMin)>0) tp.push(ex.tMin+' min'); if(Number(ex.tKm)>0) tp.push(ex.tKm+' km');
+        metaParts.push('<span class="log-ex-target">Target '+tp.join(' · ')+'</span>');
+      }
       if(last && last.log.sets && last.log.sets[0]){
         const lp=last.log.sets[0];
         if((Number(lp.min)||0)>0||(Number(lp.km)||0)>0){

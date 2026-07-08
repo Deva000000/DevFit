@@ -42,14 +42,11 @@ html[data-theme="light"]{
 html[data-theme="light"] body{
   color:#3a352f !important;
   background:
-    radial-gradient(700px 500px at 15% -5%, rgba(204,0,0,0.06), transparent 60%),
-    radial-gradient(700px 500px at 85% -5%, rgba(204,0,0,0.06), transparent 60%),
-    radial-gradient(900px 600px at 50% 110%, rgba(204,0,0,0.05), transparent 60%),
     linear-gradient(180deg,#f7f4f0 0%,#ece7e1 60%,#f2eee8 100%) !important;
   background-attachment:fixed !important;
 }
 html[data-theme="light"] body::before{
-  background:radial-gradient(900px 400px at 50% 50%,rgba(204,0,0,0.03),transparent 60%) !important;
+  background:none !important;
 }
 
 /* Dark glass cards → light elevated surfaces */

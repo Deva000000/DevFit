@@ -7,7 +7,7 @@
    - Apps Script / /api/*: network-only (never cached)
 */
 
-const VERSION = 'devfit-v4.48.3';
+const VERSION = 'devfit-v4.48.4';
 const APP_SHELL = 'devfit-shell-' + VERSION;
 const RUNTIME = 'devfit-runtime-' + VERSION;
 

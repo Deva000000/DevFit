@@ -79,7 +79,7 @@ html[data-theme="light"] nav.devfit-tabnav a{color:#6b6258 !important;}
 html[data-theme="light"] nav.devfit-tabnav a:hover{color:#14110e !important;}
 html[data-theme="light"] nav.devfit-tabnav a.active{color:#fff !important;}
 html[data-theme="light"] nav.prog-subnav{border-bottom-color:rgba(20,15,10,0.12) !important;}
-html[data-theme="light"] nav.prog-subnav button{color:#8a8178 !important;}
+html[data-theme="light"] nav.prog-subnav button{color:#6a6157 !important;}
 html[data-theme="light"] nav.prog-subnav button:hover{color:#14110e !important;}
 /* Underline tabs: active state is a red underline, NOT a filled pill — so the
    active label must be dark ink (white was a leftover from the old pill design). */
@@ -109,7 +109,7 @@ html[data-theme="light"] .section-label{color:#5a514a !important;}
 html[data-theme="light"] .score-bar-label{color:#3a352f !important;}
 html[data-theme="light"] .score-bar-track{background:#e4ded7 !important;}
 html[data-theme="light"] .score-bar-pct{color:#14110e !important;}
-html[data-theme="light"] .footer{color:#8a8178 !important;}
+html[data-theme="light"] .footer{color:#6a6157 !important;}
 
 /* ---------- Inline-style colour remap (the app hardcodes colours inline) ----------
    Substring match on the style attr. Neutral white/grey text was meant to be
@@ -128,7 +128,7 @@ html[data-theme="light"] .page [style*="color:#888"],
 html[data-theme="light"] .page [style*="color:#888888"],
 html[data-theme="light"] .page [style*="color:#999"],
 html[data-theme="light"] .page [style*="color:#94a3b8"],
-html[data-theme="light"] .page [style*="color:#666"]{color:#8a8178 !important;}
+html[data-theme="light"] .page [style*="color:#666"]{color:#6a6157 !important;}
 
 /* Dark inline backgrounds → light surface */
 html[data-theme="light"] .page [style*="background:#1a1a1a"],
@@ -166,7 +166,7 @@ html[data-theme="light"] .countdown-sub,
 html[data-theme="light"] .tier-desc,
 html[data-theme="light"] .day-lbl,
 html[data-theme="light"] .setting-btn .desc{
-  color:#8a8178 !important;
+  color:#6a6157 !important;
 }
 html[data-theme="light"] .setting-btn .chev{color:#b8ada1 !important;}
 /* DEVFIT wordmark: "DEV"/page-name spans use inline #fff — remapped to dark by the
@@ -217,7 +217,7 @@ html[data-theme="light"] .df-theme-opt{color:#6b6258}
      #14110e  near-black  — headline values, active labels
      #3a352f  body ink    — secondary values
      #6b6258  muted       — titles / inactive tabs
-     #8a8178  faint       — captions / sublabels
+     #6a6157  faint       — captions / sublabels
      #b8ada1  hint        — delete glyphs
      #faf7f3  surface     — inset rows on a card
    =========================================================== */
@@ -226,7 +226,7 @@ html[data-theme="light"] .df-theme-opt{color:#6b6258}
 html[data-theme="light"] .mode-switch,
 html[data-theme="light"] .diet-slicer{border-bottom-color:rgba(20,15,10,0.12) !important;}
 html[data-theme="light"] .mode-btn,
-html[data-theme="light"] .ds-tab{color:#8a8178 !important;}
+html[data-theme="light"] .ds-tab{color:#6a6157 !important;}
 html[data-theme="light"] .mode-btn:hover,
 html[data-theme="light"] .ds-tab:hover{color:#14110e !important;}
 html[data-theme="light"] .mode-btn.active,
@@ -234,17 +234,17 @@ html[data-theme="light"] .ds-tab.active{color:#14110e !important;}
 
 /* ---- Today Overview ---- */
 html[data-theme="light"] .ov-title{color:#6b6258 !important;}
-html[data-theme="light"] .ov-lbl{color:#8a8178 !important;}
+html[data-theme="light"] .ov-lbl{color:#6a6157 !important;}
 html[data-theme="light"] .ov-val{color:#14110e !important;}
-html[data-theme="light"] .ov-val .u{color:#8a8178 !important;}
-html[data-theme="light"] .ov-sub{color:#8a8178 !important;}
+html[data-theme="light"] .ov-val .u{color:#6a6157 !important;}
+html[data-theme="light"] .ov-sub{color:#6a6157 !important;}
 html[data-theme="light"] .ov-tile + .ov-tile{border-left-color:rgba(20,15,10,0.10) !important;}
 html[data-theme="light"] .ov-bar{background:rgba(20,15,10,0.10) !important;}
 
 /* ---- Training Status ---- */
 html[data-theme="light"] .ts-status{color:#14110e !important;}
 html[data-theme="light"] .ts-reason,
-html[data-theme="light"] .ts-empty{color:#8a8178 !important;}
+html[data-theme="light"] .ts-empty{color:#6a6157 !important;}
 html[data-theme="light"] .ts-cyc{color:#3a352f !important;}
 html[data-theme="light"] .ts-foot{border-top-color:rgba(20,15,10,0.10) !important;}
 html[data-theme="light"] .ts-ring-bg{stroke:rgba(20,15,10,0.12) !important;}
@@ -257,7 +257,7 @@ html[data-theme="light"] .lib-row{background:#faf7f3 !important;border-color:rgb
 html[data-theme="light"] .lib-name{color:#14110e !important;}
 html[data-theme="light"] .lib-meta,
 html[data-theme="light"] .lib-empty,
-html[data-theme="light"] .lib-hint{color:#8a8178 !important;}
+html[data-theme="light"] .lib-hint{color:#6a6157 !important;}
 html[data-theme="light"] .lib-del{color:#b8ada1 !important;}
 html[data-theme="light"] .lib-del:hover{color:#cc0000 !important;}
 html[data-theme="light"] .lib-btn.clear{background:#faf7f3 !important;border-color:rgba(20,15,10,0.14) !important;color:#3a352f !important;}
@@ -265,7 +265,7 @@ html[data-theme="light"] .lib-btn.clear:hover{background:#f1ebe4 !important;colo
 html[data-theme="light"] .lib-btn.save{background:rgba(204,0,0,0.08) !important;border-color:rgba(204,0,0,0.30) !important;color:#cc0000 !important;}
 html[data-theme="light"] .lib-btn.save:hover{background:rgba(204,0,0,0.14) !important;color:#a30000 !important;}
 html[data-theme="light"] .diet-lib-summary{color:#14110e !important;}
-html[data-theme="light"] .diet-lib-count{color:#8a8178 !important;}
+html[data-theme="light"] .diet-lib-count{color:#6a6157 !important;}
 
 /* ---- Workouts plan editor controls ---- */
 html[data-theme="light"] .add-btn{color:#475569 !important;border-color:rgba(20,15,10,0.22) !important;}

@@ -18,7 +18,7 @@
 <title>DevFit — Progress</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@400;500;600;700;800&family=Inter:ital,wght@1,700;1,800&family=Lora:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600;1,700&family=Anton&family=Righteous&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="scoring.js"></script><!-- shared scoring engine (app score === report score) -->
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -2595,7 +2595,6 @@ function maybeRemindInApp(){
 }
 
 showCountdown();
-startFirstRun();
 scheduleAccessCheck();
 maybeRemindInApp();
 // Cloud sync — runs after localStorage render so UI is never blocked
@@ -2611,7 +2610,20 @@ function runProgressSync(){
     renderTabs();render();applyTierGates();
   });
 }
-runProgressSync();
+// The cloud layer (supabase-js + devfit-db.js) is loaded at the END of the body,
+// AFTER this script. Wait for it before first-run onboarding + the initial sync,
+// so a returning user's saved program is pulled from the cloud instead of the
+// onboarding wizard firing again on every fresh device or browser. Falls through
+// after ~5s if the CDN never loads (offline), where startFirstRun's own guard
+// keeps the app usable.
+(function whenCloudReady(cb){
+  function ready(){ return window.DevFitDB && window.DevFitDB.forceSyncAll && window.supabase; }
+  if(ready()){ cb(); return; }
+  var waited=0, iv=setInterval(function(){
+    waited+=100;
+    if(ready() || waited>=5000){ clearInterval(iv); cb(); }
+  },100);
+})(function(){ startFirstRun(); runProgressSync(); });
 // Re-sync when PWA returns to foreground (covers backgrounded mobile app)
 document.addEventListener('visibilitychange',function(){
   if(document.visibilityState==='visible') runProgressSync();

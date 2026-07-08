@@ -26,12 +26,18 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'method' }); return; }
   if (!haveServerConfig() || !ADMIN_PW) { res.status(501).json({ error: 'not_configured' }); return; }
 
-  // Rate limit BEFORE checking the password so guessing is throttled: 8 tries / 15 min per IP.
-  const rl = await rateLimit('admin:' + clientIp(req), 8, 15 * 60);
-  if (!rl.ok) { res.status(429).json({ error: 'rate_limited', retryAfter: rl.retryAfter }); return; }
-
   const body = await readJsonBody(req);
-  if (String(body.password || '') !== ADMIN_PW) { res.status(401).json({ error: 'bad_password' }); return; }
+
+  // Throttle ONLY failed password guesses (10 wrong tries / 15 min per IP). A
+  // correct password sails straight through, so a trainer doing normal work —
+  // list, get, activate, tab-switching — is never rate-limited. (The old code
+  // counted every authenticated action too, which locked the panel mid-use.)
+  if (String(body.password || '') !== ADMIN_PW) {
+    const rl = await rateLimit('admin_fail:' + clientIp(req), 10, 15 * 60);
+    if (!rl.ok) { res.status(429).json({ error: 'rate_limited', retryAfter: rl.retryAfter }); return; }
+    res.status(401).json({ error: 'bad_password' });
+    return;
+  }
 
   const action = String(body.action || '');
   const email = String(body.email || '').trim().toLowerCase();

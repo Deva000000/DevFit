@@ -147,6 +147,7 @@
 'use strict';
 var API = '/api/admin';
 var pw = '';
+var currentSubs = [];  // last-loaded subscriber rows, so the Logins tab can prefill known dates
 
 function $(id){ return document.getElementById(id); }
 function msg(el, text, ok){ el.textContent = text; el.className = 'msg ' + (ok ? 'ok' : 'err'); }
@@ -215,6 +216,7 @@ function statusPill(s){
   return '<span class="pill free">FREE</span>';
 }
 function renderList(subs){
+  currentSubs = subs || [];
   var box=$('list');
   if(!subs.length){ box.innerHTML='<div class="hint">No subscribers yet.</div>'; return; }
   box.innerHTML = subs.map(function(s){
@@ -298,11 +300,25 @@ function renderLogins(rows){
     return '<div class="dev-wrap"><div class="dev-head" data-em="'+encodeURIComponent(em)+'">'+
       '<span class="em">'+em+'</span>'+
       '<span class="dev-count'+multi+'">'+devs.length+' device'+(devs.length===1?'':'s')+'</span>'+
-      '<span class="dev-seen">'+timeAgo(last)+'</span></div>'+
+      '<span class="dev-seen">'+timeAgo(last)+'</span>'+
+      '<span class="tap activate-login" data-act-em="'+encodeURIComponent(em)+'">activate →</span></div>'+
       '<div class="dev-body" id="db-'+encodeURIComponent(em)+'">'+items+'</div></div>';
   }).join('');
   Array.prototype.forEach.call(box.querySelectorAll('.dev-head'), function(h){
-    h.addEventListener('click', function(){ $('db-'+h.getAttribute('data-em')).classList.toggle('show'); });
+    h.addEventListener('click', function(e){
+      // The "activate →" link jumps to the Manage tab instead of toggling devices.
+      if(e.target.classList.contains('activate-login')){
+        e.stopPropagation();
+        var em=decodeURIComponent(e.target.getAttribute('data-act-em'));
+        showTab('manage');
+        $('email').value=em;
+        var s=(currentSubs||[]).filter(function(x){return x.email===em;})[0];
+        if(s){ if(s.start_date)$('start').value=s.start_date; if(s.expiry)$('end').value=s.expiry; if(s.name)$('name').value=s.name; updateDuration(); }
+        $('email').scrollIntoView({behavior:'smooth'});
+        return;
+      }
+      $('db-'+h.getAttribute('data-em')).classList.toggle('show');
+    });
   });
 }
 async function refreshLogins(){

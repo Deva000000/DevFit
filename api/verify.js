@@ -24,6 +24,17 @@ export default async function handler(req, res) {
   if (!haveServerConfig()) { res.status(501).json({ error: 'not_configured' }); return; }
 
   const body = await readJsonBody(req);
+
+  // VISIBILITY TRACKING — record every active device for anyone with a session,
+  // BEFORE the token check. This captures users who logged in before the signed-
+  // token system (cached session, no token) and pending/free users too, so the
+  // trainer's "Logins & Devices" tab shows everyone who's actually using the app,
+  // not just freshly-authenticated ones. Tracking never grants access, so the
+  // client-known email is acceptable. isLogin=false → refresh last-seen only.
+  if (body.email && String(body.email).includes('@')) {
+    await recordLogin(String(body.email).toLowerCase(), body.deviceId, req.headers['user-agent'], false);
+  }
+
   const payload = verifyToken(body.token);
   if (!payload || !payload.email) {
     res.status(200).json({ approved: false, reason: 'invalid_token' });
@@ -35,9 +46,6 @@ export default async function handler(req, res) {
     res.status(200).json({ approved: false, reason: 'revoked' });
     return;
   }
-
-  // Refresh this device's last-seen (does not bump the login count).
-  await recordLogin(payload.email, body.deviceId, req.headers['user-agent'], false);
 
   const tier = computeTier(sub);
   const signed = signToken({ email: payload.email, tier, expiry: sub.expiry || '', startDate: sub.start_date || '' });

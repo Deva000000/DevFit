@@ -135,11 +135,35 @@ html[data-theme="light"] .page [style*="background:#0f0f0f"]{
   border-color:rgba(20,15,10,0.10) !important;
 }
 
-/* Inputs keep their white field look in both themes; just firm up borders in light */
+/* Light theme firms up the input borders on the white fields */
 html[data-theme="light"] .text-input,
 html[data-theme="light"] .client-row input{
   border-color:rgba(20,15,10,0.18) !important;
 }
+
+/* ---------- Dark-mode form fields (default theme) ----------
+   The app hardcodes white inputs (background:#fff) that glared against the dark
+   surfaces — the "cheap white" look. In dark mode swap them to a soft dark field
+   with light text; light mode keeps the white fields untouched. !important is
+   required to beat the many inline background:#fff styles on individual inputs. */
+html:not([data-theme="light"]) .inp,
+html:not([data-theme="light"]) .text-input,
+html:not([data-theme="light"]) .client-row input,
+html:not([data-theme="light"]) .bf-input,
+html:not([data-theme="light"]) .sets-grid input,
+html:not([data-theme="light"]) .cardio-fld input,
+html:not([data-theme="light"]) .input-cell,
+html:not([data-theme="light"]) .input-cell input,
+html:not([data-theme="light"]) .page input[style*="background:#fff"]{
+  background:#1f1f22 !important;
+  color:#f5f5f4 !important;
+  border-color:rgba(255,255,255,0.14) !important;
+}
+html:not([data-theme="light"]) .inp::placeholder,
+html:not([data-theme="light"]) .text-input::placeholder,
+html:not([data-theme="light"]) .page input::placeholder{ color:rgba(255,255,255,0.42) !important; }
+/* Date/number picker glyphs are black by default — invert so they show on dark */
+html:not([data-theme="light"]) .page input[type="date"]::-webkit-calendar-picker-indicator{ filter:invert(1); opacity:.6; }
 
 /* ---------- Class-based text colours (tuned for dark bg) → light ----------
    These come from per-page <style> rules, not inline styles, so they need

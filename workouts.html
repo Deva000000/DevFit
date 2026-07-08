@@ -1139,14 +1139,13 @@ function renderLog(jumpToLast){
   }
   const wId=selectedWorkoutId;
 
-  // When OPENING a workout, jump to its most recent logged date so reopening
-  // e.g. "Push Day" shows your last session instead of an empty today.
-  if(jumpToLast && !findSession(date,wId)){
-    const hasData=l=>l.sets&&l.sets.some(x=>(Number(x.reps)||0)>0||(Number(x.weight)||0)>0||(Number(x.min)||0)>0||(Number(x.km)||0)>0);
-    const latest=data.sessions
-      .filter(s=>s.workoutId===wId && s.logs && s.logs.some(hasData))
-      .map(s=>s.date).sort().pop();
-    if(latest){ document.getElementById('log-date').value=latest; date=latest; }
+  // The log always opens on TODAY so a new day's session lands on the right
+  // calendar date (and the correct program week) without manual fixing. Past
+  // sessions stay reachable via the date picker; per-exercise "Last: …" labels
+  // already carry the previous-session context, so we never move the date
+  // backward on our own — doing so used to drop users onto last week's date.
+  if(jumpToLast && !document.getElementById('log-date').value){
+    document.getElementById('log-date').value=todayStr(); date=todayStr();
   }
   if(_lbl){ const wk=weekOfDate(date); _lbl.textContent = wk===null ? "Today's session" : (wk<0 ? 'Session · before program start' : 'Session · Week '+(wk+1)); }
 

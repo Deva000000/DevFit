@@ -50,6 +50,9 @@ async function searchModern(q, pageSize) {
 
 // Legacy engine (cgi/search.pl). Default sort is by popularity, so the
 // most-scanned real products (e.g. MyProtein Impact Whey) come first.
+// OFF's legacy host throws intermittent 503 "bot challenge" HTML pages under
+// load, so we retry a couple of times — a fresh hit often gets through. We also
+// guard against those HTML pages by checking the content-type is JSON.
 async function searchLegacy(q, pageSize) {
   const fields = 'code,product_name,brands,serving_size,serving_quantity,nutriments';
   const url = 'https://world.openfoodfacts.org/cgi/search.pl'
@@ -57,12 +60,17 @@ async function searchLegacy(q, pageSize) {
     + '&search_simple=1&action=process&json=1'
     + '&page_size=' + pageSize
     + '&fields=' + encodeURIComponent(fields);
-  try {
-    const r = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(8000) });
-    if (!r.ok) return [];
-    const j = await r.json();
-    return normalise(Array.isArray(j.products) ? j.products : []);
-  } catch (e) { return []; }
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const r = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(4000) });
+      const ct = r.headers.get('content-type') || '';
+      if (r.ok && ct.includes('json')) {
+        const j = await r.json();
+        return normalise(Array.isArray(j.products) ? j.products : []);
+      }
+    } catch (e) { /* try again */ }
+  }
+  return [];
 }
 
 export default async function handler(req, res) {

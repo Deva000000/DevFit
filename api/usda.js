@@ -24,11 +24,18 @@ export default async function handler(req, res) {
     return;
   }
 
+  // Generic/whole foods ONLY (Foundation, SR Legacy, FNDDS). We deliberately
+  // exclude USDA "Branded": it's ~1M US supermarket SKUs that match on the brand
+  // name — so "impact whey" surfaced "Melster Circus Peanuts by IMPACT CONFECTIONS"
+  // and other US candy that isn't even sold here. Branded/supplement search is
+  // OpenFoodFacts' job (api/off.js); USDA is here for lab-accurate whole foods.
+  // requireAllWords tightens relevance so a single stray token can't drag in junk.
   const url = 'https://api.nal.usda.gov/fdc/v1/foods/search'
     + '?api_key=' + encodeURIComponent(key)
     + '&query=' + encodeURIComponent(query)
     + '&pageSize=' + pageSize
-    + '&dataType=' + encodeURIComponent('Foundation,SR Legacy,Survey (FNDDS),Branded');
+    + '&requireAllWords=true'
+    + '&dataType=' + encodeURIComponent('Foundation,SR Legacy,Survey (FNDDS)');
 
   try {
     const r = await fetch(url);

@@ -19,8 +19,8 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:ital,wght@1,700;1,800&family=Lora:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600;1,700&family=Anton&family=Righteous&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="foods-local.js?v=4.43"></script>
-<script src="foods-bulk.js?v=4.43" defer></script>
+<script src="foods-local.js?v=4.49"></script>
+<script src="foods-bulk.js?v=4.49" defer></script>
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
@@ -2514,23 +2514,46 @@ applyNutritionTierGates();
 
   let _searchToken=0;
   function rankFoods(items,q){
-    const ql=q.toLowerCase();
+    const ql=q.toLowerCase().trim();
+    const toks=ql.split(/\s+/).filter(Boolean);
     function score(f){
       const n=f.name.toLowerCase();
+      const hay=(f.name+' '+(f.brand||'')).toLowerCase();
       let s=0;
-      if(f.source==='RECENT')s+=70;    // things you've logged before, top priority
-      if(f.source==='LOCAL')s+=50;     // curated local always near top
-      if(f.source==='KALORI')s+=30;    // Malaysian DB second priority
-      if(n===ql)s+=100; else if(n.startsWith(ql))s+=60; else if(n.includes(ql))s+=30;
-      if(f.source==='USDA')s+=8;
+      // Source trust (things you've saved / curated / local come first).
+      if(f.source==='RECENT')s+=70;
+      if(f.source==='LOCAL')s+=50;
+      if(f.source==='KALORI')s+=30;
+      // Relevance to the actual query — scored PER WORD, so multi-word searches
+      // ("myprotein impact") rank on how many of their words are present, not on
+      // whether the whole phrase appears verbatim (it almost never does).
+      if(n===ql)s+=120;
+      else if(n.startsWith(ql))s+=70;
+      else if(hay.includes(ql))s+=40;
+      let hitsName=0,hitsBrand=0;
+      toks.forEach(t=>{
+        if(n.includes(t)){s+=14;hitsName++;}
+        else if((f.brand||'').toLowerCase().includes(t)){s+=6;hitsBrand++;}
+      });
+      // Reward matching MORE of the query — full coverage beats a lone token.
+      if(toks.length>1&&hitsName+hitsBrand===toks.length)s+=25;
+      if(f.source==='USDA')s+=4;
       if(f.cal100>0&&(f.p100||f.c100||f.f100))s+=5;
-      return s;
+      return {s,hitsName,hitsBrand};
     }
     const seen=new Set();
-    return items.filter(f=>{
+    const scored=items.filter(f=>{
       const key=f.name.toLowerCase()+'|'+Math.round(f.cal100);
       if(seen.has(key))return false; seen.add(key); return true;
-    }).sort((a,b)=>score(b)-score(a)).slice(0,60);
+    }).map(f=>({f,sc:score(f)}));
+    // Relevance floor: if the query has real words, drop network results that
+    // match NONE of them (this is what killed "Onion Bread Rolls" for a whey
+    // search). Recents/local/curated are always kept — they're already yours.
+    const filtered=scored.filter(x=>{
+      if(x.f.source==='RECENT'||x.f.source==='LOCAL')return true;
+      return !toks.length || x.sc.hitsName>0 || x.sc.hitsBrand>0;
+    });
+    return filtered.sort((a,b)=>b.sc.s-a.sc.s).slice(0,60).map(x=>x.f);
   }
 
   // Instant offline results (recents + curated local) — synchronous, sub-ms

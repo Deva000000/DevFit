@@ -696,6 +696,57 @@
   m('Evaporated Milk (F&N, per 100ml)', 134, 6.7, 10, 7.6, 'evaporated milk susu cair f&n carnation teh tarik', 'F&N');
   m('Condensed Milk (sweetened, per 100ml)', 321, 7.9, 54, 8.7, 'condensed milk susu pekat manis sweetened teh tarik kopi', '');
 
+  // ── SPORTS SUPPLEMENTS (widely sold in Malaysia: Guardian, Watsons, GNC,
+  //    pharmacies, Shopee/Lazada, gym stores) ───────────────────────────────
+  // Values per 100 g of powder, from brand labels. serving = 1 scoop, so cards
+  // read "per 1 scoop (Ng)" and the picker opens at a realistic dose.
+  const sup = (n, scoopG, cal, p, c, f, tg, br) => _dedupe({
+    name: n, serving: scoopG, cal, p, c, f, tags: tg || '', brand: br || '',
+    servings: [{ n: '1 scoop (' + scoopG + 'g)', g: scoopG }, { n: '100g', g: 100 }]
+  });
+
+  // Whey / isolate protein powders
+  sup('Optimum Nutrition Gold Standard 100% Whey', 30, 393, 79, 13, 5, 'optimum nutrition on gold standard whey protein powder isolate scoop supplement gym', 'Optimum Nutrition');
+  sup('MyProtein Impact Whey Protein', 25, 404, 82, 6, 7.5, 'myprotein impact whey protein powder concentrate scoop supplement gym', 'MyProtein');
+  sup('MyProtein Impact Whey Isolate', 25, 373, 90, 2.4, 1.9, 'myprotein impact whey isolate protein powder scoop supplement gym', 'MyProtein');
+  sup('Dymatize ISO 100 Hydrolyzed Whey Isolate', 32, 370, 84, 8, 2, 'dymatize iso100 iso 100 hydrolyzed whey isolate protein powder scoop supplement', 'Dymatize');
+  sup('MuscleTech Nitro-Tech Whey', 46, 348, 65, 9, 7, 'muscletech nitrotech nitro tech whey protein powder scoop supplement gym', 'MuscleTech');
+  sup('Ultimate Nutrition Prostar Whey', 30, 400, 83, 10, 5, 'ultimate nutrition prostar whey protein powder scoop supplement gym', 'Ultimate Nutrition');
+  sup('BSN Syntha-6 Protein', 47, 426, 47, 32, 13, 'bsn syntha6 syntha 6 protein powder blend scoop supplement shake', 'BSN');
+  sup('Isopure Zero Carb Whey Isolate', 31, 323, 81, 0, 2, 'isopure zero carb whey isolate protein powder scoop supplement low carb', 'Isopure');
+  sup('Whey Protein Isolate (generic)', 30, 373, 88, 3, 2, 'whey isolate protein powder generic scoop supplement gym unflavoured', '');
+  sup('Vegan / Pea Protein (generic)', 30, 375, 78, 6, 6, 'vegan pea plant protein powder generic scoop supplement soy free', '');
+  sup('Soy Protein Isolate (generic)', 30, 370, 82, 5, 2, 'soy protein isolate powder generic scoop supplement vegetarian', '');
+
+  // Mass gainers
+  sup('Optimum Nutrition Serious Mass Gainer', 100, 375, 12.5, 79, 1.6, 'optimum nutrition serious mass gainer weight bulk powder scoop supplement', 'Optimum Nutrition');
+  sup('MuscleTech Mass-Tech Gainer', 100, 380, 21, 68, 3.5, 'muscletech masstech mass tech gainer weight bulk powder scoop supplement', 'MuscleTech');
+
+  // Creatine / amino acids / pre-workout (per scoop; near-zero calories)
+  sup('Creatine Monohydrate (per 5g)', 5, 0, 0, 0, 0, 'creatine monohydrate powder micronised supplement strength scoop teaspoon', '');
+  sup('BCAA Powder (per 10g)', 10, 0, 0, 0, 0, 'bcaa branched chain amino acid powder intra workout supplement scoop', '');
+  sup('EAA Powder (per 12g)', 12, 0, 0, 0, 0, 'eaa essential amino acid powder intra workout supplement scoop', '');
+  sup('Pre-Workout (generic, per 10g)', 10, 100, 0, 25, 0, 'pre workout preworkout energy powder caffeine supplement scoop', '');
+  sup('L-Glutamine (per 5g)', 5, 0, 0, 0, 0, 'glutamine l-glutamine powder recovery supplement scoop', '');
+
+  // Protein bars (per 100 g; serving = 1 bar)
+  a('Quest Protein Bar', 60, 333, 33, 42, 12, 'quest protein bar high protein low sugar snack supplement', 'Quest');
+  a('Grenade Carb Killa Bar', 60, 357, 35, 27, 13, 'grenade carb killa protein bar high protein low sugar snack', 'Grenade');
+  a('MyProtein Layered Protein Bar', 60, 367, 33, 35, 12, 'myprotein layered protein bar high protein snack supplement', 'MyProtein');
+  a('Fitbar Multigrain (1 bar)', 25, 440, 8, 60, 20, 'fitbar multigrain snack bar kalbe healthy accessible', 'Fitbar');
+
+  // Meal-replacement / functional milk powders (pharmacies & all grocers)
+  a('Ensure Gold (powder)', 53, 415, 16, 57, 11, 'ensure gold abbott meal replacement adult nutrition milk powder pharmacy', 'Ensure');
+  a('Anlene Gold (powder)', 30, 360, 26, 50, 6, 'anlene gold milk powder bone joint calcium adult fonterra', 'Anlene');
+  a('Nestle Nespray / Full Cream Milk Powder', 26, 496, 25, 38, 27, 'milk powder full cream nespray susu tepung nestle', 'Nestle');
+  a('Nutrilite / Whey Meal Shake (generic)', 40, 380, 30, 45, 6, 'meal replacement shake protein generic diet weight loss', '');
+
+  // Branded Greek / high-protein yogurt (very common now: AEON, Jaya, Village)
+  a('Farm Fresh Greek Yogurt (plain)', 140, 97, 9, 5, 4.5, 'farm fresh greek yogurt plain high protein breakfast snack malaysia', 'Farm Fresh');
+  a('Emborg Greek Style Yogurt', 100, 116, 5.7, 4.7, 8, 'emborg greek style yogurt high protein breakfast snack', 'Emborg');
+  a('Nestle Bliss Yogurt Drink', 190, 76, 2.6, 14, 1.1, 'nestle bliss yogurt drink cultured probiotic', 'Nestle');
+  a('Marigold Vitagen (cultured drink)', 125, 66, 1.1, 15, 0.1, 'vitagen marigold cultured milk drink probiotic yakult style', 'Vitagen');
+
   console.log('[DevFit] foods-bulk.js loaded — ' + F.length + ' total foods (' +
     _baseDropped + ' base dupes removed, ' + _skipped + ' bulk dupes skipped).');
 })();

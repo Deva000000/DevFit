@@ -18,7 +18,10 @@
   input,select{width:100%;padding:11px 13px;background:#1a1a1a;border:1px solid #2e2e2e;border-radius:9px;color:#fff;font-size:14px;outline:none;font-family:inherit}
   input:focus,select:focus{border-color:#cc0000}
   input[type=date]{color-scheme:dark}
-  .row{display:flex;gap:10px}.row>*{flex:1}
+  .row{display:flex;gap:10px}.row>*{flex:1;min-width:0}
+  /* Reserve 2 lines for the column labels so a wrapping one ("End date (last day
+     of access)") doesn't push its date input below the other and collide. */
+  .row label{min-height:2.6em;display:flex;align-items:flex-end;margin-top:0}
   button{cursor:pointer;font-family:inherit;font-weight:700;border:none;border-radius:9px;transition:all .15s}
   .btn{width:100%;padding:12px;background:#cc0000;color:#fff;font-size:14px;margin-top:14px}
   .btn:hover{background:#aa0000}

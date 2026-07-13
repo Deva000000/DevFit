@@ -996,6 +996,16 @@ function programStartDate(){
   return mondayOf(base);
 }
 function weekDayDate(w,d){ const s=programStartDate(); const dt=new Date(s); dt.setDate(s.getDate()+w*7+d); return dt; }
+// Which week (0-indexed) does TODAY fall in, relative to the program start?
+// Used to open Progress on the CURRENT week instead of always Week 1. Both
+// anchors are Monday-at-midnight, so the difference is whole weeks. Clamped to
+// the range of weeks that actually exist.
+function currentWeekIndex(){
+  const start=programStartDate(), today=mondayOf(new Date());
+  if(!start||!today) return 0;
+  const diff=Math.round((today-start)/(7*24*3600*1000));
+  return Math.max(0, Math.min(diff, totalWeeks-1));
+}
 function mon(dt){ return dt.toLocaleDateString('en-US',{month:'short'}); }
 function weekRangeLabel(w){
   const a=weekDayDate(w,0), b=weekDayDate(w,6);
@@ -1093,6 +1103,8 @@ function loadData(){
     if(s){ appData=JSON.parse(s); totalWeeks=appData.bw.length||4; }
     // Free-tier: force single current week and auto-roll weekly on Monday
     if(!isPro()) normalizeFreeTierWeeks();
+    // Pro: open on the week that today actually falls in, not always Week 1.
+    else currentWeek = currentWeekIndex();
     // Null-safe: some inputs (e.g. clientName) may not exist on every layout, and a
     // single missing element must not abort populating the rest of the profile fields.
     const setVal=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v; };
@@ -1180,6 +1192,9 @@ function renderTabs(){
     b.onclick=()=>{currentWeek=w;renderTabs();render();};
     c.appendChild(b);
   }
+  // Keep the active week visible in the horizontal strip (it may be scrolled off).
+  const activeTab=c.querySelector('.wtab.active');
+  if(activeTab) try{ activeTab.scrollIntoView({inline:'center',block:'nearest'}); }catch(e){}
   const add=document.createElement('button');
   add.className='wtab-action';
   add.textContent='+ Add';
@@ -2466,7 +2481,7 @@ function startFirstRun(){
       if(decided) return;
       decided=true; clearTimeout(fallback);
       if(localHasProgress()){
-        try{ appData=JSON.parse(localStorage.getItem('progressLog2')); totalWeeks=(appData.bw&&appData.bw.length)||4; currentWeek=Math.min(currentWeek,totalWeeks-1); if(!isPro()) normalizeFreeTierWeeks(); }catch(e){}
+        try{ appData=JSON.parse(localStorage.getItem('progressLog2')); totalWeeks=(appData.bw&&appData.bw.length)||4; if(!isPro()) normalizeFreeTierWeeks(); else currentWeek=currentWeekIndex(); }catch(e){}
         onbMarkDone();
         try{ renderTabs(); render(); applyTierGates(); }catch(e){}
         showWelcomeScreen();

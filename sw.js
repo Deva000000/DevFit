@@ -7,7 +7,7 @@
    - Apps Script / /api/*: network-only (never cached)
 */
 
-const VERSION = 'devfit-v4.49.2';
+const VERSION = 'devfit-v4.50.0';
 const APP_SHELL = 'devfit-shell-' + VERSION;
 const RUNTIME = 'devfit-runtime-' + VERSION;
 
@@ -144,40 +144,4 @@ async function staleWhileRevalidate(req) {
 
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
-});
-
-// ---------- DAILY REMINDERS ----------
-// Periodic Background Sync fires this ~once a day on installed PWAs (Chrome/
-// Android). iOS/desktop browsers that don't support it simply won't — the
-// in-app fallback on index.html covers those when the app is opened.
-self.addEventListener('periodicsync', (event) => {
-  if (event.tag === 'devfit-daily-reminder') event.waitUntil(showDailyReminder());
-});
-
-async function showDailyReminder() {
-  // At most one reminder per calendar day
-  try {
-    const today = new Date().toISOString().slice(0, 10);
-    const cache = await caches.open('devfit-reminder-state');
-    const last = await cache.match('last-reminder');
-    if (last && (await last.text()) === today) return;
-    await cache.put('last-reminder', new Response(today));
-  } catch (e) {}
-  return self.registration.showNotification('DevFit', {
-    body: "Don't break the chain — log your weight, steps and sleep today.",
-    icon: './icon-192.png',
-    badge: './icon-192.png',
-    tag: 'devfit-daily',
-    data: { url: './index.html' }
-  });
-}
-
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  const target = (event.notification.data && event.notification.data.url) || './index.html';
-  event.waitUntil((async () => {
-    const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    for (const c of all) { if (c.url.includes('index.html') && 'focus' in c) return c.focus(); }
-    if (self.clients.openWindow) return self.clients.openWindow(target);
-  })());
 });

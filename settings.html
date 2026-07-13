@@ -447,15 +447,6 @@ html.nosplash #devfit-splash{display:none!important}
       <div class="chev">›</div>
     </button>
 
-    <button class="setting-btn" id="reminders-btn" type="button">
-      <div class="icon">🔔</div>
-      <div class="body">
-        <div class="title">Daily reminders</div>
-        <div class="desc" id="reminders-desc">Get a daily nudge to log your day</div>
-      </div>
-      <div class="chev" id="reminders-state" style="font-weight:800;font-size:13px">Off</div>
-    </button>
-
     <button class="setting-btn" id="check-updates-btn" type="button">
       <div class="icon">↻</div>
       <div class="body">
@@ -1455,47 +1446,8 @@ async function checkForUpdates(){
   }
 }
 
-// ---------- DAILY REMINDERS ----------
-function remindersSupported(){ return ('Notification' in window) && ('serviceWorker' in navigator); }
-function remindersOn(){ try{ return localStorage.getItem('devfit_reminders')==='1' && Notification.permission==='granted'; }catch(e){ return false; } }
-function initReminders(){
-  const desc=document.getElementById('reminders-desc');
-  const state=document.getElementById('reminders-state');
-  if(!state) return;
-  if(!remindersSupported()){ state.textContent='N/A'; state.style.color='#888'; if(desc) desc.textContent='Not supported on this browser'; return; }
-  if(Notification.permission==='denied'){ state.textContent='Blocked'; state.style.color='#cc0000'; if(desc) desc.textContent='Notifications are blocked in your browser settings'; return; }
-  const on=remindersOn();
-  state.textContent=on?'On':'Off';
-  state.style.color=on?'#2f9e57':'#888';
-  if(desc) desc.textContent=on?'A daily nudge to log your day is on':'Get a daily nudge to log your day';
-}
-async function toggleReminders(){
-  if(!remindersSupported()){ toast('Reminders aren’t supported on this browser'); return; }
-  if(Notification.permission==='denied'){ toast('Unblock notifications in your browser settings first'); return; }
-  if(remindersOn()){
-    localStorage.setItem('devfit_reminders','0');
-    try{ const reg=await navigator.serviceWorker.ready; if(reg.periodicSync) await reg.periodicSync.unregister('devfit-daily-reminder'); }catch(e){}
-    toast('Daily reminders turned off'); initReminders(); return;
-  }
-  let perm=Notification.permission;
-  if(perm!=='granted') perm=await Notification.requestPermission();
-  if(perm!=='granted'){ toast('Allow notifications to get reminders'); initReminders(); return; }
-  localStorage.setItem('devfit_reminders','1');
-  try{
-    const reg=await navigator.serviceWorker.ready;
-    if('periodicSync' in reg){
-      let granted=true;
-      try{ const st=await navigator.permissions.query({name:'periodic-background-sync'}); granted=(st.state==='granted'); }catch(e){}
-      if(granted) await reg.periodicSync.register('devfit-daily-reminder',{minInterval:24*60*60*1000});
-    }
-    reg.showNotification('Reminders on ✓',{body:'We’ll nudge you daily to log your progress.',icon:'./icon-192.png',badge:'./icon-192.png',tag:'devfit-confirm'});
-  }catch(e){}
-  toast('Daily reminders turned on'); initReminders();
-}
-
 // ---------- WIRE UP BUTTONS (bulletproof: direct bind + global delegation fallback) ----------
 const ACTION_MAP = {
-  'reminders-btn'             : () => toggleReminders(),
   'week-report-btn'           : () => exportWeekPDF(),
   'program-report-toggle-btn' : () => {
     document.getElementById('range-row').style.display = 'grid';
@@ -1531,8 +1483,6 @@ function wireDirect(){
 wireDirect();
 // 2. Re-bind on DOM ready (in case any element was added after script ran)
 if(document.readyState !== 'complete') document.addEventListener('DOMContentLoaded', wireDirect);
-// Reflect current reminder state in the toggle label
-initReminders();
 // 3. Global delegation — works even if direct bind failed for any reason
 document.addEventListener('click', (ev) => {
   const target = ev.target.closest('[id]');

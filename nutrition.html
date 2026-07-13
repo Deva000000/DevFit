@@ -1675,26 +1675,26 @@ applyNutritionTierGates();
     ctx.fillText('DAILY NUTRITION',PAD,y);
     y+=52;
     // (date removed) tighter rhythm
-    y+=40;
+    y+=26;
 
     // Calories hero — metric-aware so the big number never overlaps below
     ctx.textBaseline='alphabetic';
     ctx.fillStyle=pal.sub;
-    ctx.font=F(700,30);
-    { const lm=vmet('CALORIES',30); ctx.fillText('CALORIES',PAD,y+lm.a); y+=lm.a+lm.d+20; }
+    ctx.font=F(700,28);
+    { const lm=vmet('CALORIES',28); ctx.fillText('CALORIES',PAD,y+lm.a); y+=lm.a+lm.d+14; }
     ctx.fillStyle=pal.fg;
-    let heroPx=190;
+    let heroPx=140;
     ctx.font=F(800,heroPx);
     const calStr=cal.toLocaleString();
-    while(ctx.measureText(calStr).width>W-PAD*2-190 && heroPx>110){ heroPx-=6; ctx.font=F(800,heroPx); }
+    while(ctx.measureText(calStr).width>W-PAD*2-160 && heroPx>96){ heroPx-=6; ctx.font=F(800,heroPx); }
     const hm=vmet(calStr,heroPx);
     const hbase=y+hm.a;
     ctx.fillText(calStr,PAD,hbase);
     const calW=ctx.measureText(calStr).width;
     ctx.fillStyle=pal.sub;
-    ctx.font=F(600,48);
-    ctx.fillText('kcal',PAD+calW+18,hbase);
-    y=hbase+hm.d+48;
+    ctx.font=F(600,40);
+    ctx.fillText('kcal',PAD+calW+16,hbase);
+    y=hbase+hm.d+40;
 
     // Macro split bar — clip to a rounded pill, then fill crisp segments
     if(macroTotal>0){
@@ -1712,13 +1712,13 @@ applyNutritionTierGates();
         segX+=segW;
       });
       ctx.restore();
-      y+=barH+58;
+      y+=barH+44;
     }
 
     // Divider
     ctx.fillStyle=pal.divider;
     ctx.fillRect(PAD,y,W-PAD*2,2);
-    y+=56;
+    y+=42;
 
     // Macro rows
     ctx.textBaseline='top';
@@ -1727,20 +1727,20 @@ applyNutritionTierGates();
       {label:'Carbs',  g:c,kcal:cCal,col:MACRO_COL.c},
       {label:'Fat',    g:f,kcal:fCal,col:MACRO_COL.f}
     ];
-    const rowH=104;
+    const rowH=82;
     rows.forEach(r=>{
       // color dot
       ctx.fillStyle=r.col;
-      ctx.beginPath(); ctx.arc(PAD+14,y+30,16,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(PAD+13,y+26,14,0,Math.PI*2); ctx.fill();
       // label
       ctx.fillStyle=pal.fg;
       ctx.textAlign='left';
-      ctx.font=F(800,56);
-      ctx.fillText(r.label,PAD+56,y);
+      ctx.font=F(800,50);
+      ctx.fillText(r.label,PAD+52,y);
       // value right
       ctx.textAlign='right';
       ctx.fillStyle=pal.fg;
-      ctx.font=F(800,56);
+      ctx.font=F(800,50);
       const gTxt=r.g+'g';
       ctx.fillText(gTxt,W-PAD,y);
       // (% of kcal removed for a cleaner, minimal card)
@@ -1755,17 +1755,17 @@ applyNutritionTierGates();
       // Divider
       ctx.fillStyle=pal.divider;
       ctx.fillRect(PAD,y,W-PAD*2,2);
-      y+=44;
+      y+=34;
 
       // Section label
       ctx.textAlign='left'; ctx.textBaseline='top';
       ctx.fillStyle=pal.sub;
       ctx.font=F(700,28);
-      ctx.fillText("TODAY'S MEALS",PAD,y); y+=46;
+      ctx.fillText("TODAY'S MEALS",PAD,y); y+=44;
 
       // Reserve the footer band so the list can NEVER collide with the DEVFIT
       // wordmark (this was the overflow bug on days with many meals).
-      const mRowH=56;
+      const mRowH=50;
       const footerTop=H-PAD-86;            // wordmark baseline sits at H-PAD
       const avail=footerTop-y;
       let maxRows=Math.max(1,Math.floor(avail/mRowH));
@@ -1780,7 +1780,7 @@ applyNutritionTierGates();
         // name
         ctx.textAlign='left'; ctx.textBaseline='top';
         ctx.fillStyle=pal.fg;
-        ctx.font=F(700,42);
+        ctx.font=F(700,38);
         // truncate if long
         let mname=meal.name;
         while(ctx.measureText(mname).width>W-PAD*2-200 && mname.length>4) mname=mname.slice(0,-1);
@@ -1789,14 +1789,14 @@ applyNutritionTierGates();
         // kcal right-aligned
         ctx.textAlign='right';
         ctx.fillStyle=pal.accent;
-        ctx.font=F(700,42);
+        ctx.font=F(700,38);
         ctx.fillText(mCal+' kcal',W-PAD,y);
         y+=mRowH;
       });
       if(overflow>0){
         ctx.textAlign='left'; ctx.textBaseline='top';
         ctx.fillStyle=pal.sub;
-        ctx.font=F(600,36);
+        ctx.font=F(600,34);
         ctx.fillText('+ '+overflow+' more meal'+(overflow>1?'s':''),PAD,y+2);
       }
     }

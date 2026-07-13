@@ -2568,10 +2568,7 @@ renderTabs();
 render();
 applyTierGates();
 try{ showProgSection(localStorage.getItem('devfit_progSection')||'daily'); }catch(e){ showProgSection('daily'); }
-// ---------- IN-APP REMINDER FALLBACK ----------
-// periodicSync (sw.js) covers installed Chrome/Android PWAs. This covers the
-// rest: when the app is opened in the evening and nothing's logged today, nudge
-// once. Honest best-effort without a push backend.
+// Maps today's calendar date to a {w,d} week/day cell in the program grid.
 function reminderTodayCell(){
   try{
     const start=programStartDate(); start.setHours(0,0,0,0);
@@ -2583,32 +2580,8 @@ function reminderTodayCell(){
     return {w,d};
   }catch(e){ return null; }
 }
-function reminderLoggedToday(){
-  const c=reminderTodayCell(); if(!c) return false;
-  const got=(arr)=> arr && arr[c.w] && arr[c.w][c.d]!=='' && arr[c.w][c.d]!=null;
-  return got(appData.bw) || got(appData.steps) || got(appData.sleep);
-}
-function maybeRemindInApp(){
-  try{
-    if(localStorage.getItem('devfit_reminders')!=='1') return;
-    if(!('Notification' in window) || Notification.permission!=='granted') return;
-    const today=new Date();
-    const todayStr=today.toISOString().slice(0,10);
-    if(localStorage.getItem('devfit_lastReminded')===todayStr) return; // already nudged today
-    if(today.getHours()<17) return;          // only from late afternoon
-    if(reminderLoggedToday()) return;        // already logged — don't nag
-    localStorage.setItem('devfit_lastReminded',todayStr);
-    if(navigator.serviceWorker && navigator.serviceWorker.ready){
-      navigator.serviceWorker.ready.then(reg=>{
-        reg.showNotification('DevFit',{body:"You haven't logged today — keep the streak alive.",icon:'./icon-192.png',badge:'./icon-192.png',tag:'devfit-daily',data:{url:'./index.html'}});
-      }).catch(()=>{});
-    }
-  }catch(e){}
-}
-
 showCountdown();
 scheduleAccessCheck();
-maybeRemindInApp();
 // Cloud sync — runs after localStorage render so UI is never blocked
 function runProgressSync(){
   if(typeof DevFitDB==='undefined') return;

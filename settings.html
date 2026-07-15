@@ -460,6 +460,44 @@ html.nosplash #devfit-splash{display:none!important}
   <!-- ============================ DATA & ACCOUNT ============================ -->
   <div class="group-title">Data &amp; Account</div>
 
+  <div class="card" id="card-backup">
+    <div class="section-label">Backup &amp; Restore</div>
+    <div id="backup-status" style="font-size:12px;line-height:1.5;padding:2px 2px 10px;color:var(--muted,#9aa0a6)">Checking cloud backup…</div>
+    <button class="setting-btn" id="backup-now-btn" type="button">
+      <div class="icon">☁</div>
+      <div class="body">
+        <div class="title">Back Up Now</div>
+        <div class="desc">Save all your data to the cloud, tied to your email</div>
+      </div>
+      <div class="chev">›</div>
+    </button>
+    <button class="setting-btn" id="restore-cloud-btn" type="button">
+      <div class="icon">⟲</div>
+      <div class="body">
+        <div class="title">Restore from Cloud</div>
+        <div class="desc">Pull your saved data back onto this device</div>
+      </div>
+      <div class="chev">›</div>
+    </button>
+    <button class="setting-btn" id="export-file-btn" type="button">
+      <div class="icon">↧</div>
+      <div class="body">
+        <div class="title">Export Backup File</div>
+        <div class="desc">Download a copy you keep — works even if your plan lapses</div>
+      </div>
+      <div class="chev">›</div>
+    </button>
+    <button class="setting-btn" id="import-file-btn" type="button">
+      <div class="icon">↥</div>
+      <div class="body">
+        <div class="title">Import Backup File</div>
+        <div class="desc">Restore from a backup file you exported earlier</div>
+      </div>
+      <div class="chev">›</div>
+    </button>
+    <input type="file" id="import-file-input" accept="application/json,.json" style="display:none">
+  </div>
+
   <div class="card" id="card-data">
     <div class="section-label">Manage</div>
     <button class="setting-btn danger" id="reset-all-btn" type="button">
@@ -482,7 +520,7 @@ html.nosplash #devfit-splash{display:none!important}
 
   <div class="footer">
     DevFit · Dominance Through Discipline<br>
-    <a href="https://wa.me/60183679177">Contact trainer</a> · v4.29.0
+    <a href="https://wa.me/60183679177">Contact trainer</a> · v4.51.0
   </div>
 
 
@@ -823,10 +861,13 @@ function getCurrentWeight(){
 // ---------- LOGOUT ----------
 function logout(){
   if(!confirm('Logout from DevFit?')) return;
+  // Best-effort flush of any unsynced local data up to the cloud before leaving,
+  // so a returning login later (any tier, any device) restores everything.
+  try{ if(window.DevFitDB && DevFitDB.pushAllLocal) DevFitDB.pushAllLocal(); }catch(e){}
   if(window.DevFitAuth){ DevFitAuth.clearSession(); }
   else { localStorage.removeItem('devfit_user'); localStorage.removeItem('devfit_lastVerified'); }
   localStorage.removeItem('devfit_token');
-  window.location.href = 'login.html';
+  setTimeout(function(){ window.location.href = 'login.html'; }, 250);
 }
 
 // ---------- RESET ALL DATA ----------
@@ -1446,8 +1487,113 @@ async function checkForUpdates(){
   }
 }
 
+// ---------- BACKUP & RESTORE ----------
+const BACKUP_KEYS = ['progressLog2','devfitNutritionV2','devfitTrainingV1'];
+
+function backupOwnerEmail(){
+  try{ return (JSON.parse(localStorage.getItem('devfit_user')||'{}').email||'').toLowerCase(); }catch(e){ return ''; }
+}
+function lastCloudBackupTs(){
+  let t = 0;
+  ['progress','nutrition','workouts'].forEach(k=>{
+    const v = parseInt(localStorage.getItem('devfit_cloud_ts_'+k)||'0',10);
+    if(v>t) t=v;
+  });
+  return t;
+}
+function refreshBackupStatus(){
+  const el = document.getElementById('backup-status');
+  if(!el) return;
+  const email = backupOwnerEmail() || 'this account';
+  const ts = lastCloudBackupTs();
+  if(ts){
+    const d = new Date(ts);
+    el.innerHTML = 'Cloud backup for <strong>'+email+'</strong><br>Last saved '+d.toLocaleString('en-MY',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  } else {
+    el.innerHTML = 'Cloud backup for <strong>'+email+'</strong><br>No cloud save yet — tap “Back Up Now”.';
+  }
+}
+
+async function backupNow(){
+  if(typeof DevFitDB==='undefined' || !DevFitDB.pushAllLocal){ toast('Cloud not ready — check connection', true); return; }
+  toast('Backing up…');
+  try{
+    await DevFitDB.pushAllLocal();
+    refreshBackupStatus();
+    toast('Backed up to cloud ✓');
+  }catch(e){ toast('Backup failed — check connection', true); }
+}
+
+async function restoreFromCloud(){
+  if(typeof DevFitDB==='undefined' || !DevFitDB.forceSyncAll){ toast('Cloud not ready — check connection', true); return; }
+  if(!confirm('Restore your data from the cloud? This replaces anything on this device with your saved cloud copy.')) return;
+  toast('Restoring…');
+  try{
+    const res = await DevFitDB.forceSyncAll();
+    if(res && res.ok){
+      toast(res.updated>0 ? ('Restored '+res.updated+' section(s) ✓') : 'Already up to date ✓');
+      setTimeout(()=>window.location.reload(), 700);
+    } else {
+      toast((res && res.reason) || 'Restore failed', true);
+    }
+  }catch(e){ toast('Restore failed — check connection', true); }
+}
+
+function exportBackupFile(){
+  try{
+    const payload = { app:'DevFit', kind:'backup', version:3, exportedAt:new Date().toISOString(), email:backupOwnerEmail(), data:{} };
+    BACKUP_KEYS.forEach(k=>{ const v=localStorage.getItem(k); if(v!=null) payload.data[k]=v; });
+    const blob = new Blob([JSON.stringify(payload,null,2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = 'DevFit_Backup_'+(backupOwnerEmail()||'account').replace(/[^a-z0-9]+/gi,'_')+'_'+stamp+'.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 1500);
+    toast('Backup file downloaded ✓');
+  }catch(e){ toast('Export failed', true); }
+}
+
+function importBackupFile(){
+  const input = document.getElementById('import-file-input');
+  if(input) input.click();
+}
+function handleImportFile(ev){
+  const file = ev.target.files && ev.target.files[0];
+  ev.target.value = '';
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(){
+    try{
+      const parsed = JSON.parse(reader.result);
+      const data = parsed && parsed.data;
+      if(!data || typeof data!=='object'){ toast('Not a valid DevFit backup', true); return; }
+      const owner = backupOwnerEmail();
+      const from  = (parsed.email||'').toLowerCase();
+      let msg = 'Import this backup? It replaces the data on this device.';
+      if(from && owner && from!==owner) msg = 'This backup is from '+from+', but you are signed in as '+owner+'. Import anyway? It replaces the data on this device.';
+      if(!confirm(msg)) return;
+      let n = 0;
+      BACKUP_KEYS.forEach(k=>{
+        if(data[k]!=null){ try{ localStorage.setItem(k, data[k]); n++; }catch(_){} }
+      });
+      // Mark local as freshly edited so the imported copy wins the next cloud sync
+      // (and gets pushed up), rather than being overwritten by an older cloud row.
+      ['progress','nutrition','workouts'].forEach(t=>{ try{ localStorage.setItem('devfit_local_ts_'+t, String(Date.now())); }catch(_){}});
+      toast('Imported '+n+' section(s) ✓');
+      setTimeout(()=>window.location.reload(), 800);
+    }catch(e){ toast('Could not read backup file', true); }
+  };
+  reader.readAsText(file);
+}
+
 // ---------- WIRE UP BUTTONS (bulletproof: direct bind + global delegation fallback) ----------
 const ACTION_MAP = {
+  'backup-now-btn'            : () => backupNow(),
+  'restore-cloud-btn'         : () => restoreFromCloud(),
+  'export-file-btn'           : () => exportBackupFile(),
+  'import-file-btn'           : () => importBackupFile(),
   'week-report-btn'           : () => exportWeekPDF(),
   'program-report-toggle-btn' : () => {
     document.getElementById('range-row').style.display = 'grid';
@@ -1483,6 +1629,13 @@ function wireDirect(){
 wireDirect();
 // 2. Re-bind on DOM ready (in case any element was added after script ran)
 if(document.readyState !== 'complete') document.addEventListener('DOMContentLoaded', wireDirect);
+
+// Backup: file-input change + initial status
+(function(){
+  const input = document.getElementById('import-file-input');
+  if(input && !input._devfitBound){ input.addEventListener('change', handleImportFile); input._devfitBound = true; }
+  try{ refreshBackupStatus(); }catch(e){}
+})();
 // 3. Global delegation — works even if direct bind failed for any reason
 document.addEventListener('click', (ev) => {
   const target = ev.target.closest('[id]');
@@ -1563,6 +1716,7 @@ body{padding-bottom:104px!important}
         set('usage-workouts',workouts); set('usage-nutrition',nutDays);
       }catch(e){}
     }
+    try{ refreshBackupStatus(); }catch(e){}
   }).catch(function(){});
 })();
 </script>

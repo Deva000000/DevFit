@@ -918,6 +918,33 @@ html.nosplash #devfit-splash{display:none!important}
   Tap Share, then <strong>"Add to Home Screen"</strong>
 </div>
 
+<!-- FIRST-LOGIN INSTALL GUIDE — shown once after login, only in the browser -->
+<style>
+  #devfit-install-guide{position:fixed;inset:0;z-index:10000;display:none;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+  #devfit-install-guide.show{display:flex}
+  #devfit-install-guide .sheet{background:#141418;border:1px solid rgba(255,255,255,.10);border-top:3px solid #cc0000;border-radius:20px 20px 0 0;padding:22px 22px calc(22px + env(safe-area-inset-bottom));max-width:460px;width:100%;box-shadow:0 -12px 40px rgba(0,0,0,.5);animation:dfig-up .32s cubic-bezier(.2,.8,.2,1)}
+  @keyframes dfig-up{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  #devfit-install-guide h3{margin:0 0 6px;font-family:'DM Sans',sans-serif;font-weight:800;font-size:17px;color:#fff}
+  #devfit-install-guide p.sub{margin:0 0 14px;font-size:13px;color:#b6bcc4;line-height:1.55}
+  #devfit-install-guide ol{margin:0 0 16px;padding-left:18px;color:#d5d9df;font-size:13.5px;line-height:1.8}
+  #devfit-install-guide ol strong{color:#ff5a5a}
+  #devfit-install-guide .row{display:flex;gap:10px}
+  #devfit-install-guide button{flex:1;border:none;border-radius:12px;padding:12px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:13.5px;cursor:pointer}
+  #devfit-install-guide .primary{background:#cc0000;color:#fff}
+  #devfit-install-guide .ghost{background:rgba(255,255,255,.07);color:#cfd4da;border:1px solid rgba(255,255,255,.12)}
+</style>
+<div id="devfit-install-guide">
+  <div class="sheet">
+    <h3>Add DevFit to your home screen</h3>
+    <p class="sub">Open it like an app — full-screen, faster, and it auto-updates. Do this once, then log in inside the installed app for the smoothest experience.</p>
+    <ol id="dfig-steps"></ol>
+    <div class="row">
+      <button class="ghost" id="dfig-later" type="button">Maybe later</button>
+      <button class="primary" id="dfig-action" type="button">Got it</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // LOGIN CHECK — verify with server every time page loads
 const SHEET_URL_AUTH = 'https://script.google.com/macros/s/AKfycbzHTJOANyp1JJ-k2PmRuMjxpTz03G30ThTyV1thlMJ4QMIOvS8HRN4xW3VsHbzI7YXc/exec';
@@ -2321,10 +2348,11 @@ function exportProgramPDF(){
 }
 
 function logout(){
+  try{ if(window.DevFitDB && DevFitDB.pushAllLocal) DevFitDB.pushAllLocal(); }catch(e){}
   if(window.DevFitAuth){ DevFitAuth.clearSession(); }
   else { localStorage.removeItem('devfit_user'); }
   localStorage.removeItem('devfit_token');
-  window.location.href='login.html';
+  setTimeout(function(){ window.location.href='login.html'; }, 250);
 }
 
 function showCountdown(){
@@ -2869,14 +2897,64 @@ document.addEventListener('visibilitychange',function(){
     const b=document.getElementById('pwa-install-bar'); if(b) b.classList.remove('show');
   };
   const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isAndroid=/android/i.test(navigator.userAgent);
   const isStandalone=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone;
-  if(isIOS && !isStandalone && localStorage.getItem('ios-hint-dismissed')!=='1'){
+
+  // ── First-login install guide (once, only in the browser) ────────────────
+  // Runs once per browser after the user is logged in. Guides them to add DevFit
+  // to the home screen and to log in inside the installed app — avoiding the
+  // "installed the empty app, now I have to log in again" confusion.
+  function showInstallGuide(){
+    if(isStandalone){ try{localStorage.setItem('devfit_install_banner_seen','1');}catch(e){} return; }
+    let seen=false; try{ seen=localStorage.getItem('devfit_install_banner_seen')==='1'; }catch(e){}
+    if(seen) return;
+    let loggedIn=false; try{ loggedIn=!!(JSON.parse(localStorage.getItem('devfit_user')||'{}').email); }catch(e){}
+    if(!loggedIn) return;
+    const guide=document.getElementById('devfit-install-guide');
+    const steps=document.getElementById('dfig-steps');
+    const action=document.getElementById('dfig-action');
+    const later=document.getElementById('dfig-later');
+    if(!guide||!steps||!action) return;
+
+    if(isIOS){
+      steps.innerHTML='<li>Tap the <strong>Share</strong> icon in Safari (square with an up-arrow).</li>'+
+        '<li>Scroll and tap <strong>Add to Home Screen</strong>.</li>'+
+        '<li>Tap <strong>Add</strong>, then open DevFit from your home screen and log in there.</li>';
+      action.textContent='Got it';
+    } else if(isAndroid){
+      steps.innerHTML='<li>Tap <strong>Install</strong> below (or the ⋮ menu → <strong>Install app</strong>).</li>'+
+        '<li>Confirm <strong>Add to Home screen</strong>.</li>'+
+        '<li>Open DevFit from your home screen and log in there.</li>';
+      action.textContent = dp ? 'Install' : 'Got it';
+    } else {
+      steps.innerHTML='<li>Click the <strong>install icon</strong> in your browser’s address bar.</li>'+
+        '<li>Confirm <strong>Install</strong>.</li>'+
+        '<li>Open DevFit from your desktop and log in there.</li>';
+      action.textContent = dp ? 'Install' : 'Got it';
+    }
+
+    function close(){ try{localStorage.setItem('devfit_install_banner_seen','1');}catch(e){} guide.classList.remove('show'); }
+    if(later && !later._b){ later._b=1; later.addEventListener('click', close); }
+    if(!action._b){ action._b=1; action.addEventListener('click', async ()=>{
+      if(dp){ try{ await window.pwaInstall(); }catch(e){} }
+      close();
+    }); }
+    setTimeout(()=>guide.classList.add('show'), 1400);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', showInstallGuide);
+  else showInstallGuide();
+
+  // Legacy small iOS hint — only after the full guide has been seen, so first
+  // login shows one clear prompt, not two.
+  if(isIOS && !isStandalone && localStorage.getItem('devfit_install_banner_seen')==='1' && localStorage.getItem('ios-hint-dismissed')!=='1'){
     const hint=document.getElementById('ios-hint');
     if(hint){ setTimeout(()=>hint.classList.add('show'),3000); hint.querySelector('.x').addEventListener('click',()=>localStorage.setItem('ios-hint-dismissed','1')); }
   }
   window.addEventListener('appinstalled',()=>{
     localStorage.setItem('pwa-installed-at',new Date().toISOString());
+    try{localStorage.setItem('devfit_install_banner_seen','1');}catch(e){}
     const b=document.getElementById('pwa-install-bar'); if(b) b.classList.remove('show');
+    const g=document.getElementById('devfit-install-guide'); if(g) g.classList.remove('show');
   });
 })();
 </script>

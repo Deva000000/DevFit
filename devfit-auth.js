@@ -59,6 +59,64 @@
     } catch (e) {}
   }
 
+  // ── Per-account local data isolation ──────────────────────────────────────
+  // The cloud (Supabase devfit_data) is keyed by email, but the LOCAL cache uses
+  // global keys. Without a guard, logging out and back in as a different email on
+  // the same device leaves the previous person's program/diet/workout data in
+  // localStorage — the app then shows it AND syncs it up to the new email's cloud
+  // row, cross-contaminating both accounts. enforceDataOwner() binds the local
+  // cache to exactly one email at a time and wipes it clean on an account switch.
+  var DATA_KEYS = [
+    'progressLog2', 'devfitNutritionV2', 'devfitNutritionV1', 'devfitTrainingV1',
+    'devfit_cloud_ts_progress', 'devfit_cloud_ts_nutrition', 'devfit_cloud_ts_workouts',
+    'devfit_local_ts_progress', 'devfit_local_ts_nutrition', 'devfit_local_ts_workouts',
+    'devfit_freeWeekKey', 'devfit_displayName',
+    'devfit_cardioSessGoal', 'devfit_cardioGoalKm', 'devfit_trendRange', 'devfit_progSection'
+  ];
+
+  function wipeLocalData() {
+    try { DATA_KEYS.forEach(function (k) { localStorage.removeItem(k); }); } catch (e) {}
+  }
+
+  // Snapshot the three core data blobs under an email-scoped key before wiping, so
+  // an offline account-switch never destroys unsynced edits — they can be recovered
+  // from devfit_backup_<email> if that user logs back in on this same device.
+  function snapshotFor(email) {
+    if (!email) return;
+    try {
+      var snap = {
+        progressLog2: localStorage.getItem('progressLog2'),
+        devfitNutritionV2: localStorage.getItem('devfitNutritionV2'),
+        devfitTrainingV1: localStorage.getItem('devfitTrainingV1'),
+        ts: Date.now()
+      };
+      if (snap.progressLog2 || snap.devfitNutritionV2 || snap.devfitTrainingV1) {
+        localStorage.setItem('devfit_backup_' + email, JSON.stringify(snap));
+      }
+    } catch (e) {}
+  }
+
+  function currentEmail() { return (getUser().email || '').trim().toLowerCase(); }
+
+  function enforceDataOwner() {
+    try {
+      var current = currentEmail();
+      if (!current) return;                     // not logged in — gate() redirects
+      var owner = (localStorage.getItem('devfit_data_owner') || '').trim().toLowerCase();
+      if (!owner) { localStorage.setItem('devfit_data_owner', current); return; } // adopt existing cache
+      if (owner === current) return;            // same account — nothing to do
+      // A different account owns the local cache. Preserve it, then wipe clean so
+      // the newly logged-in email starts from its own cloud data (or fresh).
+      snapshotFor(owner);
+      wipeLocalData();
+      localStorage.setItem('devfit_data_owner', current);
+    } catch (e) {}
+  }
+
+  // Run the guard as early as possible — this IIFE executes before any page's
+  // data-reading code, so the cache is already clean by the time the app reads it.
+  enforceDataOwner();
+
   // Tier as the client sees it — trusts the last verified value, but still
   // auto-reverts to Free the moment the paid period ends (offline-safe).
   function getUserTier() {
@@ -155,6 +213,7 @@
   global.DevFitAuth = {
     getUser: getUser, getToken: getToken, setSession: setSession, clearSession: clearSession,
     getUserTier: getUserTier, isPro: isPro, startSession: startSession, reverify: reverify, gate: gate,
+    wipeLocalData: wipeLocalData, enforceDataOwner: enforceDataOwner, DATA_KEYS: DATA_KEYS,
     get strict() { return STRICT; }
   };
 })(window);

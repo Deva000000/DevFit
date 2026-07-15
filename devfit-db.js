@@ -1,30 +1,41 @@
 /**
- * DevFit Cloud Sync — Supabase backend
+ * DevFit Cloud Sync — via the token-authenticated /api/data proxy.
  * Keeps progress, nutrition and workout data synced across all devices.
  * localStorage stays as the offline cache — sync is additive, never destructive.
  *
- * Table: devfit_data  (email TEXT, data_type TEXT, data JSONB, updated_at TIMESTAMPTZ)
- * PK: (email, data_type)
+ * SECURITY: the browser no longer talks to Supabase directly. All reads/writes go
+ * through /api/data, which derives the email from the SIGNED session token, so a
+ * user can only ever touch their own row. The Supabase table denies the public
+ * anon key entirely; only the server (service-role key) can reach it.
  */
 (function (global) {
   'use strict';
 
-  const SUPABASE_URL = 'https://zngberygrzpkhiqrrzwj.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_oJSFEcVvsvbhPA_8mhUrGQ_JCrBddtn';
+  const DATA_API = '/api/data';
 
-  let _client = null;
-
-  function client() {
-    if (_client) return _client;
-    if (!global.supabase) return null;
-    try { _client = global.supabase.createClient(SUPABASE_URL, SUPABASE_KEY); }
-    catch (e) { return null; }
-    return _client;
+  function getToken() {
+    try { return localStorage.getItem('devfit_token') || ''; } catch (e) { return ''; }
   }
-
   function getEmail() {
     try { return JSON.parse(localStorage.getItem('devfit_user') || '{}').email || null; }
     catch (e) { return null; }
+  }
+
+  // Core transport. Resolves to the parsed JSON, or { skip:true } when there is no
+  // session/token or the backend isn't configured — callers treat skip as "stay
+  // local, try again later" and never surface an error or lose data.
+  async function apiCall(op, extra) {
+    const token = getToken();
+    if (!token) return { skip: true, reason: 'no_token' };
+    const res = await fetch(DATA_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      body: JSON.stringify(Object.assign({ token: token, op: op }, extra || {}))
+    });
+    if (res.status === 501 || res.status === 401) return { skip: true, status: res.status };
+    if (!res.ok) throw new Error('data api ' + res.status);
+    return await res.json();
   }
 
   // ── Sync indicator dot (injected into header automatically) ──────────────
@@ -36,17 +47,9 @@
     dot.id = 'devfit-cloud-dot';
     dot.title = 'Cloud sync';
     dot.style.cssText = [
-      'display:inline-block',
-      'width:7px',
-      'height:7px',
-      'border-radius:50%',
-      'background:#6b7280',
-      'position:absolute',
-      'top:10px',
-      'right:14px',
-      'transition:background .4s',
-      'z-index:999',
-      'cursor:default'
+      'display:inline-block', 'width:7px', 'height:7px', 'border-radius:50%',
+      'background:#6b7280', 'position:absolute', 'top:10px', 'right:14px',
+      'transition:background .4s', 'z-index:999', 'cursor:default'
     ].join(';');
     header.style.position = 'relative';
     header.appendChild(dot);
@@ -61,7 +64,6 @@
     el.title = labels[state] || 'Cloud sync';
   }
 
-  // Auto-inject dot once DOM is ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', injectDot);
   } else {
@@ -70,26 +72,20 @@
 
   // ── Core save ─────────────────────────────────────────────────────────────
   /**
-   * Save data to Supabase. Fire-and-forget — never blocks UI.
+   * Save data to the cloud. Fire-and-forget — never blocks UI.
    * @param {'progress'|'nutrition'|'workouts'} dataType
    * @param {object} data
    */
   async function cloudSave(dataType, data) {
-    // Record the local-modified time synchronously, BEFORE any async work and
-    // regardless of whether the cloud round-trip succeeds. This is the source
-    // of truth for "local has unsynced edits newer than the cloud copy" and
-    // protects edits if the user navigates away before the upload completes.
+    // Record the local-modified time synchronously, BEFORE any async work — the
+    // source of truth for "local has unsynced edits newer than the cloud copy",
+    // so an edit is never clobbered even if the user navigates away mid-upload.
     try { localStorage.setItem('devfit_local_ts_' + dataType, String(Date.now())); } catch (_) {}
-    const db = client();
-    const email = getEmail();
-    if (!db || !email) return;
+    if (!getToken()) return;
     setIndicator('syncing');
     try {
-      const { error } = await db.from('devfit_data').upsert(
-        { email, data_type: dataType, data, updated_at: new Date().toISOString() },
-        { onConflict: 'email,data_type' }
-      );
-      if (error) throw error;
+      const r = await apiCall('set', { dataType: dataType, data: data });
+      if (r && r.skip) { setIndicator('offline'); return; }
       localStorage.setItem('devfit_cloud_ts_' + dataType, String(Date.now()));
       setIndicator('ok');
     } catch (e) {
@@ -98,65 +94,47 @@
     }
   }
 
-  // Effective local timestamp for a data type = the most recent of "last
-  // successful cloud sync" and "last local edit". Using the local-edit time
-  // means an edit that hasn't reached the cloud yet still counts as newer than
-  // the (older) cloud copy, so sync never clobbers it.
+  // Effective local timestamp = most recent of last cloud sync and last local edit.
   function localTsFor(dataType) {
     const synced = parseInt(localStorage.getItem('devfit_cloud_ts_' + dataType) || '0', 10);
     const edited = parseInt(localStorage.getItem('devfit_local_ts_' + dataType) || '0', 10);
     return Math.max(synced || 0, edited || 0);
   }
 
-  // ── Startup sync ──────────────────────────────────────────────────────────
+  // ── Startup sync (single data type) ───────────────────────────────────────
   /**
-   * On page load: compare local vs cloud timestamps.
-   * If cloud is newer → pull and call onNewData(parsedData).
-   * If local is newer → push local up to cloud.
-   * @param {'progress'|'nutrition'|'workouts'} dataType
-   * @param {string} localKey  - localStorage key
-   * @param {Function|null} onNewData - called when cloud data replaces local
+   * On page load: compare local vs cloud timestamps for one data type.
+   * Cloud newer → pull + call onNewData(parsedData). Local newer → push up.
    */
   async function cloudSync(dataType, localKey, onNewData) {
-    const db = client();
-    const email = getEmail();
-    if (!db || !email) return;
+    if (!getToken()) return;
     setIndicator('syncing');
     const localTs = localTsFor(dataType);
     try {
-      const { data: row, error } = await db
-        .from('devfit_data')
-        .select('data, updated_at')
-        .eq('email', email)
-        .eq('data_type', dataType)
-        .maybeSingle();
-
-      if (error) throw error;
+      const r = await apiCall('get');
+      if (r && r.skip) { setIndicator('offline'); return; }
+      const rows = (r && r.rows) || [];
+      const row = rows.filter(function (x) { return x.data_type === dataType; })[0];
 
       if (!row) {
-        // Nothing in cloud yet — push local data up
+        // Nothing in cloud yet — push local up.
         const raw = localStorage.getItem(localKey);
-        if (raw) {
-          try { await cloudSave(dataType, JSON.parse(raw)); } catch (_) {}
-        }
+        if (raw) { try { await cloudSave(dataType, JSON.parse(raw)); } catch (_) {} }
         setIndicator('ok');
         return;
       }
 
       const cloudTs = new Date(row.updated_at).getTime();
-
       if (cloudTs > localTs + 3000) {
-        // Cloud is meaningfully newer — overwrite local cache and notify page
+        // Cloud meaningfully newer — adopt it and notify the page.
         localStorage.setItem(localKey, JSON.stringify(row.data));
         localStorage.setItem('devfit_cloud_ts_' + dataType, String(cloudTs));
         setIndicator('ok');
         if (typeof onNewData === 'function') onNewData(row.data);
       } else {
-        // Local is same or newer — push up
+        // Local same or newer — push up.
         const raw = localStorage.getItem(localKey);
-        if (raw) {
-          try { await cloudSave(dataType, JSON.parse(raw)); } catch (_) {}
-        }
+        if (raw) { try { await cloudSave(dataType, JSON.parse(raw)); } catch (_) {} }
         setIndicator('ok');
       }
     } catch (e) {
@@ -165,81 +143,67 @@
     }
   }
 
-  // ── Restore-on-load sync (Settings auto-restore) ─────────────────────────
+  // ── Restore-on-load sync (all types, timestamp-safe) ─────────────────────
   /**
-   * Reconcile every data type with the cloud, RESPECTING timestamps so it is
-   * non-destructive: a cloud copy only overwrites local when it is genuinely
-   * newer than the local edit/sync time. If local is newer (a recent edit that
-   * hasn't been uploaded yet), local is pushed up instead of being clobbered.
-   * This is what prevents the "edit in one page, change a setting elsewhere,
-   * come back and the edit is gone" data-loss bug.
-   * Returns { ok: boolean, updated: number, reason?: string }
-   *   updated = number of local keys actually replaced by a newer cloud copy.
+   * Reconcile every data type with the cloud, respecting timestamps so it is
+   * non-destructive: a cloud copy only overwrites local when genuinely newer;
+   * otherwise local is pushed up. Returns { ok, updated, reason? }.
    */
   async function forceSyncAll() {
-    const db = client();
-    const email = getEmail();
-    if (!db || !email) return { ok: false, reason: 'Not connected — check your internet' };
+    if (!getToken()) return { ok: false, reason: 'Not signed in' };
     setIndicator('syncing');
     try {
-      const { data: rows, error } = await db
-        .from('devfit_data')
-        .select('data_type, data, updated_at')
-        .eq('email', email);
-      if (error) throw error;
-
+      const r = await apiCall('get');
+      if (r && r.skip) { setIndicator('offline'); return { ok: false, reason: 'Not connected — check your internet' }; }
+      const rows = (r && r.rows) || [];
       const keyMap = {
-        progress:  'progressLog2',
+        progress: 'progressLog2',
         nutrition: 'devfitNutritionV2',
-        workouts:  'devfitTrainingV1'
+        workouts: 'devfitTrainingV1'
       };
       let updated = 0;
-      (rows || []).forEach(row => {
+      rows.forEach(function (row) {
         const lk = keyMap[row.data_type];
         if (!lk || !row.data) return;
         const cloudTs = new Date(row.updated_at).getTime();
         const localTs = localTsFor(row.data_type);
         if (cloudTs > localTs + 3000) {
-          // Cloud is meaningfully newer — safe to adopt it.
           localStorage.setItem(lk, JSON.stringify(row.data));
           localStorage.setItem('devfit_cloud_ts_' + row.data_type, String(cloudTs));
           updated++;
         } else if (localTs > cloudTs) {
-          // Local has newer unsynced edits — push them up, don't overwrite.
           const raw = localStorage.getItem(lk);
           if (raw) { try { cloudSave(row.data_type, JSON.parse(raw)); } catch (_) {} }
         }
       });
       setIndicator('ok');
-      return { ok: true, updated };
+      return { ok: true, updated: updated };
     } catch (e) {
       setIndicator('err');
       return { ok: false, reason: e.message || String(e) };
     }
   }
 
-  // ── Push all local data to cloud (first-time setup) ──────────────────────
+  // ── Push all local data to cloud (first-time setup / backup) ─────────────
   async function pushAllLocal() {
     const types = [
-      { type: 'progress',  key: 'progressLog2' },
+      { type: 'progress', key: 'progressLog2' },
       { type: 'nutrition', key: 'devfitNutritionV2' },
-      { type: 'workouts',  key: 'devfitTrainingV1' }
+      { type: 'workouts', key: 'devfitTrainingV1' }
     ];
-    for (const { type, key } of types) {
-      const raw = localStorage.getItem(key);
-      if (raw) {
-        try { await cloudSave(type, JSON.parse(raw)); } catch (_) {}
-      }
+    for (const t of types) {
+      const raw = localStorage.getItem(t.key);
+      if (raw) { try { await cloudSave(t.type, JSON.parse(raw)); } catch (_) {} }
     }
   }
 
-  // ── Expose public API ─────────────────────────────────────────────────────
+  // ── Public API (unchanged surface) ────────────────────────────────────────
   global.DevFitDB = {
-    cloudSave,
-    cloudSync,
-    forceSyncAll,
-    pushAllLocal,
-    setIndicator
+    cloudSave: cloudSave,
+    cloudSync: cloudSync,
+    forceSyncAll: forceSyncAll,
+    pushAllLocal: pushAllLocal,
+    setIndicator: setIndicator
   };
 
 })(window);

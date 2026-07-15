@@ -946,66 +946,19 @@ html.nosplash #devfit-splash{display:none!important}
 </div>
 
 <script>
-// LOGIN CHECK — verify with server every time page loads
-const SHEET_URL_AUTH = 'https://script.google.com/macros/s/AKfycbzHTJOANyp1JJ-k2PmRuMjxpTz03G30ThTyV1thlMJ4QMIOvS8HRN4xW3VsHbzI7YXc/exec';
-
-// Layer 1: signed-token gate. Redirects if no session, re-verifies against the
-// server (/api/verify) so a forged localStorage session is corrected on load,
-// and reloads if the tier changed. Falls back to trusting the cached session
-// when the backend isn't live yet or the device is offline.
+// LOGIN CHECK — signed-token gate (devfit-auth.js). Redirects when there's no
+// session, re-verifies against /api/verify so a forged localStorage session is
+// rejected (STRICT), and reloads when the tier changes. Offline → trusts the
+// cached session. This is the single source of truth for access — the old
+// Google-Sheet polling was removed (it could wrongly log out paying clients and
+// was a weaker parallel auth path).
 if(window.DevFitAuth){
   DevFitAuth.gate(function(){ if(typeof showCountdown==='function') showCountdown(); });
 } else {
-  (function(){
-    try{
-      const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
-      if(!user.email){ window.location.href='login.html'; return; }
-      const url = SHEET_URL_AUTH+'?action=checkAccess&email='+encodeURIComponent(user.email)+'&_='+Date.now();
-      fetch(url, {cache:'no-store'})
-        .then(r=>r.json())
-        .then(data=>{
-          if(data.approved){
-            try{
-              const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
-              const oldTier = (u.tier||'').toLowerCase();
-              const newTier = (data.tier||'pro').toLowerCase();
-              if(data.expiry) u.expiry = data.expiry;
-              if(data.startDate) u.startDate = data.startDate;
-              if(data.plan) u.plan = data.plan;
-              if(data.name) u.name = data.name;
-              u.tier = newTier;
-              localStorage.setItem('devfit_user', JSON.stringify(u));
-              localStorage.setItem('devfit_lastVerified', String(Date.now()));
-              if(oldTier && oldTier !== newTier){ setTimeout(()=>window.location.reload(), 50); return; }
-            }catch(e){}
-            if(typeof showCountdown==='function') showCountdown();
-          } else {
-            localStorage.removeItem('devfit_user');
-            localStorage.removeItem('devfit_lastVerified');
-            window.location.href='login.html';
-          }
-        })
-        .catch(()=>{ /* offline — trust local session */ });
-    }catch(e){ window.location.href='login.html'; }
-  })();
+  // Auth script didn't load — we can't verify, so require login.
+  try{ if(!JSON.parse(localStorage.getItem('devfit_user')||'{}').email) window.location.href='login.html'; }
+  catch(e){ window.location.href='login.html'; }
 }
-
-setInterval(()=>{
-  try{
-    const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
-    if(!user.email) return;
-    fetch(SHEET_URL_AUTH+'?action=checkAccess&email='+encodeURIComponent(user.email))
-      .then(r=>r.json())
-      .then(data=>{
-        if(!data.approved){
-          localStorage.removeItem('devfit_user');
-          alert('Your access has been revoked. Please contact your trainer.');
-          window.location.href='login.html';
-        }
-      })
-      .catch(()=>{});
-  }catch(e){}
-}, 30 * 60 * 1000);
 
 const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
@@ -2565,29 +2518,17 @@ function dismissWelcome(){
 }
 
 function scheduleAccessCheck(){
-  const INTERVAL = 24*60*60*1000;
+  // Periodic re-verify against the signed-token backend (not the old Sheet), so a
+  // long-open session picks up revocation / plan changes. reverify() updates the
+  // cached tier; 'kick' clears the session and 'reload' re-renders with the new tier.
+  const INTERVAL = 6*60*60*1000;
   setInterval(()=>{
-    try{
-      const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
-      if(!user.email) return;
-      fetch(SHEET_URL_AUTH+'?action=checkAccess&email='+encodeURIComponent(user.email))
-        .then(r=>r.json())
-        .then(data=>{
-          if(!data.approved){
-            localStorage.removeItem('devfit_user');
-            alert('Your program has ended. Contact your trainer to renew.');
-            window.location.href='login.html';
-          } else {
-            if(data.expiry){
-              const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
-              u.expiry = data.expiry;
-              localStorage.setItem('devfit_user', JSON.stringify(u));
-            }
-            showCountdown();
-          }
-        })
-        .catch(()=>{});
-    }catch(e){}
+    if(!window.DevFitAuth || !DevFitAuth.reverify) return;
+    DevFitAuth.reverify().then(r=>{
+      if(r==='kick'){ DevFitAuth.clearSession(); window.location.href='login.html'; }
+      else if(r==='reload'){ setTimeout(()=>window.location.reload(), 50); }
+      else { try{ showCountdown(); }catch(e){} }
+    }).catch(()=>{});
   }, INTERVAL);
 }
 

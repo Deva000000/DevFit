@@ -22,7 +22,7 @@
 
   var VERIFY_API = '/api/verify';
   var SESSION_API = '/api/session';
-  var STRICT = false; // ← flip to true after Supabase table + Vercel env vars are verified
+  var STRICT = true; // backend live + verified — forged/absent tokens are now rejected
 
   function getUser() {
     try { return JSON.parse(localStorage.getItem('devfit_user') || '{}'); } catch (e) { return {}; }

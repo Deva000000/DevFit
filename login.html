@@ -200,7 +200,6 @@ html.nosplash #devfit-splash{display:none!important}
 'use strict';
 
 const CLIENT_ID  = '94871311791-ql8k9lo0q9e1uq3ri98ghnfr1m187chh.apps.googleusercontent.com';
-const SHEET_URL  = 'https://script.google.com/macros/s/AKfycbzHTJOANyp1JJ-k2PmRuMjxpTz03G30ThTyV1thlMJ4QMIOvS8HRN4xW3VsHbzI7YXc/exec';
 const SB_URL     = 'https://zngberygrzpkhiqrrzwj.supabase.co';
 const SB_KEY     = 'sb_publishable_oJSFEcVvsvbhPA_8mhUrGQ_JCrBddtn';
 
@@ -227,48 +226,18 @@ function hideSpinner(){ document.getElementById('spinner').style.display='none';
 async function checkApproval(email, name, provider, providerToken){
   showSpinner(); hideAll(); show('status-checking');
 
-  if(window.DevFitAuth && providerToken){
-    try{
-      const r = await DevFitAuth.startSession(provider || 'supabase', providerToken, name);
-      if(r && r.approved){
-        hideSpinner(); hideAll();
-        document.cookie='devfit_email='+encodeURIComponent(email)+';max-age=31536000;path=/;SameSite=Lax';
-        window.location.href = 'index.html';
-        return;
-      }
-      if(DevFitAuth.strict && r && (r.status==='pending' || r.status==='denied')){
-        hideSpinner(); hideAll();
-        show(r.status==='pending' ? 'status-pending' : 'status-denied');
-        return;
-      }
-      // Not strict yet, or notConfigured/transport error → fall through to Sheet,
-      // which stays authoritative until every client is migrated.
-    }catch(e){ /* transport error → fall through to legacy */ }
-  }
-
+  // Signed-token backend is authoritative. It verifies the provider token
+  // server-side, looks up the subscriber, and returns a signed session that
+  // can't be forged. (The old Google-Sheet fallback was removed.)
   try{
-    const url = SHEET_URL+'?action=checkAccess&email='+encodeURIComponent(email)+'&_='+Date.now();
-    const res  = await fetch(url,{cache:'no-store'});
-    const data = await res.json();
+    const r = await DevFitAuth.startSession(provider || 'supabase', providerToken, name);
     hideSpinner(); hideAll();
-
-    if(data.approved){
-      localStorage.setItem('devfit_user', JSON.stringify({
-        email, name, approved:true,
-        plan:      data.plan||'',
-        expiry:    data.expiry||'',
-        startDate: data.startDate||'',
-        tier:      (data.tier||'pro').toLowerCase()
-      }));
-      localStorage.setItem('devfit_lastVerified', String(Date.now()));
-      // Save email in cookie (365 days) so it pre-fills after PWA reinstall
+    if(r && r.approved){
       document.cookie='devfit_email='+encodeURIComponent(email)+';max-age=31536000;path=/;SameSite=Lax';
       window.location.href = 'index.html';
-    } else if(data.status==='pending'){
-      show('status-pending');
-    } else {
-      show('status-denied');
+      return;
     }
+    show(r && r.status==='pending' ? 'status-pending' : 'status-denied');
   }catch(e){
     hideSpinner(); hideAll(); show('status-denied');
   }

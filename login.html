@@ -151,13 +151,13 @@ html.nosplash #devfit-splash{display:none!important}
 
   <div class="divider"></div>
 
-  <div class="welcome">Welcome back</div>
-  <p class="subtitle">Enter your email to receive a login link — no password needed.</p>
+  <div class="welcome">Sign in or join free</div>
+  <p class="subtitle">DevFit is free to use. Continue with Google, or get a one-tap sign-in link by email — no password, no sign-up form.</p>
 
   <!-- PRIMARY: Email magic link -->
   <div class="email-section">
     <input type="email" id="email-input" class="email-input" placeholder="your@email.com" autocomplete="email" inputmode="email">
-    <button class="email-btn" id="email-btn" type="button">Send Login Link</button>
+    <button class="email-btn" id="email-btn" type="button">Email me a sign-in link</button>
     <div class="sent-msg" id="sent-msg">
       ✉️ Check your inbox!<br>
       <span style="font-size:11px;color:#86efac">Click the link in the email to sign in. Check spam if it doesn't arrive within a minute.</span>
@@ -181,17 +181,17 @@ html.nosplash #devfit-splash{display:none!important}
   <div class="spinner" id="spinner"></div>
 
   <div class="status-box status-checking" id="status-checking">Checking your access — please wait.</div>
-  <div class="status-box status-pending"  id="status-pending">Your account is pending approval.<br>Please contact your trainer to activate access.</div>
-  <div class="status-box status-denied"   id="status-denied">Access not found for this account.<br>Make sure you're using the correct email or contact your trainer.</div>
+  <div class="status-box status-pending"  id="status-pending">This account has been suspended.<br>Please contact your trainer.</div>
+  <div class="status-box status-denied"   id="status-denied">Couldn't sign you in — check your connection and try again.</div>
 
   <div class="contact-box">
-    <p>Not subscribed yet? Contact your trainer to get access.</p>
+    <p>Want Pro (full plans, unlimited history)? Ask your trainer to upgrade you.</p>
     <a href="https://wa.me/60183679177" class="contact-link">WhatsApp Trainer</a>
     <p style="margin-top:12px;margin-bottom:0"><a href="landing.html" style="color:#888;text-decoration:none;font-size:12px;font-weight:600">New to DevFit? See what it does →</a></p>
   </div>
 
   <button id="install-btn" class="install-btn" type="button">Install DevFit App</button>
-  <div class="footer">DevFit · Secure login · v3.8.0</div>
+  <div class="footer">DevFit · Secure login · v4.53.0</div>
   <button id="force-refresh-btn" type="button" style="margin-top:14px;background:transparent;border:1px solid #555;color:#aaa;padding:8px 16px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">↻ Force refresh app</button>
   <div style="font-size:10px;color:#555;margin-top:6px">Having trouble? Tap above to clear cache.</div>
 </div>
@@ -361,7 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
     el.value = savedEmail;
     // Show a subtle hint
     const sub = document.querySelector('.subtitle');
-    if(sub) sub.textContent = 'Welcome back! Tap "Send Login Link" to sign in instantly.';
+    if(sub) sub.textContent = 'Welcome back! Tap "Email me a sign-in link" to sign in instantly.';
   }
 
   // Coming back from magic link?

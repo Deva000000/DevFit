@@ -12,7 +12,7 @@
 
 import {
   haveServerConfig, emailFromSupabaseToken, emailFromGoogleToken,
-  getSubscriber, computeTier, signToken, rateLimit, clientIp, readJsonBody, recordLogin
+  getSubscriber, computeTier, signToken, rateLimit, clientIp, readJsonBody, recordLogin, sbUpsert
 } from './_lib.js';
 
 export default async function handler(req, res) {
@@ -42,8 +42,19 @@ export default async function handler(req, res) {
   // from which device (two phones / phone+tablet+laptop all show up).
   await recordLogin(email, body.deviceId, req.headers['user-agent'], true);
 
-  const sub = await getSubscriber(email);
-  if (!sub) { res.status(200).json({ approved: false, status: 'denied' }); return; }
+  // OPEN SIGNUP: DevFit is free to join. Any verified email that has no record yet
+  // is auto-provisioned a Free account, so anyone can sign in. Pro is the paid
+  // upgrade the trainer activates from admin.html. A row only becomes non-approved
+  // when the trainer explicitly revokes/bans it — those stay locked out.
+  let sub = await getSubscriber(email);
+  if (!sub) {
+    const created = await sbUpsert(
+      'devfit_subscribers',
+      { email, name: email.split('@')[0], tier: 'free', approved: true, updated_at: new Date().toISOString() },
+      'email'
+    );
+    sub = (Array.isArray(created) ? created[0] : created) || { email, tier: 'free', approved: true };
+  }
   if (!sub.approved) { res.status(200).json({ approved: false, status: 'pending' }); return; }
 
   const tier = computeTier(sub);

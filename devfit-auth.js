@@ -59,13 +59,13 @@
     } catch (e) {}
   }
 
-  // ── Per-account local data isolation ──────────────────────────────────────
-  // The cloud (Supabase devfit_data) is keyed by email, but the LOCAL cache uses
-  // global keys. Without a guard, logging out and back in as a different email on
-  // the same device leaves the previous person's program/diet/workout data in
-  // localStorage — the app then shows it AND syncs it up to the new email's cloud
-  // row, cross-contaminating both accounts. enforceDataOwner() binds the local
-  // cache to exactly one email at a time and wipes it clean on an account switch.
+  // ── Per-account data separation (physical namespacing) ────────────────────
+  // Each email's app data is stored under keys suffixed with "::<email>", so two
+  // accounts on the SAME device keep completely separate storage and can never
+  // mix — no wiping, no timing, no re-download. A tiny shim over localStorage
+  // transparently routes these per-user keys to the current email's namespace;
+  // every other key (session, theme, device id, onboarding flags) passes through
+  // untouched. All app code keeps calling the plain key names — nothing else changes.
   var DATA_KEYS = [
     'progressLog2', 'devfitNutritionV2', 'devfitNutritionV1', 'devfitTrainingV1',
     'devfit_cloud_ts_progress', 'devfit_cloud_ts_nutrition', 'devfit_cloud_ts_workouts',
@@ -73,48 +73,69 @@
     'devfit_freeWeekKey', 'devfit_displayName',
     'devfit_cardioSessGoal', 'devfit_cardioGoalKm', 'devfit_trendRange', 'devfit_progSection'
   ];
+  var DATA_KEY_SET = {};
+  DATA_KEYS.forEach(function (k) { DATA_KEY_SET[k] = true; });
 
+  (function installNamespaceShim() {
+    var LS;
+    try { LS = global.localStorage; } catch (e) { return; }
+    if (!LS) return;
+    var origGet = LS.getItem.bind(LS);
+    var origSet = LS.setItem.bind(LS);
+    var origRemove = LS.removeItem.bind(LS);
+
+    function emailNow() {
+      try { return (JSON.parse(origGet('devfit_user') || '{}').email || '').trim().toLowerCase(); }
+      catch (e) { return ''; }
+    }
+    // Per-user keys → "key::email"; everything else untouched. Logged-out access
+    // (no email) uses a fixed "__anon__" bucket so it never lands on a real account.
+    function ns(key) {
+      if (!DATA_KEY_SET[key]) return key;
+      return key + '::' + (emailNow() || '__anon__');
+    }
+
+    // ONE-TIME migration: data written before this shim lived under plain keys.
+    // Move it into the owning email's namespace so upgraded users don't see empty
+    // data, then clear the plain copies. Uses raw methods (no re-namespacing).
+    try {
+      if (!origGet('devfit_ns_migrated')) {
+        var owner = (origGet('devfit_data_owner') || '').trim().toLowerCase() || emailNow();
+        DATA_KEYS.forEach(function (k) {
+          var base = origGet(k);
+          if (base != null) {
+            if (owner && origGet(k + '::' + owner) == null) origSet(k + '::' + owner, base);
+            origRemove(k);
+          }
+        });
+        origSet('devfit_ns_migrated', '1');
+      }
+    } catch (e) {}
+
+    try {
+      LS.getItem = function (k) { return origGet(ns(k)); };
+      LS.setItem = function (k, v) { return origSet(ns(k), v); };
+      LS.removeItem = function (k) { return origRemove(ns(k)); };
+    } catch (e) { /* override blocked → app still works on plain keys */ }
+  })();
+
+  function currentEmail() { return (getUser().email || '').trim().toLowerCase(); }
+
+  // Wipe just the CURRENT account's data (used by reset/backup flows). The shim
+  // scopes these removes to the current email's namespace, so it never touches
+  // any other account.
   function wipeLocalData() {
     try { DATA_KEYS.forEach(function (k) { localStorage.removeItem(k); }); } catch (e) {}
   }
 
-  // Snapshot the three core data blobs under an email-scoped key before wiping, so
-  // an offline account-switch never destroys unsynced edits — they can be recovered
-  // from devfit_backup_<email> if that user logs back in on this same device.
-  function snapshotFor(email) {
-    if (!email) return;
-    try {
-      var snap = {
-        progressLog2: localStorage.getItem('progressLog2'),
-        devfitNutritionV2: localStorage.getItem('devfitNutritionV2'),
-        devfitTrainingV1: localStorage.getItem('devfitTrainingV1'),
-        ts: Date.now()
-      };
-      if (snap.progressLog2 || snap.devfitNutritionV2 || snap.devfitTrainingV1) {
-        localStorage.setItem('devfit_backup_' + email, JSON.stringify(snap));
-      }
-    } catch (e) {}
-  }
-
-  function currentEmail() { return (getUser().email || '').trim().toLowerCase(); }
-
+  // Retained for compatibility; namespacing now makes cross-account mixing
+  // structurally impossible, so this only records the active owner (no wiping).
   function enforceDataOwner() {
     try {
       var current = currentEmail();
-      if (!current) return;                     // not logged in — gate() redirects
-      var owner = (localStorage.getItem('devfit_data_owner') || '').trim().toLowerCase();
-      if (!owner) { localStorage.setItem('devfit_data_owner', current); return; } // adopt existing cache
-      if (owner === current) return;            // same account — nothing to do
-      // A different account owns the local cache. Preserve it, then wipe clean so
-      // the newly logged-in email starts from its own cloud data (or fresh).
-      snapshotFor(owner);
-      wipeLocalData();
-      localStorage.setItem('devfit_data_owner', current);
+      if (current) localStorage.setItem('devfit_data_owner', current);
     } catch (e) {}
   }
-
-  // Run the guard as early as possible — this IIFE executes before any page's
-  // data-reading code, so the cache is already clean by the time the app reads it.
   enforceDataOwner();
 
   // Tier as the client sees it — trusts the last verified value, but still

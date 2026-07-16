@@ -162,8 +162,31 @@
 
 <script>
   const phone = '60183679177';
-  const msg = `Hi DevFit! I'd like to activate Pro (RM16.90/month).%0A%0AMy Gmail: %0AScreenshot of payment attached.`;
-  document.getElementById('wa-link').href = `https://wa.me/${phone}?text=${msg}`;
+  function ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+  // Pre-fill the WhatsApp receipt with everything the trainer needs to activate:
+  // the payer's account email + name, and the exact 30-day window (start → end).
+  // If they're renewing early (expiry still in the future), the new window
+  // continues from the day after their current end so they don't lose paid days.
+  function buildReceiptMsg(){
+    let u = {};
+    try{ u = JSON.parse(localStorage.getItem('devfit_user')||'{}'); }catch(e){}
+    const today = new Date(); today.setHours(0,0,0,0);
+    let start = today;
+    if(u.expiry){ const e = new Date(u.expiry); if(!isNaN(e) && e > today){ start = new Date(e); start.setDate(start.getDate()+1); } }
+    const end = new Date(start); end.setDate(end.getDate()+29); // 30-day inclusive span
+    return [
+      "Hi DevFit! I've paid RM16.90 for Pro — please activate my account:",
+      "",
+      "• Email: " + (u.email || '(type your Gmail here)'),
+      "• Name: "  + (u.name  || '(type your name here)'),
+      "• Start: " + ymd(start),
+      "• End: "   + ymd(end),
+      "",
+      "My payment receipt is attached. Thank you!"
+    ].join("\n");
+  }
+  document.getElementById('wa-link').href = 'https://wa.me/'+phone+'?text='+encodeURIComponent(buildReceiptMsg());
 </script>
 </body>
 </html>

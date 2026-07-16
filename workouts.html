@@ -408,13 +408,12 @@ function getUserTier(){
 function isPro(){ return getUserTier() === 'pro'; }
 
 function paywallHTML(featureName){
-  const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
-  const msg = encodeURIComponent('Hi, I\'d like to upgrade DevFit to Pro. My account: ' + (u.email||'(my email)'));
   return `<div style="background:linear-gradient(135deg,#1a0000,#2a0000);border:1px solid #cc0000;border-radius:14px;padding:24px;text-align:center;margin:8px 0">
     <div style="font-size:11px;font-weight:800;letter-spacing:.08em;color:#ff8888;margin-bottom:8px">PRO FEATURE</div>
     <div style="font-size:16px;color:#fff;font-weight:800;margin-bottom:8px">${featureName}</div>
-    <div style="font-size:13px;color:#aaa;line-height:1.5;margin-bottom:14px">Available on DevFit Pro. Track sessions across weeks, see your progression, and share workout cards.</div>
-    <a href="https://wa.me/60183679177?text=${msg}" style="display:inline-block;background:#cc0000;color:#fff;text-decoration:none;padding:10px 22px;border-radius:20px;font-weight:700;font-size:13px">Upgrade to Pro</a>
+    <div style="font-size:13px;color:#ccc;line-height:1.6;margin-bottom:12px">Track every session across weeks, watch your strength climb, and share clean workout cards — the stuff that keeps you consistent.</div>
+    <div style="font-size:12px;color:#888;margin-bottom:14px">Everything unlocked for <b style="color:#fff">≈ 56 sen a day</b> · RM16.90/mo · cancel anytime</div>
+    <a href="pricing.html" style="display:inline-block;background:#cc0000;color:#fff;text-decoration:none;padding:10px 22px;border-radius:20px;font-weight:700;font-size:13px">See what Pro unlocks →</a>
   </div>`;
 }
 

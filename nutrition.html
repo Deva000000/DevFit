@@ -576,10 +576,8 @@ function applyNutritionTierGates(){
     monthBtn.innerHTML = 'MONTH 🔒';
     monthBtn.addEventListener('click', (e) => {
       e.preventDefault(); e.stopPropagation();
-      const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
-      const msg = encodeURIComponent('Hi, I\'d like to upgrade DevFit to Pro. My account: ' + (u.email||'(my email)'));
-      if(confirm('Monthly trend is a Pro feature. Open WhatsApp to upgrade?')){
-        window.open('https://wa.me/60183679177?text=' + msg, '_blank');
+      if(confirm('See your full monthly nutrition trend — spot the real pattern beyond one week. Pro is RM16.90/mo (≈ 56 sen a day). View what Pro unlocks?')){
+        window.location.href = 'pricing.html';
       }
     }, true);
   }

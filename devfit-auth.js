@@ -112,9 +112,30 @@
       }
     } catch (e) {}
 
+    // Friendly one-time warning when the device's localStorage is full, instead
+    // of saves silently failing (most call sites swallow the error in try/catch).
+    var quotaWarned = false;
+    function notifyQuotaFull() {
+      if (quotaWarned) return; quotaWarned = true;
+      try {
+        var b = document.createElement('div');
+        b.textContent = '⚠ Your device storage is almost full — recent changes may not save. Export a backup in Settings, then free up space.';
+        b.style.cssText = 'position:fixed;left:12px;right:12px;bottom:12px;z-index:2147483000;background:#7f1d1d;color:#fff;padding:12px 14px;border-radius:10px;font:600 13px/1.45 system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.45);text-align:center';
+        (document.body || document.documentElement).appendChild(b);
+        setTimeout(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 9000);
+      } catch (_) {}
+    }
+    function isQuotaError(e) {
+      return e && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014 ||
+                   e.name === 'NS_ERROR_DOM_QUOTA_REACHED');
+    }
+
     try {
       LS.getItem = function (k) { return origGet(ns(k)); };
-      LS.setItem = function (k, v) { return origSet(ns(k), v); };
+      LS.setItem = function (k, v) {
+        try { return origSet(ns(k), v); }
+        catch (e) { if (isQuotaError(e)) notifyQuotaFull(); throw e; }
+      };
       LS.removeItem = function (k) { return origRemove(ns(k)); };
     } catch (e) { /* override blocked → app still works on plain keys */ }
   })();

@@ -718,10 +718,16 @@ html.nosplash #devfit-splash{display:none!important}
 
   <!-- PRO UPGRADE BANNER (shown to free users) -->
   <div class="pro-locked card" style="text-align:center;padding:28px 16px;background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid #334155;">
-    <div style="font-size:22px;margin-bottom:8px;">🔒</div>
-    <div style="font-size:15px;font-weight:700;color:#f1f5f9;margin-bottom:6px;">Progress Analytics — Pro</div>
-    <div style="font-size:12px;color:#94a3b8;margin-bottom:16px;line-height:1.6;">Unlock True Progress Score, weekly analysis,<br>bodyweight trend &amp; score charts.</div>
-    <a href="pricing.html" style="display:inline-block;background:#2f9e57;color:#fff;font-weight:700;font-size:13px;padding:10px 24px;border-radius:20px;text-decoration:none;">Upgrade to Pro — RM16.90/month</a>
+    <div style="font-size:22px;margin-bottom:8px;">📈</div>
+    <div style="font-size:15px;font-weight:800;color:#f1f5f9;margin-bottom:8px;">See if your plan is actually working</div>
+    <div style="font-size:12.5px;color:#cbd5e1;margin-bottom:14px;line-height:1.7;text-align:left;max-width:280px;margin-left:auto;margin-right:auto;">
+      <div style="margin-bottom:5px;">✓ <b>True Progress Score</b> — one number from 6 signals</div>
+      <div style="margin-bottom:5px;">✓ <b>Full history</b> — every week, not just today</div>
+      <div style="margin-bottom:5px;">✓ <b>Trend charts</b> — bodyweight &amp; score over time</div>
+      <div>✓ <b>PDF reports</b> you can keep or share</div>
+    </div>
+    <div style="font-size:12px;color:#94a3b8;margin-bottom:14px;">Everything unlocked for <b style="color:#f1f5f9;">≈ 56 sen a day</b> — RM16.90/month, cancel anytime.</div>
+    <a href="pricing.html" style="display:inline-block;background:#2f9e57;color:#fff;font-weight:700;font-size:13px;padding:11px 26px;border-radius:20px;text-decoration:none;">Unlock Pro →</a>
   </div>
 
   <!-- FEEDBACK (Pro) -->
@@ -1110,7 +1116,8 @@ function loadData(){
     .devfit-lock-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(10,10,12,0.55);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);z-index:10;cursor:pointer;text-align:center;padding:20px}
     .devfit-lock-badge{font-size:10px;font-weight:800;letter-spacing:.12em;color:#fff;background:#cc0000;padding:5px 12px;border-radius:20px;text-transform:uppercase;box-shadow:0 6px 18px rgba(204,0,0,0.45)}
     .devfit-lock-title{font-size:14px;font-weight:800;color:#fff;line-height:1.3;max-width:80%}
-    .devfit-lock-cta{display:inline-flex;align-items:center;gap:6px;background:#fff;color:#cc0000;font-weight:800;font-size:12px;padding:9px 18px;border-radius:22px;text-decoration:none;box-shadow:0 6px 18px rgba(0,0,0,0.4)}
+    .devfit-lock-sub{font-size:11px;color:rgba(255,255,255,0.7);margin-top:6px;margin-bottom:2px;max-width:85%}
+    .devfit-lock-cta{display:inline-flex;align-items:center;gap:6px;background:#fff;color:#cc0000;font-weight:800;font-size:12px;padding:9px 18px;border-radius:22px;text-decoration:none;box-shadow:0 6px 18px rgba(0,0,0,0.4);margin-top:8px}
     .devfit-lock-cta:active{transform:scale(0.96)}
   `;
   document.head.appendChild(s);
@@ -1132,7 +1139,8 @@ function lockCard(card, title){
   overlay.innerHTML = `
     <div class="devfit-lock-badge">★ Pro</div>
     <div class="devfit-lock-title">${title}</div>
-    <a class="devfit-lock-cta" href="https://wa.me/60183679177?text=${msg}" target="_blank" rel="noopener">Upgrade →</a>`;
+    <div class="devfit-lock-sub">Everything unlocked for ≈ 56 sen/day · RM16.90/mo</div>
+    <a class="devfit-lock-cta" href="pricing.html">See what Pro unlocks →</a>`;
   card.appendChild(overlay);
 }
 

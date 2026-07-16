@@ -121,7 +121,7 @@
     <h2>Scan &amp; pay <span class="red">RM16.90</span></h2>
 
     <div class="qr-box">
-      <img src="duitnow-qr.png" alt="DuitNow QR" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <img id="qr-img" src="duitnow-qr.jpg" alt="DuitNow QR" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
       <div class="qr-fallback" style="display:none">DuitNow QR<br><small style="color:#888;margin-top:8px;display:block">Upload your QR as<br><code style="color:#cc0000">duitnow-qr.png</code></small></div>
       <div class="qr-caption">DuitNow QR &middot; <span>Free with any bank or e-wallet</span></div>
     </div>
@@ -161,7 +161,7 @@
 </div>
 
 <script>
-  const phone = '60183679177';
+  let phone = '60183679177';   // default; overridden by /api/config (admin-editable)
   function ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 
   // Pre-fill the WhatsApp receipt with everything the trainer needs to activate:
@@ -186,7 +186,27 @@
       "My payment receipt is attached. Thank you!"
     ].join("\n");
   }
-  document.getElementById('wa-link').href = 'https://wa.me/'+phone+'?text='+encodeURIComponent(buildReceiptMsg());
+  function refreshWa(){
+    document.getElementById('wa-link').href = 'https://wa.me/'+phone+'?text='+encodeURIComponent(buildReceiptMsg());
+  }
+  refreshWa();
+
+  // Live payment settings the trainer can update from admin.html (QR + WhatsApp +
+  // note) — no code change needed. Falls back to the static QR / number above if
+  // the endpoint is unset or offline.
+  fetch('/api/config', { cache: 'no-store' }).then(function(r){ return r.json(); }).then(function(cfg){
+    if(!cfg) return;
+    if(cfg.whatsapp){ phone = String(cfg.whatsapp).replace(/[^0-9]/g,'') || phone; }
+    if(cfg.qr){
+      var img = document.getElementById('qr-img');
+      if(img){ img.src = cfg.qr; img.style.display = ''; var fb = img.nextElementSibling; if(fb) fb.style.display = 'none'; }
+    }
+    if(cfg.note){
+      var cap = document.querySelector('.qr-caption span');
+      if(cap) cap.textContent = cfg.note;
+    }
+    refreshWa();
+  }).catch(function(){});
 </script>
 </body>
 </html>

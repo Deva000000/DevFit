@@ -55,6 +55,24 @@ export default async function handler(req, res) {
       return;
     }
 
+    // ── Payment settings (DuitNow QR / WhatsApp / note) — trainer-editable ──
+    if (action === 'getConfig') {
+      const rows = await sbSelect('devfit_config', 'id=eq.1&select=*');
+      res.status(200).json({ config: (Array.isArray(rows) && rows[0]) || {} });
+      return;
+    }
+    if (action === 'setConfig') {
+      const row = { id: 1, updated_at: new Date().toISOString() };
+      if (typeof body.whatsapp === 'string') row.whatsapp = body.whatsapp.replace(/[^0-9]/g, '').slice(0, 20);
+      if (typeof body.price === 'string') row.price = body.price.slice(0, 20);
+      if (typeof body.qr === 'string') row.qr = body.qr.slice(0, 500000);   // cap ~500KB base64
+      if (typeof body.note === 'string') row.note = body.note.slice(0, 500);
+      const saved = await sbUpsert('devfit_config', row, 'id');
+      if (!saved) { res.status(500).json({ error: 'save_failed' }); return; }
+      res.status(200).json({ ok: true, config: Array.isArray(saved) ? saved[0] : saved });
+      return;
+    }
+
     if (action === 'get') {
       if (!email) { res.status(400).json({ error: 'missing_email' }); return; }
       res.status(200).json({ subscriber: await getSubscriber(email) });

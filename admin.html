@@ -89,6 +89,23 @@
 
     <!-- ===== MANAGE VIEW ===== -->
     <div id="view-manage">
+      <div class="card" id="card-payment">
+        <h2>Payment settings <span class="tap" id="pay-reload">reload</span></h2>
+        <label>WhatsApp number for receipts (digits only)</label>
+        <input type="text" id="pay-whatsapp" placeholder="60183679177" inputmode="numeric" autocomplete="off">
+        <label>DuitNow QR image</label>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:4px">
+          <img id="pay-qr-preview" alt="" style="display:none;width:92px;height:92px;object-fit:contain;background:#fff;border-radius:8px;padding:4px;flex:none">
+          <label for="pay-qr-file" style="flex:1;padding:12px;background:#1a1a1a;border:1px dashed #333;border-radius:9px;text-align:center;color:#93c5fd;cursor:pointer;font-size:13px;margin:0">Tap to upload new QR</label>
+          <input type="file" id="pay-qr-file" accept="image/*" style="display:none">
+        </div>
+        <label>Payment note (optional)</label>
+        <input type="text" id="pay-note" placeholder="e.g. Activated within 24 hours">
+        <button class="btn" id="pay-save">Save payment settings</button>
+        <div class="msg" id="pay-msg"></div>
+        <div class="hint">Shown on the public pricing page. Changes go live within a minute — no code or laptop needed.</div>
+      </div>
+
       <div class="card">
         <h2>Activate / manage a client</h2>
         <label>Client email (Gmail they log in with)</label>
@@ -199,6 +216,7 @@ async function doLogin(){
     $('start').value = ymd(new Date());
     updateDuration();
     renderList(r.data.subscribers || []);
+    loadConfig();
   } else if(r.status === 501){
     msg($('login-msg'), 'Backend not configured yet — set the Vercel env vars (see SETUP_AUTH.md).', false);
   } else if(r.status === 429){
@@ -339,8 +357,62 @@ function showTab(which){
   if(!m) refreshLogins();
 }
 
+/* ---------- payment settings ---------- */
+var payQrData = null;   // pending new QR (base64 data URL); null = keep existing
+
+async function loadConfig(){
+  var r = await call('getConfig');
+  if(r.status !== 200) return;
+  var c = (r.data && r.data.config) || {};
+  $('pay-whatsapp').value = c.whatsapp || '';
+  $('pay-note').value = c.note || '';
+  payQrData = null;
+  var prev = $('pay-qr-preview');
+  if(c.qr){ prev.src = c.qr; prev.style.display = ''; } else { prev.style.display = 'none'; }
+}
+
+// Downscale the uploaded QR to <=480px JPEG so the stored/base64 payload stays
+// small (a phone photo could be several MB otherwise).
+function onQrFile(ev){
+  var file = ev.target.files && ev.target.files[0];
+  ev.target.value = '';
+  if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var img = new Image();
+    img.onload = function(){
+      var max = 480, w = img.width, h = img.height;
+      if(w > max || h > max){ if(w >= h){ h = Math.round(h*max/w); w = max; } else { w = Math.round(w*max/h); h = max; } }
+      var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      payQrData = cv.toDataURL('image/jpeg', 0.85);
+      var prev = $('pay-qr-preview'); prev.src = payQrData; prev.style.display = '';
+      msg($('pay-msg'), 'New QR ready — tap Save to publish it.', true);
+    };
+    img.onerror = function(){ msg($('pay-msg'), 'That file is not a valid image.', false); };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function savePayment(){
+  var btn = $('pay-save'); btn.disabled = true; var t = btn.textContent; btn.textContent = 'Saving…';
+  var extra = {
+    whatsapp: ($('pay-whatsapp').value || '').replace(/[^0-9]/g, ''),
+    note: $('pay-note').value || ''
+  };
+  if(payQrData) extra.qr = payQrData;
+  var r = await call('setConfig', extra);
+  btn.disabled = false; btn.textContent = t;
+  if(r.status === 200 && r.data.ok){ payQrData = null; msg($('pay-msg'), 'Saved ✓ — live on the pricing page within a minute.', true); }
+  else { msg($('pay-msg'), 'Failed: ' + (r.data.error || r.status), false); }
+}
+
 /* ---------- wire ---------- */
 $('login-btn').addEventListener('click', doLogin);
+$('pay-save').addEventListener('click', savePayment);
+$('pay-reload').addEventListener('click', loadConfig);
+$('pay-qr-file').addEventListener('change', onQrFile);
 $('pw').addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); });
 $('logout-btn').addEventListener('click', function(){ pw=''; $('pw').value=''; $('panel').classList.add('hide'); $('login-card').classList.remove('hide'); });
 $('refresh').addEventListener('click', refreshList);

@@ -69,6 +69,19 @@ export async function sbSelect(table, query) {
   return r.json();
 }
 
+// Plain insert (no conflict key). Returns the inserted rows, or null on any error
+// — callers treat null as "not persisted" and never fail because of it.
+export async function sbInsert(table, row) {
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: { ...sbHeaders(), Prefer: 'return=minimal' },
+      body: JSON.stringify(row)
+    });
+    return r.ok ? true : null;
+  } catch (e) { return null; }
+}
+
 export async function sbUpsert(table, row, onConflict) {
   const r = await fetch(`${SB_URL}/rest/v1/${table}?on_conflict=${onConflict}`, {
     method: 'POST',
@@ -183,6 +196,23 @@ export async function rateLimit(id, limit, windowSeconds) {
     await sbUpsert('devfit_rate', { id, hits, reset_at: resetAt }, 'id');
     return { ok: true };
   } catch (e) { return { ok: true }; }
+}
+
+// ── Same-origin guard for the public food-search proxies ─────────────────────
+// The USDA/OFF/Kalori proxies take no auth (they must work for logged-out users
+// on the pricing/landing pages too), so they were wide-open — anyone could script
+// them and run up Vercel invocations + upstream quota. A legit in-app fetch is
+// always same-origin, so its Referer/Origin host equals this deployment's own Host.
+// A scripted curl from elsewhere has a foreign host or none → blocked. Zero added
+// latency (header check only), so it stays off the hot search path's critical path.
+export function sameSiteOnly(req) {
+  try {
+    const host = String((req.headers && req.headers['host']) || '').toLowerCase();
+    const ref = String((req.headers && (req.headers['referer'] || req.headers['origin'])) || '').toLowerCase();
+    if (!ref || !host) return false;
+    const refHost = new URL(ref).host.toLowerCase();
+    return refHost === host || refHost === 'localhost' || refHost.startsWith('localhost:');
+  } catch (e) { return false; }
 }
 
 export function clientIp(req) {

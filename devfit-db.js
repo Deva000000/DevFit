@@ -197,13 +197,66 @@
     }
   }
 
+  // ── Preferences backup (iOS ITP / device-change durability) ───────────────
+  // The big three data types already re-download from the cloud after Safari's
+  // 7-day storage eviction. These small per-user keys (display name, goals, view
+  // prefs) were device-only, so an eviction or a new device silently reset them.
+  // We mirror them to the cloud under a 'prefs' row and restore any that are
+  // missing locally — non-destructive, so a fresher local value always wins.
+  const PREF_KEYS = [
+    'devfit_displayName', 'devfit_cardioGoalKm', 'devfit_cardioSessGoal',
+    'devfit_trendRange', 'devfit_progSection', 'devfit_theme', 'devfit_shareFont'
+  ];
+
+  async function backupPrefs() {
+    if (!getToken()) return;
+    const obj = {}; let any = false;
+    PREF_KEYS.forEach(function (k) {
+      let v = null; try { v = localStorage.getItem(k); } catch (e) {}
+      if (v != null) { obj[k] = v; any = true; }
+    });
+    if (!any) return;
+    try { await apiCall('set', { dataType: 'prefs', data: obj }); } catch (e) {}
+  }
+
+  async function restorePrefs() {
+    if (!getToken()) return;
+    try {
+      const r = await apiCall('get');
+      if (!r || r.skip) return;
+      const row = ((r && r.rows) || []).filter(function (x) { return x.data_type === 'prefs'; })[0];
+      if (!row || !row.data) return;
+      Object.keys(row.data).forEach(function (k) {
+        if (PREF_KEYS.indexOf(k) < 0) return;
+        try { if (localStorage.getItem(k) == null) localStorage.setItem(k, row.data[k]); } catch (e) {}
+      });
+    } catch (e) {}
+  }
+
+  // On load: restore any missing prefs, then push the current set up. Also back up
+  // whenever the app is hidden (tab switch / app backgrounded) so the latest values
+  // are captured without touching every pref call site.
+  function initPrefsSync() {
+    if (!getToken()) return;
+    restorePrefs().then(backupPrefs);
+    try {
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden) backupPrefs();
+      });
+    } catch (e) {}
+  }
+  // Delay so the primary data sync goes first.
+  setTimeout(initPrefsSync, 2500);
+
   // ── Public API (unchanged surface) ────────────────────────────────────────
   global.DevFitDB = {
     cloudSave: cloudSave,
     cloudSync: cloudSync,
     forceSyncAll: forceSyncAll,
     pushAllLocal: pushAllLocal,
-    setIndicator: setIndicator
+    setIndicator: setIndicator,
+    backupPrefs: backupPrefs,
+    restorePrefs: restorePrefs
   };
 
 })(window);

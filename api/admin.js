@@ -11,12 +11,23 @@
 //   action 'deactivate' { email }                  → tier 'free' (data kept)
 //   action 'revoke'   { email }                    → approved:false (kicked out)
 
+import crypto from 'crypto';
 import {
   haveServerConfig, sbSelect, sbUpsert, getSubscriber,
   rateLimit, clientIp, readJsonBody, listLogins
 } from './_lib.js';
 
 const ADMIN_PW = process.env.DEVFIT_ADMIN_PASSWORD || '';
+
+// Constant-time password check so response timing can't leak how many leading
+// characters matched. Length-mismatch still returns false without comparing.
+function pwOk(given) {
+  try {
+    const a = Buffer.from(String(given || ''));
+    const b = Buffer.from(ADMIN_PW);
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  } catch (e) { return false; }
+}
 
 function ymd(d) { return d.toISOString().slice(0, 10); }
 function addDays(base, n) { const d = new Date(base); d.setDate(d.getDate() + n); return d; }
@@ -32,7 +43,7 @@ export default async function handler(req, res) {
   // correct password sails straight through, so a trainer doing normal work —
   // list, get, activate, tab-switching — is never rate-limited. (The old code
   // counted every authenticated action too, which locked the panel mid-use.)
-  if (String(body.password || '') !== ADMIN_PW) {
+  if (!pwOk(body.password)) {
     const rl = await rateLimit('admin_fail:' + clientIp(req), 10, 15 * 60);
     if (!rl.ok) { res.status(429).json({ error: 'rate_limited', retryAfter: rl.retryAfter }); return; }
     res.status(401).json({ error: 'bad_password' });
@@ -132,6 +143,7 @@ export default async function handler(req, res) {
     if (!saved) { res.status(500).json({ error: 'save_failed' }); return; }
     res.status(200).json({ ok: true, subscriber: Array.isArray(saved) ? saved[0] : saved });
   } catch (e) {
-    res.status(500).json({ error: 'server_error', detail: String(e && e.message || e) });
+    console.error('[DevFit admin]', String(e && e.message || e));
+    res.status(500).json({ error: 'server_error' });
   }
 }

@@ -15,7 +15,7 @@ import {
   haveServerConfig, verifyToken, sbSelect, sbUpsert, readJsonBody
 } from './_lib.js';
 
-const TYPES = ['progress', 'nutrition', 'workouts'];
+const TYPES = ['progress', 'nutrition', 'workouts', 'prefs'];
 
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');

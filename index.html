@@ -417,6 +417,7 @@ html.nosplash #devfit-splash{display:none!important}
 <!-- Shared theme: early-apply (no flash) + override stylesheet + controller -->
 <script>try{if(localStorage.getItem('devfit_theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
 <link rel="stylesheet" href="theme.css">
+<script src="devfit-errorlog.js"></script>
 <script defer src="theme.js"></script>
 <script src="devfit-auth.js"></script>
 </head>
@@ -1019,7 +1020,7 @@ let appData = {
 function getUserTier(){
   try {
     const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
-    let t = (u.tier || 'pro').toLowerCase();
+    let t = (u.tier || 'free').toLowerCase();
     // Auto-revert to Free the moment the paid period ends (access runs through the expiry day).
     if(t === 'pro' && u.expiry){
       const today = new Date(); today.setHours(0,0,0,0);
@@ -1030,7 +1031,7 @@ function getUserTier(){
       }
     }
     return t;
-  } catch(e){ return 'pro'; }
+  } catch(e){ return 'free'; }
 }
 function isPro(){ return getUserTier() === 'pro'; }
 
@@ -1045,18 +1046,39 @@ function isoWeekKey(d){
   return dt.getFullYear() + '-W' + String(Math.ceil(((dt - new Date(dt.getFullYear(),0,1))/86400000 + 1)/7)).padStart(2,'0');
 }
 
+// Tier-aware reconciliation of the progress weeks. Call after EVERY appData
+// replacement (load, onboarding restore, cloud sync). Pro → restore full history;
+// Free → single rolling week, but NON-DESTRUCTIVELY (history is preserved).
+function reconcileTierWeeks(){
+  if(isPro()){ restoreProHistory(); currentWeek = currentWeekIndex(); return; }
+  normalizeFreeTierWeeksView();
+}
+
+function anyWeekVals(a){ return Array.isArray(a) && a.some(v => v !== '' && v != null); }
+function weekHasData(w){ return anyWeekVals(w && w.bw) || anyWeekVals(w && w.steps) || anyWeekVals(w && w.sleep); }
+
 // FREE TIER: exactly one week of logging, auto-rolling every Monday (ISO-week
-// anchored). The current week's data is STAMPED with its ISO week in
-// appData.freeWeekOf. Because the stamp travels with the data (localStorage AND
-// cloud), a cloud re-sync that restores last week's copy is detected here and
-// rolled over to a fresh blank week — the old bug where stale data kept coming
-// back after sync (and the week never renewed) is fixed by comparing the stamp,
-// not a one-shot localStorage flag. Must run after EVERY appData replacement.
-function normalizeFreeTierWeeks(){
-  if(isPro()) return;
+// anchored, stamped in appData.freeWeekOf).
+//
+// DATA SAFETY: this used to COLLAPSE + BLANK the stored weeks and push the empty
+// copy to the cloud — so a lapsed Pro user permanently lost their entire history
+// (locally AND in the cloud). Now the complete history is first preserved inside
+// appData._proHistory. Because that field travels with the progress blob to the
+// cloud, no save can ever lose it, and restoreProHistory() puts it back the moment
+// the account is Pro again. The visible arrays are still reduced to one week so the
+// free experience is unchanged.
+function normalizeFreeTierWeeksView(){
   const currentWk = isoWeekKey(new Date());
-  // Free tier only ever shows one week — collapse any multi-week history to the
-  // most recent week (preserves whatever the user last entered).
+  // Preserve the FULL history once, before the view is reduced.
+  if(appData.bw && appData.bw.length > 1 && !appData._proHistory){
+    try{
+      appData._proHistory = JSON.parse(JSON.stringify({
+        bw: appData.bw, steps: appData.steps, sleep: appData.sleep,
+        weeklyCheckin: appData.weeklyCheckin, programStart: appData.programStart || ''
+      }));
+    }catch(e){}
+  }
+  // Reduce the VISIBLE data to the most-recent single week (history stays in _proHistory).
   if(appData.bw && appData.bw.length > 1){
     const li = appData.bw.length - 1;
     appData.bw = [appData.bw[li]];
@@ -1083,14 +1105,58 @@ function normalizeFreeTierWeeks(){
   }
 }
 
+// Restore the full multi-week history preserved during a Free period, and fold any
+// week the user logged while on Free back into its true calendar position (only
+// into an empty slot — real history is never clobbered). Runs when the account is Pro.
+function restoreProHistory(){
+  if(!appData || !appData._proHistory) return;
+  const h = appData._proHistory;
+  // Snapshot the single Free-period week (if it holds any real entries) before we overwrite.
+  const freeWeek = (appData.bw && appData.bw.length === 1) ? {
+    bw: appData.bw[0],
+    steps: (appData.steps && appData.steps[0]) || Array(7).fill(''),
+    sleep: (appData.sleep && appData.sleep[0]) || Array(7).fill(''),
+    checkin: (appData.weeklyCheckin && appData.weeklyCheckin[0]) || freshCheckin(),
+    monday: appData.programStart || ''
+  } : null;
+  appData.bw = h.bw || [];
+  appData.steps = h.steps || [];
+  appData.sleep = h.sleep || [];
+  appData.weeklyCheckin = h.weeklyCheckin || [];
+  if(h.programStart) appData.programStart = h.programStart;
+  delete appData._proHistory;
+  delete appData.freeWeekOf;
+  if(freeWeek && weekHasData(freeWeek) && freeWeek.monday){
+    const start = appData.programStart ? mondayOf(new Date(appData.programStart)) : mondayOf(new Date());
+    const wkMon = mondayOf(new Date(freeWeek.monday));
+    if(start && wkMon){
+      let idx = Math.round((wkMon - start) / (7*24*3600*1000));
+      if(idx < 0) idx = appData.bw.length;
+      while(appData.bw.length <= idx){
+        appData.bw.push(Array(7).fill('')); appData.steps.push(Array(7).fill(''));
+        appData.sleep.push(Array(7).fill('')); appData.weeklyCheckin.push(freshCheckin());
+      }
+      if(!weekHasData({ bw: appData.bw[idx], steps: appData.steps[idx], sleep: appData.sleep[idx] })){
+        appData.bw[idx] = freeWeek.bw; appData.steps[idx] = freeWeek.steps;
+        appData.sleep[idx] = freeWeek.sleep; appData.weeklyCheckin[idx] = freeWeek.checkin;
+      }
+    }
+  }
+  totalWeeks = (appData.bw && appData.bw.length) || 1;
+  try { localStorage.setItem('progressLog2', JSON.stringify(appData)); } catch(e){}
+  if(typeof DevFitDB!=='undefined' && DevFitDB.cloudSave) DevFitDB.cloudSave('progress',appData);
+}
+
+// Back-compat shim: some call sites / older references may still call this name.
+function normalizeFreeTierWeeks(){ if(!isPro()) normalizeFreeTierWeeksView(); }
+
 function loadData(){
   try{
     const s=localStorage.getItem('progressLog2');
     if(s){ appData=JSON.parse(s); totalWeeks=appData.bw.length||4; }
-    // Free-tier: force single current week and auto-roll weekly on Monday
-    if(!isPro()) normalizeFreeTierWeeks();
-    // Pro: open on the week that today actually falls in, not always Week 1.
-    else currentWeek = currentWeekIndex();
+    // Pro → restore full history + open on the current week; Free → single rolling
+    // week (non-destructive: Pro history is preserved for re-upgrade).
+    reconcileTierWeeks();
     // Null-safe: some inputs (e.g. clientName) may not exist on every layout, and a
     // single missing element must not abort populating the rest of the profile fields.
     const setVal=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v; };
@@ -2470,7 +2536,7 @@ function startFirstRun(){
       if(decided) return;
       decided=true; clearTimeout(fallback);
       if(localHasProgress()){
-        try{ appData=JSON.parse(localStorage.getItem('progressLog2')); totalWeeks=(appData.bw&&appData.bw.length)||4; if(!isPro()) normalizeFreeTierWeeks(); else currentWeek=currentWeekIndex(); }catch(e){}
+        try{ appData=JSON.parse(localStorage.getItem('progressLog2')); totalWeeks=(appData.bw&&appData.bw.length)||4; reconcileTierWeeks(); }catch(e){}
         onbMarkDone();
         try{ renderTabs(); render(); applyTierGates(); }catch(e){}
         showWelcomeScreen();
@@ -2566,9 +2632,9 @@ function runProgressSync(){
     appData=d;
     totalWeeks=appData.bw.length||4;
     currentWeek=Math.min(currentWeek,totalWeeks-1);
-    // Re-apply the free-tier single-week rollover — the cloud copy may hold last
-    // week's (or multi-week) data, which must be collapsed/rolled here too.
-    if(!isPro()) normalizeFreeTierWeeks();
+    // Re-apply tier reconciliation — the cloud copy may hold multi-week (Pro) data
+    // or a preserved _proHistory, which must be restored/reduced here too.
+    reconcileTierWeeks();
     renderTabs();render();applyTierGates();
   });
 }

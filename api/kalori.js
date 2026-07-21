@@ -5,8 +5,11 @@
 //   2. Cache results at the edge so repeated searches are instant
 //   3. Allow graceful fallback if the API is down
 
+import { sameSiteOnly } from './_lib.js';
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
+  if (!sameSiteOnly(req)) { res.status(200).json({ data: [] }); return; }
 
   const q = String((req.query && req.query.q) || '').slice(0, 100).trim();
   if (!q) { res.status(200).json({ data: [] }); return; }

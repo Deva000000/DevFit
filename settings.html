@@ -262,6 +262,7 @@ html.nosplash #devfit-splash{display:none!important}
 <!-- Shared theme: early-apply (no flash) + override stylesheet + controller -->
 <script>try{if(localStorage.getItem('devfit_theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
 <link rel="stylesheet" href="theme.css">
+<script src="devfit-errorlog.js"></script>
 <script defer src="theme.js"></script>
 <script src="devfit-auth.js"></script>
 </head>
@@ -1365,13 +1366,13 @@ function exportProgramPDF(){
 function getUserTier(){
   try {
     const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
-    let t = (u.tier || 'pro').toLowerCase();
+    let t = (u.tier || 'free').toLowerCase();
     if(t === 'pro' && u.expiry){
       const dl = acctDaysLeft(u.expiry);
       if(dl !== null && dl <= 0) t = 'free';
     }
     return t;
-  } catch(e){ return 'pro'; }
+  } catch(e){ return 'free'; }
 }
 function isPro(){ return getUserTier() === 'pro'; }
 
@@ -1471,10 +1472,13 @@ function lastCloudBackupTs(){
   });
   return t;
 }
+// Escape user-controlled text before it goes into innerHTML (defense-in-depth).
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 function refreshBackupStatus(){
   const el = document.getElementById('backup-status');
   if(!el) return;
-  const email = backupOwnerEmail() || 'this account';
+  const email = esc(backupOwnerEmail() || 'this account');
   const ts = lastCloudBackupTs();
   if(ts){
     const d = new Date(ts);

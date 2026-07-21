@@ -10,8 +10,14 @@
 // so food search keeps working from day one. OpenFoodFacts (client-side, no key)
 // remains the primary source for branded/Malaysian products + barcodes.
 
+import { sameSiteOnly } from './_lib.js';
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
+
+  // Block off-site scripted abuse (in-app fetches are same-origin). Degrades to an
+  // empty result set so a legit request with a stripped Referer still parses cleanly.
+  if (!sameSiteOnly(req)) { res.status(200).json({ foods: [] }); return; }
 
   const key = process.env.USDA_KEY || 'DEMO_KEY';
   const query = String((req.query && req.query.query) || '').slice(0, 100).trim();

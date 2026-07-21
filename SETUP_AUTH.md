@@ -71,12 +71,30 @@ create table if not exists devfit_logins (
   primary key (email, device_id)
 );
 
+-- OPTIONAL: durable client crash log (api/log.js). Without this table, client
+-- errors still show up in Vercel's function logs — this just keeps a history.
+create table if not exists devfit_errors (
+  id      bigint generated always as identity primary key,
+  type    text,
+  message text,
+  stack   text,
+  src     text,
+  page    text,
+  ua      text,
+  at      timestamptz default now()
+);
+
 -- Lock all tables down: only the server (service-role key) may touch them.
 alter table devfit_subscribers enable row level security;
 alter table devfit_rate        enable row level security;
 alter table devfit_logins      enable row level security;
+alter table devfit_errors      enable row level security;
 -- No policies = the public anon key cannot read or write. Service key bypasses RLS.
 ```
+
+> **Note:** the `prefs` cloud backup (display name, goals, view prefs — added for
+> iOS storage-eviction durability) reuses the existing `devfit_data` table's
+> `data_type` column, so there is **no new table** to create for it.
 
 ## Step 2 — Vercel: set environment variables
 

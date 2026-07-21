@@ -130,6 +130,16 @@
                    e.name === 'NS_ERROR_DOM_QUOTA_REACHED');
     }
 
+    // SCOPE / SAFETY:
+    //  - Only get/set/removeItem are namespaced. key(i) / length are intentionally
+    //    left as native passthrough: no code in the app enumerates localStorage by
+    //    index (verified), so index/length would only ever be used for whole-store
+    //    tooling, which should see the real underlying keys. If you ever add code
+    //    that iterates localStorage.key(i), namespace-suffixed keys will appear —
+    //    filter on the "::" suffix there rather than expecting plain names.
+    //  - LOAD ORDER: this file MUST load before any script that reads/writes a
+    //    per-user DATA_KEY, or that access lands in the un-namespaced bucket. All
+    //    pages load devfit-auth.js ahead of app logic and devfit-db.js — keep it so.
     try {
       LS.getItem = function (k) { return origGet(ns(k)); };
       LS.setItem = function (k, v) {
@@ -164,7 +174,7 @@
   function getUserTier() {
     try {
       var u = getUser();
-      var t = (u.tier || 'pro').toLowerCase();
+      var t = (u.tier || 'free').toLowerCase();
       if (t === 'pro') {
         var today = new Date(); today.setHours(0, 0, 0, 0);
         // Not started yet → Free until the plan's start date.
@@ -182,7 +192,7 @@
         }
       }
       return t;
-    } catch (e) { return 'pro'; }
+    } catch (e) { return 'free'; }
   }
   function isPro() { return getUserTier() === 'pro'; }
 
@@ -199,7 +209,7 @@
       setSession({
         email: data.email, name: data.name || name || '', approved: true,
         plan: data.plan || '', expiry: data.expiry || '', startDate: data.startDate || '',
-        tier: (data.tier || 'pro').toLowerCase()
+        tier: (data.tier || 'free').toLowerCase()
       }, data.token);
     }
     return data;
@@ -219,7 +229,7 @@
       var data = await res.json();
       if (data && data.approved) {
         var oldTier = (u.tier || '').toLowerCase();
-        var newTier = (data.tier || 'pro').toLowerCase();
+        var newTier = (data.tier || 'free').toLowerCase();
         u.tier = newTier;
         if (data.expiry !== undefined) u.expiry = data.expiry;
         if (data.startDate) u.startDate = data.startDate;

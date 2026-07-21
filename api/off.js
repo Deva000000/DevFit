@@ -15,6 +15,8 @@
 //
 // Edge-cached so popular queries are instant and OFF isn't hammered.
 
+import { sameSiteOnly } from './_lib.js';
+
 const UA = 'DevFit/1.0 (devfitportal.vercel.app)';
 
 // Keep only products that actually have a name and an energy value — anything
@@ -75,6 +77,7 @@ async function searchLegacy(q, pageSize) {
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
+  if (!sameSiteOnly(req)) { res.status(200).json({ products: [] }); return; }
 
   const q = String((req.query && req.query.query) || '').slice(0, 100).trim();
   let pageSize = parseInt((req.query && req.query.pageSize) || '40', 10);

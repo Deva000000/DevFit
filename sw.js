@@ -1,4 +1,4 @@
-/* DevFit Service Worker — v3.2.0
+/* DevFit Service Worker — v3.3.0
    Strategy:
    - HTML pages: NETWORK-FIRST with cache fallback (instant offline from any page)
    - All core HTML precached at install → app works offline after first SW install
@@ -7,7 +7,7 @@
    - Apps Script / /api/*: network-only (never cached)
 */
 
-const VERSION = 'devfit-v4.56.0';
+const VERSION = 'devfit-v4.57.0';
 const APP_SHELL = 'devfit-shell-' + VERSION;
 const RUNTIME = 'devfit-runtime-' + VERSION;
 
@@ -32,6 +32,7 @@ const SHELL_FILES = [
   // ── App JS / CSS ─────────────────────────────────────────────────────
   './devfit-db.js',
   './devfit-auth.js',
+  './devfit-errorlog.js',
   './pwa-update.js',
   './foods-local.js',
   './foods-bulk.js',

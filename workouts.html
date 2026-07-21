@@ -264,6 +264,7 @@ html.nosplash #devfit-splash{display:none!important}
 <!-- Shared theme: early-apply (no flash) + override stylesheet + controller -->
 <script>try{if(localStorage.getItem('devfit_theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
 <link rel="stylesheet" href="theme.css">
+<script src="devfit-errorlog.js"></script>
 <script defer src="theme.js"></script>
 <script src="devfit-auth.js"></script>
 </head>
@@ -392,7 +393,7 @@ if(window.DevFitAuth){
 function getUserTier(){
   try {
     const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
-    let t = (u.tier || 'pro').toLowerCase();
+    let t = (u.tier || 'free').toLowerCase();
     // Auto-revert to Free the moment the paid period ends (access runs through the expiry day).
     if(t === 'pro' && u.expiry){
       const today = new Date(); today.setHours(0,0,0,0);
@@ -403,7 +404,7 @@ function getUserTier(){
       }
     }
     return t;
-  } catch(e){ return 'pro'; }
+  } catch(e){ return 'free'; }
 }
 function isPro(){ return getUserTier() === 'pro'; }
 

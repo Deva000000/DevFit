@@ -1,13 +1,16 @@
-/* DevFit Service Worker — v3.3.0
-   Strategy:
-   - HTML pages: NETWORK-FIRST with cache fallback (instant offline from any page)
-   - All core HTML precached at install → app works offline after first SW install
-   - Icons / manifest / static: cache-first
-   - CDN assets (Chart.js, jsPDF, fonts): stale-while-revalidate
-   - Apps Script / /api/*: network-only (never cached)
+/* DevFit Service Worker — v4.0.0
+   Strategy (atomic updates — no stale code can ever mix with fresh HTML):
+   - HTML pages + app logic (.js/.css): NETWORK-FIRST with cache fallback, so every
+     online load gets a consistent, up-to-date set. This is what prevents the
+     "new page + stale script = broken feature" class of bugs after a deploy.
+   - Big food databases (foods-local/bulk.js): cache-first (versioned via ?v=), to
+     save mobile data. Offline, ignoreSearch resolves ?v= URLs to the precached file.
+   - Icons / manifest / images: cache-first.
+   - CDN assets (Chart.js, jsPDF, fonts): stale-while-revalidate.
+   - Apps Script / /api/*: network-only (never cached).
 */
 
-const VERSION = 'devfit-v4.57.1';
+const VERSION = 'devfit-v4.58.0';
 const APP_SHELL = 'devfit-shell-' + VERSION;
 const RUNTIME = 'devfit-runtime-' + VERSION;
 
@@ -87,46 +90,51 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (url.origin === self.location.origin) {
-    // HTML navigation — NETWORK FIRST so deploys are instant
-    const isHTML = req.mode === 'navigate' ||
-                   req.destination === 'document' ||
-                   url.pathname.endsWith('.html') ||
-                   url.pathname.endsWith('/');
-    if (isHTML) {
-      event.respondWith(networkFirst(req));
-      return;
-    }
-    // Static — cache-first
+    const path = url.pathname;
+    // NETWORK-FIRST for HTML + all app logic (.js/.css) so a deploy is ATOMIC:
+    // you can never end up with fresh HTML wired to stale JS (the exact failure
+    // that stuck the diet page after an update). Offline falls back to cache.
+    // The big, rarely-changing food databases stay CACHE-FIRST to save mobile data
+    // (they're versioned via ?v= and busted on change).
+    const isDoc = req.mode === 'navigate' || req.destination === 'document' ||
+                  path.endsWith('.html') || path.endsWith('/');
+    const isBigFoodDb = /foods-(local|bulk)\.js$/.test(path);
+    const isAppCode = /\.(js|css)$/.test(path) && !isBigFoodDb;
+
+    if (isDoc || isAppCode) { event.respondWith(networkFirst(req)); return; }
+    // Everything else (food DBs, icons, images, manifest) — cache-first.
     event.respondWith(cacheFirst(req));
   }
 });
 
 async function networkFirst(req) {
+  const cache = await caches.open(APP_SHELL);
   try {
     const fresh = await fetch(req, { cache: 'no-store' });
-    if (fresh && fresh.ok) {
-      const cache = await caches.open(APP_SHELL);
-      cache.put(req, fresh.clone());
-    }
-    return fresh;
+    if (fresh && fresh.ok) { cache.put(req, fresh.clone()); return fresh; }
+    // Non-OK (e.g. a bad deploy briefly 404s) → prefer last-known-good cache.
+    const cached = await cache.match(req) || await cache.match(req, { ignoreSearch: true });
+    return cached || fresh;
   } catch (e) {
-    const cached = await caches.match(req);
+    const cached = await cache.match(req) || await cache.match(req, { ignoreSearch: true });
     if (cached) return cached;
-    const fallback = await caches.match('./index.html');
-    if (fallback) return fallback;
+    if (req.mode === 'navigate') {
+      const shell = await cache.match('./index.html');
+      if (shell) return shell;
+    }
     return new Response('Offline', { status: 503 });
   }
 }
 
 async function cacheFirst(req) {
-  const cached = await caches.match(req);
+  const cache = await caches.open(APP_SHELL);
+  // Match the exact URL first, then ignore ?v= so versioned assets still resolve
+  // offline against the precached base file.
+  const cached = await cache.match(req) || await cache.match(req, { ignoreSearch: true });
   if (cached) return cached;
   try {
     const fresh = await fetch(req);
-    if (fresh.ok) {
-      const cache = await caches.open(APP_SHELL);
-      cache.put(req, fresh.clone());
-    }
+    if (fresh.ok) cache.put(req, fresh.clone());
     return fresh;
   } catch (e) {
     return new Response('Offline', { status: 503 });

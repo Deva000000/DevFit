@@ -1056,92 +1056,123 @@ function reconcileTierWeeks(){
 
 function anyWeekVals(a){ return Array.isArray(a) && a.some(v => v !== '' && v != null); }
 function weekHasData(w){ return anyWeekVals(w && w.bw) || anyWeekVals(w && w.steps) || anyWeekVals(w && w.sleep); }
+function mkBlankWeek(){ return { bw:Array(7).fill(''), steps:Array(7).fill(''), sleep:Array(7).fill(''), checkin:freshCheckin() }; }
 
-// FREE TIER: exactly one week of logging, auto-rolling every Monday (ISO-week
-// anchored, stamped in appData.freeWeekOf).
-//
-// DATA SAFETY: this used to COLLAPSE + BLANK the stored weeks and push the empty
-// copy to the cloud — so a lapsed Pro user permanently lost their entire history
-// (locally AND in the cloud). Now the complete history is first preserved inside
-// appData._proHistory. Because that field travels with the progress blob to the
-// cloud, no save can ever lose it, and restoreProHistory() puts it back the moment
-// the account is Pro again. The visible arrays are still reduced to one week so the
-// free experience is unchanged.
+// The archive of PAST weeks, kept as a calendar-indexed timeline (parallel arrays +
+// programStart). Rides inside the progress blob, so it syncs to the cloud and is
+// never lost. The single visible week (appData.bw[0]) is the CURRENT week only —
+// no week is ever in both places, so there's no divergence and no data loss.
+function ensureHistory(anchorYmd){
+  if(!appData._proHistory) appData._proHistory = { bw:[], steps:[], sleep:[], weeklyCheckin:[], programStart: anchorYmd || '' };
+  if(!appData._proHistory.programStart && anchorYmd) appData._proHistory.programStart = anchorYmd;
+  return appData._proHistory;
+}
+// Fold one week {bw,steps,sleep,checkin} into a timeline H at its TRUE calendar
+// index (from H.programStart). Pads with blank weeks as needed and only ever fills
+// an EMPTY slot, so existing archived data is never overwritten. The single tested
+// primitive shared by archiving (Free rollover) and restore (upgrade).
+function foldWeekIntoTimeline(H, wk, weekMondayStr){
+  if(!H || !weekHasData(wk) || !weekMondayStr) return;
+  const wkMon = mondayOf(new Date(weekMondayStr));
+  if(!wkMon) return;
+  // Anchor (re-anchor) to this week whenever the timeline is empty, so a stale/early
+  // anchor left by an empty archive can never skew the calendar indices.
+  if(!H.programStart || !H.bw.length){ H.programStart = ymd(wkMon); }
+  const start = mondayOf(new Date(H.programStart));
+  if(!start) return;
+  let idx = Math.round((wkMon - start) / (7*24*3600*1000));
+  if(idx < 0){
+    // Earlier than the current anchor → prepend blanks and move the anchor back,
+    // keeping the whole timeline correctly ordered.
+    const shift = -idx;
+    for(let k=0;k<shift;k++){ const b=mkBlankWeek(); H.bw.unshift(b.bw); H.steps.unshift(b.steps); H.sleep.unshift(b.sleep); H.weeklyCheckin.unshift(b.checkin); }
+    H.programStart = ymd(wkMon); idx = 0;
+  }
+  while(H.bw.length <= idx){ const b=mkBlankWeek(); H.bw.push(b.bw); H.steps.push(b.steps); H.sleep.push(b.sleep); H.weeklyCheckin.push(b.checkin); }
+  if(!weekHasData({ bw:H.bw[idx], steps:H.steps[idx], sleep:H.sleep[idx] })){
+    H.bw[idx]=wk.bw; H.steps[idx]=wk.steps; H.sleep[idx]=wk.sleep; H.weeklyCheckin[idx]=wk.checkin;
+  }
+}
+function visibleWeek(){
+  return { bw:(appData.bw&&appData.bw[0])||Array(7).fill(''), steps:(appData.steps&&appData.steps[0])||Array(7).fill(''),
+           sleep:(appData.sleep&&appData.sleep[0])||Array(7).fill(''), checkin:(appData.weeklyCheckin&&appData.weeklyCheckin[0])||freshCheckin() }; }
+
+// FREE TIER: the app shows exactly ONE week (the current calendar week) and rolls
+// every Monday. DATA SAFETY / SYNC-ALL-YEAR: every completed week is ARCHIVED into
+// the _proHistory timeline (which syncs) instead of being wiped — so a free user's
+// data is retained for the whole year and fully restored if they ever go Pro. Only
+// the VIEW is limited to one week; the data is never destroyed for any tier.
 function normalizeFreeTierWeeksView(){
   const currentWk = isoWeekKey(new Date());
-  // Preserve the FULL history once, before the view is reduced.
-  if(appData.bw && appData.bw.length > 1 && !appData._proHistory){
-    try{
-      appData._proHistory = JSON.parse(JSON.stringify({
-        bw: appData.bw, steps: appData.steps, sleep: appData.sleep,
-        weeklyCheckin: appData.weeklyCheckin, programStart: appData.programStart || ''
-      }));
-    }catch(e){}
-  }
-  // Reduce the VISIBLE data to the most-recent single week (history stays in _proHistory).
+  const thisMon = ymd(mondayOf(new Date()));
+
+  // Fresh downgrade from Pro: appData still holds the whole multi-week program.
+  // Split it: the CURRENT calendar week stays visible/editable; every OTHER week
+  // that has data is archived into the timeline. This keeps exactly one copy of each
+  // week (no overlap, no collision), so nothing is ever lost or duplicated. An
+  // all-empty default appData creates no archive at all.
   if(appData.bw && appData.bw.length > 1){
-    const li = appData.bw.length - 1;
-    appData.bw = [appData.bw[li]];
-    appData.steps = [(appData.steps && appData.steps[li]) || Array(7).fill('')];
-    appData.sleep = [(appData.sleep && appData.sleep[li]) || Array(7).fill('')];
-    appData.weeklyCheckin = [(appData.weeklyCheckin && appData.weeklyCheckin[li]) || freshCheckin()];
-  }
-  totalWeeks = 1;
-  currentWeek = 0;
-  // New calendar week (or data stamped for a past week) → start fresh on Monday.
-  if(appData.freeWeekOf !== currentWk){
-    appData.bw = [Array(7).fill('')];
-    appData.steps = [Array(7).fill('')];
-    appData.sleep = [Array(7).fill('')];
-    appData.weeklyCheckin = [freshCheckin()];
+    const base = mondayOf(new Date(appData.programStart || thisMon));
+    const curIdx = base ? Math.round((mondayOf(new Date()) - base) / (7*86400000)) : -1;
+    const weeksIn = [];
+    let currentWeekData = null;
+    for(let i=0;i<appData.bw.length;i++){
+      const wk = { bw:appData.bw[i]||Array(7).fill(''), steps:(appData.steps&&appData.steps[i])||Array(7).fill(''),
+                   sleep:(appData.sleep&&appData.sleep[i])||Array(7).fill(''), checkin:(appData.weeklyCheckin&&appData.weeklyCheckin[i])||freshCheckin() };
+      if(i === curIdx){ currentWeekData = wk; continue; }
+      if(weekHasData(wk)) weeksIn.push({ wk:wk, mon: base ? ymd(new Date(base.getTime()+i*7*86400000)) : thisMon });
+    }
+    if(weeksIn.length){
+      const H = ensureHistory(weeksIn[0].mon);
+      weeksIn.forEach(function(x){ foldWeekIntoTimeline(H, x.wk, x.mon); });
+    }
+    const cw = currentWeekData || mkBlankWeek();
+    appData.bw=[cw.bw]; appData.steps=[cw.steps]; appData.sleep=[cw.sleep]; appData.weeklyCheckin=[cw.checkin];
+    appData.programStart = thisMon;
     appData.freeWeekOf = currentWk;
-    // Anchor the single visible week to THIS calendar week's Monday so the date
-    // labels, "today" highlight and reminder mapping all point at the real week.
-    const mon = mondayOf(new Date());
-    if(mon){ appData.programStart = ymd(mon); const ps=document.getElementById('programStart'); if(ps) ps.value=appData.programStart; }
+    const ps0=document.getElementById('programStart'); if(ps0) ps0.value=appData.programStart;
+    localStorage.setItem('devfit_freeWeekKey', currentWk);
+    totalWeeks = 1; currentWeek = 0;
+    try { localStorage.setItem('progressLog2', JSON.stringify(appData)); } catch(e){}
+    if(typeof DevFitDB!=='undefined' && DevFitDB.cloudSave) DevFitDB.cloudSave('progress',appData);
+    return; // downgrade fully handled — current week is visible, others archived
+  }
+
+  totalWeeks = 1; currentWeek = 0;
+
+  // Roll to the current week: archive the OUTGOING visible week (if it holds data)
+  // at its own Monday, then start a fresh blank current week anchored to this Monday.
+  if(appData.freeWeekOf !== currentWk){
+    const outgoing = visibleWeek();
+    if(weekHasData(outgoing) && appData.programStart && appData.freeWeekOf && appData.freeWeekOf !== '__rolled__'){
+      const H = ensureHistory(appData.programStart);
+      foldWeekIntoTimeline(H, outgoing, appData.programStart);
+    }
+    appData.bw=[Array(7).fill('')]; appData.steps=[Array(7).fill('')]; appData.sleep=[Array(7).fill('')]; appData.weeklyCheckin=[freshCheckin()];
+    appData.freeWeekOf = currentWk;
+    appData.programStart = thisMon;
+    const ps=document.getElementById('programStart'); if(ps) ps.value=appData.programStart;
     localStorage.setItem('devfit_freeWeekKey', currentWk);
     try { localStorage.setItem('progressLog2', JSON.stringify(appData)); } catch(e){}
     if(typeof DevFitDB!=='undefined' && DevFitDB.cloudSave) DevFitDB.cloudSave('progress',appData);
   }
 }
 
-// Restore the full multi-week history preserved during a Free period, and fold any
-// week the user logged while on Free back into its true calendar position (only
-// into an empty slot — real history is never clobbered). Runs when the account is Pro.
+// Upgrade → Pro: promote the archived timeline into the visible weeks and fold the
+// current week back in at its true calendar slot. Nothing was ever lost, so the
+// user sees their complete history the moment they go Pro.
 function restoreProHistory(){
   if(!appData || !appData._proHistory) return;
-  const h = appData._proHistory;
-  // Snapshot the single Free-period week (if it holds any real entries) before we overwrite.
-  const freeWeek = (appData.bw && appData.bw.length === 1) ? {
-    bw: appData.bw[0],
-    steps: (appData.steps && appData.steps[0]) || Array(7).fill(''),
-    sleep: (appData.sleep && appData.sleep[0]) || Array(7).fill(''),
-    checkin: (appData.weeklyCheckin && appData.weeklyCheckin[0]) || freshCheckin(),
-    monday: appData.programStart || ''
-  } : null;
-  appData.bw = h.bw || [];
-  appData.steps = h.steps || [];
-  appData.sleep = h.sleep || [];
-  appData.weeklyCheckin = h.weeklyCheckin || [];
-  if(h.programStart) appData.programStart = h.programStart;
+  const H = appData._proHistory;
+  // Fold the current visible week (the one live slot) into the timeline before promoting.
+  if(appData.bw && appData.bw.length === 1) foldWeekIntoTimeline(H, visibleWeek(), appData.programStart || '');
+  appData.bw = H.bw && H.bw.length ? H.bw : [Array(7).fill('')];
+  appData.steps = H.steps && H.steps.length ? H.steps : [Array(7).fill('')];
+  appData.sleep = H.sleep && H.sleep.length ? H.sleep : [Array(7).fill('')];
+  appData.weeklyCheckin = H.weeklyCheckin && H.weeklyCheckin.length ? H.weeklyCheckin : [freshCheckin()];
+  if(H.programStart) appData.programStart = H.programStart;
   delete appData._proHistory;
   delete appData.freeWeekOf;
-  if(freeWeek && weekHasData(freeWeek) && freeWeek.monday){
-    const start = appData.programStart ? mondayOf(new Date(appData.programStart)) : mondayOf(new Date());
-    const wkMon = mondayOf(new Date(freeWeek.monday));
-    if(start && wkMon){
-      let idx = Math.round((wkMon - start) / (7*24*3600*1000));
-      if(idx < 0) idx = appData.bw.length;
-      while(appData.bw.length <= idx){
-        appData.bw.push(Array(7).fill('')); appData.steps.push(Array(7).fill(''));
-        appData.sleep.push(Array(7).fill('')); appData.weeklyCheckin.push(freshCheckin());
-      }
-      if(!weekHasData({ bw: appData.bw[idx], steps: appData.steps[idx], sleep: appData.sleep[idx] })){
-        appData.bw[idx] = freeWeek.bw; appData.steps[idx] = freeWeek.steps;
-        appData.sleep[idx] = freeWeek.sleep; appData.weeklyCheckin[idx] = freeWeek.checkin;
-      }
-    }
-  }
   totalWeeks = (appData.bw && appData.bw.length) || 1;
   try { localStorage.setItem('progressLog2', JSON.stringify(appData)); } catch(e){}
   if(typeof DevFitDB!=='undefined' && DevFitDB.cloudSave) DevFitDB.cloudSave('progress',appData);

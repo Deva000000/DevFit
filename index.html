@@ -922,7 +922,7 @@ html.nosplash #devfit-splash{display:none!important}
 <div id="ios-hint">
   <button class="x" onclick="document.getElementById('ios-hint').classList.remove('show')">×</button>
   <strong>Install DevFit</strong><br>
-  Tap Share, then <strong>"Add to Home Screen"</strong>
+  <span id="ios-hint-text">In <strong>Safari</strong>, tap Share → <strong>"Add to Home Screen"</strong></span>
 </div>
 
 <!-- FIRST-LOGIN INSTALL GUIDE — shown once after login, only in the browser -->
@@ -2942,7 +2942,9 @@ document.addEventListener('visibilitychange',function(){
     localStorage.setItem('pwa-install-dismissed','1');
     const b=document.getElementById('pwa-install-bar'); if(b) b.classList.remove('show');
   };
-  const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  // Chrome/Firefox/Edge on iPhone CANNOT add to the home screen — only Safari can.
+  const isIOSNonSafari=isIOS&&/CriOS|FxiOS|EdgiOS|OPT\//.test(navigator.userAgent);
   const isAndroid=/android/i.test(navigator.userAgent);
   const isStandalone=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone;
 
@@ -2962,7 +2964,12 @@ document.addEventListener('visibilitychange',function(){
     const later=document.getElementById('dfig-later');
     if(!guide||!steps||!action) return;
 
-    if(isIOS){
+    if(isIOSNonSafari){
+      steps.innerHTML='<li><strong>Important:</strong> on iPhone this only works in <strong>Safari</strong> — not this browser.</li>'+
+        '<li>Open <strong>devfitportal.vercel.app</strong> in <strong>Safari</strong>.</li>'+
+        '<li>Tap <strong>Share</strong> → <strong>Add to Home Screen</strong> → <strong>Add</strong>, then log in there.</li>';
+      action.textContent='Got it';
+    } else if(isIOS){
       steps.innerHTML='<li>Tap the <strong>Share</strong> icon in Safari (square with an up-arrow).</li>'+
         '<li>Scroll and tap <strong>Add to Home Screen</strong>.</li>'+
         '<li>Tap <strong>Add</strong>, then open DevFit from your home screen and log in there.</li>';
@@ -2994,7 +3001,13 @@ document.addEventListener('visibilitychange',function(){
   // login shows one clear prompt, not two.
   if(isIOS && !isStandalone && localStorage.getItem('devfit_install_banner_seen')==='1' && localStorage.getItem('ios-hint-dismissed')!=='1'){
     const hint=document.getElementById('ios-hint');
-    if(hint){ setTimeout(()=>hint.classList.add('show'),3000); hint.querySelector('.x').addEventListener('click',()=>localStorage.setItem('ios-hint-dismissed','1')); }
+    if(hint){
+      if(isIOSNonSafari){
+        const t=document.getElementById('ios-hint-text');
+        if(t) t.innerHTML='Open <strong>devfitportal.vercel.app</strong> in <strong>Safari</strong> to install (iPhone can’t install from this browser).';
+      }
+      setTimeout(()=>hint.classList.add('show'),3000); hint.querySelector('.x').addEventListener('click',()=>localStorage.setItem('ios-hint-dismissed','1'));
+    }
   }
   window.addEventListener('appinstalled',()=>{
     localStorage.setItem('pwa-installed-at',new Date().toISOString());

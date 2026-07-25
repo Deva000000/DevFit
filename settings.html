@@ -439,11 +439,11 @@ html.nosplash #devfit-splash{display:none!important}
       <div class="chev">›</div>
     </button>
 
-    <button class="setting-btn" id="ios-install-hint-btn" type="button" style="display:none">
-      <div class="icon">↓</div>
+    <button class="setting-btn" id="install-guide-btn" type="button">
+      <div class="icon">📲</div>
       <div class="body">
-        <div class="title">Install on iPhone</div>
-        <div class="desc">Tap to see how to add to home screen</div>
+        <div class="title">How to Install DevFit</div>
+        <div class="desc">Add to your home screen — full Android &amp; iPhone steps</div>
       </div>
       <div class="chev">›</div>
     </button>
@@ -521,23 +521,43 @@ html.nosplash #devfit-splash{display:none!important}
 
   <div class="footer">
     DevFit · Dominance Through Discipline<br>
-    <a href="https://wa.me/60183679177">Contact trainer</a> · v4.56.0
+    <a href="https://wa.me/60183679177">Contact trainer</a> · v4.59.0
   </div>
 
 
 </div>
 
-<!-- iOS install hint modal (outside .page so it covers entire viewport cleanly) -->
-<div id="ios-hint-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;padding:1rem">
-  <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-top:3px solid #cc0000;border-radius:14px;padding:24px;max-width:380px;width:100%;text-align:center">
-    <div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:14px">Install DevFit on iPhone</div>
-    <div style="font-size:13px;color:#aaa;line-height:1.7;margin-bottom:18px;text-align:left">
-      1. Tap the <strong style="color:#cc0000">Share</strong> button at the bottom of Safari (square with up arrow).<br><br>
-      2. Scroll down and tap <strong style="color:#cc0000">"Add to Home Screen"</strong>.<br><br>
-      3. Tap <strong style="color:#cc0000">Add</strong> in the top right.<br><br>
-      DevFit will appear on your home screen like a native app.
+<!-- Install guide modal (outside .page so it covers the entire viewport cleanly) -->
+<div id="ios-hint-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;padding:1rem;overflow-y:auto">
+  <div style="background:#151518;border:1px solid #2a2a2a;border-top:3px solid #cc0000;border-radius:16px;padding:22px 20px;max-width:400px;width:100%;max-height:88vh;overflow-y:auto">
+    <div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:4px;text-align:center">Install DevFit on your phone</div>
+    <div style="font-size:12px;color:#8a8f98;margin-bottom:14px;text-align:center">One-tap access, works offline, feels like a real app.</div>
+
+    <!-- Context note (filled in by JS for the user's actual browser) -->
+    <div id="ig-note" style="display:none;font-size:12.5px;line-height:1.6;border-radius:10px;padding:11px 13px;margin-bottom:16px"></div>
+
+    <!-- ANDROID -->
+    <div style="font-size:14px;font-weight:800;color:#fff;margin:0 0 8px">🤖 Android (Chrome)</div>
+    <div style="font-size:13px;color:#c4c8ce;line-height:1.75;margin-bottom:18px">
+      1. Tap the <strong style="color:#fff">⋮</strong> menu (top-right of Chrome).<br>
+      2. Tap <strong style="color:#cc4444">"Add to Home screen"</strong> (or <strong style="color:#cc4444">"Install app"</strong>).<br>
+      3. Tap <strong style="color:#cc4444">Add</strong> / <strong style="color:#cc4444">Install</strong> to confirm.<br>
+      4. Open <strong style="color:#fff">DevFit</strong> from your home screen and sign in there.
     </div>
-    <button id="ios-hint-close" type="button" style="background:#cc0000;color:#fff;border:none;border-radius:10px;padding:11px 24px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer">Got it</button>
+
+    <!-- IPHONE -->
+    <div style="font-size:14px;font-weight:800;color:#fff;margin:0 0 8px">🍎 iPhone / iPad</div>
+    <div style="font-size:12px;color:#e0b400;background:rgba(224,180,0,.09);border:1px solid rgba(224,180,0,.25);border-radius:9px;padding:9px 11px;line-height:1.55;margin-bottom:10px">
+      ⚠️ On iPhone this <strong>only works in Safari</strong> — Apple blocks it in Chrome, Firefox &amp; Edge. If you're in another browser, open <strong>devfitportal.vercel.app</strong> in <strong>Safari</strong> first.
+    </div>
+    <div style="font-size:13px;color:#c4c8ce;line-height:1.75;margin-bottom:20px">
+      1. In <strong style="color:#fff">Safari</strong>, tap the <strong style="color:#cc4444">Share</strong> button (the square with an up-arrow, at the bottom).<br>
+      2. Scroll down and tap <strong style="color:#cc4444">"Add to Home Screen"</strong>.<br>
+      3. Tap <strong style="color:#cc4444">Add</strong> (top-right).<br>
+      4. Open <strong style="color:#fff">DevFit</strong> from your home screen and sign in there.
+    </div>
+
+    <button id="ios-hint-close" type="button" style="display:block;width:100%;background:#cc0000;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer">Got it</button>
   </div>
 </div>
 
@@ -1412,22 +1432,46 @@ function installApp(){
 
 // iOS detection — Safari on iOS doesn't fire beforeinstallprompt
 function isIOS(){
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const ua = navigator.userAgent;
+  // iPadOS 13+ reports as desktop Safari, so also treat a touch-Mac as iOS.
+  return (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) ||
+         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
+// True only for REAL Safari on iOS. Chrome (CriOS), Firefox (FxiOS) and Edge
+// (EdgiOS) on iPhone canNOT add to the home screen — only Safari can.
+function isIOSNonSafari(){
+  return isIOS() && /CriOS|FxiOS|EdgiOS|OPT\//.test(navigator.userAgent);
+}
+function isAndroidDevice(){ return /Android/i.test(navigator.userAgent); }
 function isStandalone(){
   return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 }
+// Open the install guide, tailoring the top note to the user's actual browser.
 function showIosHint(){
+  const note = document.getElementById('ig-note');
+  if(note){
+    if(isStandalone()){
+      note.style.display='block'; note.style.color='#22c55e';
+      note.style.background='rgba(34,197,94,.09)'; note.style.border='1px solid rgba(34,197,94,.28)';
+      note.innerHTML='✓ DevFit is already installed — you’re using the installed app right now.';
+    } else if(isIOSNonSafari()){
+      note.style.display='block'; note.style.color='#ff6b6b';
+      note.style.background='rgba(204,0,0,.10)'; note.style.border='1px solid rgba(204,0,0,.35)';
+      note.innerHTML='You’re on an <strong>iPhone using another browser</strong>. Adding to the home screen only works in <strong>Safari</strong> — open <strong>devfitportal.vercel.app</strong> in Safari, then follow the iPhone steps below.';
+    } else if(isIOS()){
+      note.style.display='block'; note.style.color='#c4c8ce';
+      note.style.background='rgba(255,255,255,.05)'; note.style.border='1px solid #2a2a2a';
+      note.innerHTML='You’re on <strong>iPhone/iPad</strong> — follow the <strong>🍎 iPhone</strong> steps below.';
+    } else if(isAndroidDevice()){
+      note.style.display='block'; note.style.color='#c4c8ce';
+      note.style.background='rgba(255,255,255,.05)'; note.style.border='1px solid #2a2a2a';
+      note.innerHTML='You’re on <strong>Android</strong> — follow the <strong>🤖 Android</strong> steps below.';
+    } else {
+      note.style.display='none';
+    }
+  }
   document.getElementById('ios-hint-modal').style.display = 'flex';
 }
-(function setupIosInstall(){
-  try{
-    if(isIOS() && !isStandalone()){
-      const el = document.getElementById('ios-install-hint-btn');
-      if(el) el.style.display = 'flex';
-    }
-  }catch(e){ console.error('[iosInstall]', e); }
-})();
 
 // ---------- CHECK FOR UPDATES ----------
 async function checkForUpdates(){
@@ -1575,7 +1619,7 @@ const ACTION_MAP = {
   },
   'program-report-btn'        : () => exportProgramPDF(),
   'install-app-btn'           : () => installApp(),
-  'ios-install-hint-btn'      : () => showIosHint(),
+  'install-guide-btn'         : () => showIosHint(),
   'check-updates-btn'         : () => checkForUpdates(),
   'reset-all-btn'             : () => resetAll(),
   'logout-btn'                : () => logout(),

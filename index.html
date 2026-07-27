@@ -2697,16 +2697,38 @@ function reminderTodayCell(){
 showCountdown();
 scheduleAccessCheck();
 // Cloud sync — runs after localStorage render so UI is never blocked
+// Program-setup fields that live at the top of appData (not inside the weeks, so
+// they have no _proHistory backup). A stale or partial cloud copy must NEVER blank
+// one that's already set locally — that's what wiped a user's start/target weight
+// on downgrade. We keep the local value, persist it, and heal the cloud copy.
+var PROFILE_FIELDS = ['clientName','goal','goalType','startWeight','programDuration','targetSteps','targetSleep'];
+function mergeProfileFields(incoming, prev){
+  var healed=false;
+  PROFILE_FIELDS.forEach(function(k){
+    var dv=incoming[k];
+    if((dv===undefined||dv===null||dv==='') && prev && prev[k]!==undefined && prev[k]!==null && prev[k]!==''){
+      incoming[k]=prev[k]; healed=true;
+    }
+  });
+  return healed;
+}
 function runProgressSync(){
   if(typeof DevFitDB==='undefined') return;
   DevFitDB.cloudSync('progress','progressLog2',function(d){
+    var healed=mergeProfileFields(d, appData);
     appData=d;
+    // cloudSync already wrote the raw cloud row to localStorage; re-persist the
+    // merged copy so preserved fields survive the next reload too.
+    try{ localStorage.setItem('progressLog2', JSON.stringify(appData)); }catch(e){}
     totalWeeks=appData.bw.length||4;
     currentWeek=Math.min(currentWeek,totalWeeks-1);
     // Re-apply tier reconciliation — the cloud copy may hold multi-week (Pro) data
     // or a preserved _proHistory, which must be restored/reduced here too.
     reconcileTierWeeks();
     renderTabs();render();applyTierGates();
+    // If we restored fields the cloud was missing, push the repaired copy back up
+    // so the cloud (and other devices) stop serving the blanked version.
+    if(healed){ try{ if(DevFitDB.cloudSave) DevFitDB.cloudSave('progress',appData); }catch(e){} }
   });
 }
 // The cloud layer (supabase-js + devfit-db.js) is loaded at the END of the body,

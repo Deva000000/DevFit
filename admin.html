@@ -210,8 +210,9 @@ function updateDuration(){
   if(!s || !e){ box.textContent='Pick a start date, then a plan length or end date.'; box.style.color='#9a9a9a'; return; }
   if(new Date(e) < new Date(s)){ box.textContent='⚠ End date is before start date.'; box.style.color='#fca5a5'; return; }
   var days=daysBetweenInclusive(s,e);
-  var wk=(days/7);
-  var wkTxt = Number.isInteger(wk) ? (wk+' week'+(wk===1?'':'s')) : (wk.toFixed(1)+' weeks');
+  var wkTxt;
+  if(days % 7 === 0){ var w=days/7; wkTxt = w+' week'+(w===1?'':'s'); }
+  else { var mo=Math.round(days/30.44); wkTxt = (mo>=1 && Math.abs(days - mo*30.44) <= 3) ? (mo+' month'+(mo===1?'':'s')) : (days+' days'); }
   box.textContent = wkTxt+'  ·  '+days+' days  ·  access through '+e;
   box.style.color='#86efac';
   // highlight a preset button if it matches exactly
@@ -324,7 +325,12 @@ async function buildInvoiceDoc(sub){
   var plan  = sub.plan || 'Pro';
   var days  = (start&&end) ? daysBetweenInclusive(start,end) : 30;
   var wk    = days/7;
-  var wkTxt = (Number.isInteger(wk) ? wk : wk.toFixed(1)) + ' week' + (wk===1?'':'s');
+  // Clean, professional duration text: whole weeks when the span divides evenly
+  // (e.g. an 8-week preset), whole months when it's a near-exact month multiple
+  // (e.g. a 2-month plan = ~61 days), otherwise just the day count. Never a decimal.
+  var wkTxt;
+  if(days % 7 === 0){ var w=days/7; wkTxt = w+' week'+(w===1?'':'s'); }
+  else { var mo=Math.round(days/30.44); if(mo>=1 && Math.abs(days - mo*30.44) <= 3){ wkTxt = mo+' month'+(mo===1?'':'s'); } else { wkTxt = days+' days'; } }
   var invNo = invNumber(sub);
   var today = ymd(new Date());
 
@@ -363,7 +369,8 @@ async function buildInvoiceDoc(sub){
   doc.text('DevFit Pro Subscription — '+plan, M+3, ry);
   doc.text(price, RIGHT-3, ry, {align:'right'});
   doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(110,110,110);
-  doc.text('Access period: '+(start||'?')+'  to  '+(end||'?')+'   ('+wkTxt+' · '+days+' days)', M+3, ry+6);
+  var durLine = /days$/.test(wkTxt) ? wkTxt : (wkTxt+' · '+days+' days');
+  doc.text('Access period: '+(start||'?')+'  to  '+(end||'?')+'   ('+durLine+')', M+3, ry+6);
 
   var toty=ry+24;
   doc.setDrawColor(220,220,220); doc.setLineWidth(0.3); doc.line(M, toty-7, RIGHT, toty-7);

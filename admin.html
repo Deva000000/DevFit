@@ -174,8 +174,29 @@
 <!-- INVOICE MODAL -->
 <div class="modal-bg" id="inv-modal">
   <div class="modal">
-    <h2>Invoice</h2>
-    <div id="inv-summary" class="hint" style="font-size:13px;color:#ccc;line-height:1.8;margin:8px 0 16px">Building…</div>
+    <h2>Invoice — <span id="inv-who" style="color:#fff;font-style:normal"></span></h2>
+    <label>Invoice type</label>
+    <select id="inv-type">
+      <option value="app">DevFit Pro — app subscription only</option>
+      <option value="coach">Personal Training Coaching (app Pro FREE)</option>
+    </select>
+    <div id="inv-coach-opts" style="display:none">
+      <label>Coaching package</label>
+      <select id="inv-pkg">
+        <option value="n4">Normal &middot; 4 weeks &middot; RM200</option>
+        <option value="n8">Normal &middot; 8 weeks &middot; RM360</option>
+        <option value="s4">Student &middot; 4 weeks &middot; RM160</option>
+        <option value="s8">Student &middot; 8 weeks &middot; RM280</option>
+        <option value="custom">Custom…</option>
+      </select>
+      <div id="inv-custom" style="display:none">
+        <label>Custom description</label>
+        <input id="inv-custom-label" placeholder="Personal Training Coaching — 12 weeks">
+        <label>Custom amount (RM)</label>
+        <input id="inv-custom-amt" placeholder="500" inputmode="decimal">
+      </div>
+    </div>
+    <div id="inv-summary" class="hint" style="font-size:13px;color:#ccc;line-height:1.8;margin:12px 0 16px">Building…</div>
     <button class="btn" id="inv-download">⤓ Download PDF</button>
     <button class="btn" id="inv-share">↗ Share (WhatsApp / Email)</button>
     <button class="btn ghost" id="inv-close">Close</button>
@@ -304,19 +325,35 @@ function loadImgData(src){
     img.src=src;
   });
 }
+// Coaching packages (from the IG offer). Prices fixed; "Custom…" covers anything else.
+var COACH_PKGS = {
+  n4: { label:'Personal Training Coaching (4 weeks)',           amt:200, weeks:4 },
+  n8: { label:'Personal Training Coaching (8 weeks)',           amt:360, weeks:8 },
+  s4: { label:'Personal Training Coaching (4 weeks · Student)', amt:160, weeks:4 },
+  s8: { label:'Personal Training Coaching (8 weeks · Student)', amt:280, weeks:8 }
+};
+function rm(n){ return 'RM' + (Number.isInteger(n) ? n : Number(n).toFixed(2)); }
+// Clean duration label: whole weeks if divisible by 7, else whole months when it's a
+// near-exact month multiple (±3 days), else plain days. Never a decimal.
+function cleanDuration(days){
+  if(days % 7 === 0){ var w=days/7; return w+' week'+(w===1?'':'s'); }
+  var mo=Math.round(days/30.44);
+  return (mo>=1 && Math.abs(days - mo*30.44) <= 3) ? (mo+' month'+(mo===1?'':'s')) : (days+' days');
+}
 // Stable invoice number per client + billing period (regenerating gives the same No.).
-function invNumber(sub){
+// 'C' prefix marks a coaching invoice so it's distinct from an app-only one.
+function invNumber(sub, type){
   var start=(sub.start_date||ymd(new Date())).replace(/-/g,'');
   var h=0, e=String(sub.email||''); for(var i=0;i<e.length;i++){ h=(h*31+e.charCodeAt(i))>>>0; }
-  return 'DF-'+start+'-'+('000'+(h%10000)).slice(-4);
+  return 'DF'+(type==='coach'?'C':'')+'-'+start+'-'+('000'+(h%10000)).slice(-4);
 }
 
-async function buildInvoiceDoc(sub){
+async function buildInvoiceDoc(sub, opts){
+  opts = opts || { type:'app' };
   var jsPDFctor = window.jspdf && window.jspdf.jsPDF;
   if(!jsPDFctor) throw new Error('PDF library not loaded — check your connection.');
   var doc = new jsPDFctor({ unit:'mm', format:'a4' });
   var M=18, RIGHT=210-M;
-  var price = ($('pay-price').value || 'RM19.90').trim();
   var waNum = ($('pay-whatsapp').value || '60183679177').replace(/[^0-9]/g,'') || '60183679177';
   var name  = sub.name || String(sub.email||'').split('@')[0];
   var email = sub.email || '';
@@ -324,19 +361,13 @@ async function buildInvoiceDoc(sub){
   var end   = sub.expiry || '';
   var plan  = sub.plan || 'Pro';
   var days  = (start&&end) ? daysBetweenInclusive(start,end) : 30;
-  var wk    = days/7;
-  // Clean, professional duration text: whole weeks when the span divides evenly
-  // (e.g. an 8-week preset), whole months when it's a near-exact month multiple
-  // (e.g. a 2-month plan = ~61 days), otherwise just the day count. Never a decimal.
-  var wkTxt;
-  if(days % 7 === 0){ var w=days/7; wkTxt = w+' week'+(w===1?'':'s'); }
-  else { var mo=Math.round(days/30.44); if(mo>=1 && Math.abs(days - mo*30.44) <= 3){ wkTxt = mo+' month'+(mo===1?'':'s'); } else { wkTxt = days+' days'; } }
-  var invNo = invNumber(sub);
+  var durTxt = cleanDuration(days);
+  var durLine = /days$/.test(durTxt) ? durTxt : (durTxt+' · '+days+' days');
+  var invNo = invNumber(sub, opts.type);
   var today = ymd(new Date());
 
   var logo = await loadImgData('icon-512.png');
   if(logo){ doc.addImage(logo,'PNG',M,13,20,20); }
-
   doc.setFont('helvetica','bolditalic'); doc.setFontSize(22); doc.setTextColor(20,20,20);
   doc.text('DEV', M+24, 24); var dw=doc.getTextWidth('DEV');
   doc.setTextColor(204,0,0); doc.text('FIT', M+24+dw, 24);
@@ -364,19 +395,39 @@ async function buildInvoiceDoc(sub){
   doc.text('DESCRIPTION', M+3, ty);
   doc.text('AMOUNT', RIGHT-3, ty, {align:'right'});
 
-  var ry=ty+13;
-  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20,20,20);
-  doc.text('DevFit Pro Subscription — '+plan, M+3, ry);
-  doc.text(price, RIGHT-3, ry, {align:'right'});
-  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(110,110,110);
-  var durLine = /days$/.test(wkTxt) ? wkTxt : (wkTxt+' · '+days+' days');
-  doc.text('Access period: '+(start||'?')+'  to  '+(end||'?')+'   ('+durLine+')', M+3, ry+6);
+  var totalStr, toty;
+  if(opts.type === 'coach'){
+    // Row 1 — the paid coaching plan.
+    var ry=ty+13;
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20,20,20);
+    doc.text(String(opts.coachLabel||'Personal Training Coaching'), M+3, ry);
+    doc.text(rm(opts.coachAmount), RIGHT-3, ry, {align:'right'});
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(110,110,110);
+    doc.text('Program: '+(opts.coachWeeks?(opts.coachWeeks+' weeks'):durTxt)+'   ·   '+(start||'?')+' to '+(end||'?'), M+3, ry+6);
+    // Row 2 — DevFit Pro app, FREE (bundled with coaching).
+    var ry2=ry+18;
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20,20,20);
+    doc.text('DevFit Pro App Subscription', M+3, ry2);
+    doc.setTextColor(22,101,52); doc.text('FREE', RIGHT-3, ry2, {align:'right'});
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(110,110,110);
+    doc.text('Included with coaching · '+durLine+' access', M+3, ry2+6);
+    totalStr = rm(opts.coachAmount);
+    toty = ry2+20;
+  } else {
+    var price = ($('pay-price').value || 'RM19.90').trim();
+    var ry=ty+13;
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20,20,20);
+    doc.text('DevFit Pro Subscription — '+plan, M+3, ry);
+    doc.text(price, RIGHT-3, ry, {align:'right'});
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(110,110,110);
+    doc.text('Access period: '+(start||'?')+'  to  '+(end||'?')+'   ('+durLine+')', M+3, ry+6);
+    totalStr = price; toty = ry+24;
+  }
 
-  var toty=ry+24;
   doc.setDrawColor(220,220,220); doc.setLineWidth(0.3); doc.line(M, toty-7, RIGHT, toty-7);
   doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(20,20,20);
   doc.text('TOTAL', RIGHT-42, toty, {align:'left'});
-  doc.text(price, RIGHT-3, toty, {align:'right'});
+  doc.text(totalStr, RIGHT-3, toty, {align:'right'});
   doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(22,101,52);
   doc.text('STATUS:  PAID', M, toty);
 
@@ -386,24 +437,61 @@ async function buildInvoiceDoc(sub){
   doc.text('DevFit · WhatsApp +'+waNum+' · devfitportal.vercel.app', M, fy);
   doc.text('Thank you for training with DevFit.', RIGHT, fy, {align:'right'});
 
-  return { doc:doc, filename:'DevFit-Invoice-'+invNo+'.pdf', invNo:invNo, name:name, price:price };
+  return { doc:doc, filename:'DevFit-Invoice-'+invNo+'.pdf', invNo:invNo, name:name, total:totalStr, type:opts.type };
 }
 
-async function openInvoice(email){
-  var sub=(currentSubs||[]).filter(function(x){return x.email===email;})[0];
-  if(!sub){ return; }
-  $('inv-msg').className='msg';
-  $('inv-summary').innerHTML='Building invoice…';
-  $('inv-modal').classList.add('show');
+var invSub = null;   // subscriber the modal is currently building an invoice for
+
+// Read the modal controls into a build-options object.
+function invOpts(){
+  var type = $('inv-type').value;
+  if(type !== 'coach') return { type:'app' };
+  var pkg = $('inv-pkg').value;
+  if(pkg === 'custom'){
+    return { type:'coach',
+      coachLabel: ($('inv-custom-label').value || 'Personal Training Coaching').trim(),
+      coachAmount: parseFloat($('inv-custom-amt').value) || 0,
+      coachWeeks: null };
+  }
+  var p = COACH_PKGS[pkg] || COACH_PKGS.n4;
+  return { type:'coach', coachLabel:p.label, coachAmount:p.amt, coachWeeks:p.weeks };
+}
+
+async function rebuildInvoice(){
+  if(!invSub) return;
+  // Show/hide the coaching sub-options.
+  $('inv-coach-opts').style.display = ($('inv-type').value === 'coach') ? '' : 'none';
+  $('inv-custom').style.display     = ($('inv-type').value === 'coach' && $('inv-pkg').value === 'custom') ? '' : 'none';
+  $('inv-summary').innerHTML = 'Building invoice…';
   try{
-    invBuilt = await buildInvoiceDoc(sub);
-    $('inv-summary').innerHTML =
-      '<b style="color:#fff">'+invBuilt.invNo+'</b><br>'+
-      (sub.name||sub.email)+' &middot; '+sub.email+'<br>'+
-      'Plan: '+(sub.plan||'Pro')+'<br>'+
-      'Period: '+(sub.start_date||'?')+' → '+(sub.expiry||'?')+'<br>'+
-      'Amount: <b style="color:#fff">'+invBuilt.price+'</b>';
+    var opts = invOpts();
+    invBuilt = await buildInvoiceDoc(invSub, opts);
+    var lines = [
+      '<b style="color:#fff">'+invBuilt.invNo+'</b>',
+      (invSub.name||invSub.email)+' &middot; '+invSub.email,
+      'Period: '+(invSub.start_date||'?')+' → '+(invSub.expiry||'?')
+    ];
+    if(opts.type==='coach'){
+      lines.push('Coaching: <b style="color:#fff">'+rm(opts.coachAmount)+'</b>');
+      lines.push('DevFit Pro app: <b style="color:#22c55e">FREE</b>');
+    } else {
+      lines.push('DevFit Pro: <b style="color:#fff">'+invBuilt.total+'</b>');
+    }
+    $('inv-summary').innerHTML = lines.join('<br>');
   }catch(e){ invBuilt=null; $('inv-summary').innerHTML='Could not build invoice: '+(e.message||e); }
+}
+
+function openInvoice(email){
+  invSub=(currentSubs||[]).filter(function(x){return x.email===email;})[0];
+  if(!invSub){ return; }
+  $('inv-msg').className='msg';
+  $('inv-who').textContent = invSub.name || invSub.email;
+  // Sensible default: if a plan length matches a coaching package, preselect coaching.
+  $('inv-type').value = 'app';
+  $('inv-pkg').value = 'n4';
+  $('inv-custom-label').value=''; $('inv-custom-amt').value='';
+  $('inv-modal').classList.add('show');
+  rebuildInvoice();
 }
 
 function downloadInvoice(){ if(invBuilt){ invBuilt.doc.save(invBuilt.filename); } }
@@ -577,6 +665,10 @@ async function savePayment(){
 $('login-btn').addEventListener('click', doLogin);
 $('inv-download').addEventListener('click', downloadInvoice);
 $('inv-share').addEventListener('click', shareInvoice);
+$('inv-type').addEventListener('change', rebuildInvoice);
+$('inv-pkg').addEventListener('change', rebuildInvoice);
+$('inv-custom-label').addEventListener('input', rebuildInvoice);
+$('inv-custom-amt').addEventListener('input', rebuildInvoice);
 $('inv-close').addEventListener('click', function(){ $('inv-modal').classList.remove('show'); });
 $('inv-modal').addEventListener('click', function(e){ if(e.target===$('inv-modal')) $('inv-modal').classList.remove('show'); });
 $('pay-save').addEventListener('click', savePayment);

@@ -368,11 +368,11 @@ html.nosplash #devfit-splash{display:none!important}
       </div>
     </div>
 
-    <a href="pricing.html" id="renew-btn" class="upgrade-btn">Renew Pro — RM16.90/month</a>
+    <a href="pricing.html" id="renew-btn" class="upgrade-btn">Renew Pro — RM19.90/month</a>
 
     <!-- How billing works -->
     <div class="bill-steps" id="bill-steps">
-      <div class="bill-step"><div class="n">1</div><div class="tx"><b>Pay RM16.90</b> via DuitNow QR on the activation page, then WhatsApp the receipt with your Gmail.</div></div>
+      <div class="bill-step"><div class="n">1</div><div class="tx"><b>Pay RM19.90</b> via DuitNow QR on the activation page, then WhatsApp the receipt with your Gmail.</div></div>
       <div class="bill-step"><div class="n">2</div><div class="tx"><b>Activated within 24 hours.</b> Your plan turns Pro and the end date above is set to 30 days out.</div></div>
       <div class="bill-step"><div class="n">3</div><div class="tx"><b>Full access until the end date.</b> Everything unlocks — history, charts, reports, share cards.</div></div>
       <div class="bill-step"><div class="n">4</div><div class="tx"><b>Reverts to Free automatically</b> when the date passes. Your logged data is never deleted — it's safe and waiting.</div></div>
@@ -521,7 +521,7 @@ html.nosplash #devfit-splash{display:none!important}
 
   <div class="footer">
     DevFit · Dominance Through Discipline<br>
-    <a href="https://wa.me/60183679177">Contact trainer</a> · v4.59.0
+    <a href="https://wa.me/60183679177">Contact trainer</a> · v4.60.0
   </div>
 
 
@@ -753,7 +753,7 @@ function fmtDate(d){ try{ const x=new Date(d); if(isNaN(x)) return '—'; return
         fillBar();
         bar.className = 'sub-bar' + (daysLeft<=7?' danger':daysLeft<=14?' warn':'');
         renew.style.display = '';
-        renew.textContent = daysLeft<=7 ? 'Renew Pro — RM16.90/month' : 'Extend Pro — RM16.90/month';
+        renew.textContent = daysLeft<=7 ? 'Renew Pro — RM19.90/month' : 'Extend Pro — RM19.90/month';
       }
     } else {
       // FREE — either never upgraded, or Pro period ended and auto-reverted.
@@ -773,7 +773,7 @@ function fmtDate(d){ try{ const x=new Date(d); if(isNaN(x)) return '—'; return
         barWrap.style.display = 'none';
       }
       renew.style.display = '';
-      renew.textContent = 'Unlock Pro — RM16.90/mo (≈ 56 sen/day)';
+      renew.textContent = 'Unlock Pro — RM19.90/mo (≈ 66 sen/day)';
     }
 
     // ---------- USAGE ----------

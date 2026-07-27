@@ -721,13 +721,21 @@ html.nosplash #devfit-splash{display:none!important}
   <div class="pro-locked card" style="text-align:center;padding:28px 16px;background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid #334155;">
     <div style="font-size:22px;margin-bottom:8px;">📈</div>
     <div style="font-size:15px;font-weight:800;color:#f1f5f9;margin-bottom:8px;">See if your plan is actually working</div>
+    <!-- Teaser: real 4-week bodyweight shape, blurred + unlabelled, so free users
+         see they HAVE a trend without the paid numbers. Hidden if too little data. -->
+    <div id="teaser-spark-wrap" style="display:none;position:relative;max-width:280px;margin:0 auto 14px;">
+      <canvas id="teaser-spark" width="280" height="70" style="width:100%;height:70px;filter:blur(3px);opacity:.8"></canvas>
+      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+        <span style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#fff;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.25);border-radius:20px;padding:5px 12px;">🔒 Your trend — unlock to see</span>
+      </div>
+    </div>
     <div style="font-size:12.5px;color:#cbd5e1;margin-bottom:14px;line-height:1.7;text-align:left;max-width:280px;margin-left:auto;margin-right:auto;">
       <div style="margin-bottom:5px;">✓ <b>True Progress Score</b> — one number from 6 signals</div>
       <div style="margin-bottom:5px;">✓ <b>Full history</b> — every week, not just today</div>
       <div style="margin-bottom:5px;">✓ <b>Trend charts</b> — bodyweight &amp; score over time</div>
       <div>✓ <b>PDF reports</b> you can keep or share</div>
     </div>
-    <div style="font-size:12px;color:#94a3b8;margin-bottom:14px;">Everything unlocked for <b style="color:#f1f5f9;">≈ 56 sen a day</b> — RM16.90/month, cancel anytime.</div>
+    <div style="font-size:12px;color:#94a3b8;margin-bottom:14px;">Everything unlocked for <b style="color:#f1f5f9;">≈ 66 sen a day</b> — RM19.90/month, cancel anytime.</div>
     <a href="pricing.html" style="display:inline-block;background:#2f9e57;color:#fff;font-weight:700;font-size:13px;padding:11px 26px;border-radius:20px;text-decoration:none;">Unlock Pro →</a>
   </div>
 
@@ -1181,6 +1189,37 @@ function restoreProHistory(){
 // Back-compat shim: some call sites / older references may still call this name.
 function normalizeFreeTierWeeks(){ if(!isPro()) normalizeFreeTierWeeksView(); }
 
+// ── Free-tier teaser sparkline ────────────────────────────────────────────
+// Weekly-average bodyweight for the last 4 logged weeks (archive + current),
+// used only to draw a blurred, number-free "you have a trend" teaser for free users.
+function weekAvgBw(weekArr){
+  if(!Array.isArray(weekArr)) return null;
+  var v=weekArr.map(function(x){return parseFloat(x);}).filter(function(n){return isFinite(n)&&n>0;});
+  return v.length ? v.reduce(function(a,b){return a+b;},0)/v.length : null;
+}
+function last4WeeksBwAvgs(){
+  var s=[]; var H=appData._proHistory;
+  if(H && Array.isArray(H.bw)) H.bw.forEach(function(wk){ s.push(weekAvgBw(wk)); });
+  s.push(weekAvgBw(appData.bw && appData.bw[0]));
+  return s.filter(function(v){return v!=null;}).slice(-4);
+}
+function drawTeaserSparkline(){
+  var wrap=document.getElementById('teaser-spark-wrap'), cv=document.getElementById('teaser-spark');
+  if(!wrap||!cv) return;
+  var pts=last4WeeksBwAvgs();
+  if(pts.length<2){ wrap.style.display='none'; return; }
+  wrap.style.display='';
+  var ctx=cv.getContext('2d'), W=cv.width, Hh=cv.height, pad=12;
+  ctx.clearRect(0,0,W,Hh);
+  var min=Math.min.apply(null,pts), max=Math.max.apply(null,pts), range=(max-min)||1;
+  var stepX=(W-2*pad)/(pts.length-1);
+  function xy(v,i){ return [pad+i*stepX, pad+(Hh-2*pad)*(1-(v-min)/range)]; }
+  ctx.beginPath();
+  pts.forEach(function(v,i){ var p=xy(v,i); i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]); });
+  ctx.strokeStyle='#4ade80'; ctx.lineWidth=3; ctx.lineJoin='round'; ctx.lineCap='round'; ctx.stroke();
+  pts.forEach(function(v,i){ var p=xy(v,i); ctx.beginPath(); ctx.arc(p[0],p[1],3.2,0,Math.PI*2); ctx.fillStyle='#4ade80'; ctx.fill(); });
+}
+
 function loadData(){
   try{
     const s=localStorage.getItem('progressLog2');
@@ -1236,7 +1275,7 @@ function lockCard(card, title){
   overlay.innerHTML = `
     <div class="devfit-lock-badge">★ Pro</div>
     <div class="devfit-lock-title">${title}</div>
-    <div class="devfit-lock-sub">Everything unlocked for ≈ 56 sen/day · RM16.90/mo</div>
+    <div class="devfit-lock-sub">Everything unlocked for ≈ 66 sen/day · RM19.90/mo</div>
     <a class="devfit-lock-cta" href="pricing.html">See what Pro unlocks →</a>`;
   card.appendChild(overlay);
 }
@@ -1658,6 +1697,7 @@ function renderExtraCards(){
   } else {
     proSections.forEach(el=>el.style.display='none');
     locked.forEach(el=>el.style.display='');
+    try{ drawTeaserSparkline(); }catch(e){}
   }
 }
 

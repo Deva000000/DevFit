@@ -104,8 +104,8 @@
     <span class="pro-badge">DevFit Pro</span>
     <h3>One plan. Everything unlocked.</h3>
     <div class="sub">No tiers. No upsells. Cancel anytime.</div>
-    <div class="price">RM16.90<small>/month</small></div>
-    <div class="price-note">≈ 56 sen a day &middot; 30 days full access &middot; DuitNow QR</div>
+    <div class="price"><span id="pc-amt">RM19.90</span><small>/month</small></div>
+    <div class="price-note"><span id="pc-perday">≈ 66 sen a day</span> &middot; 30 days full access &middot; DuitNow QR</div>
     <ul>
       <li><b>See if it's working</b> — six-signal True Progress Score</li>
       <li><b>Your whole journey</b> — every week of history, not just today</li>
@@ -119,7 +119,7 @@
 
   <!-- Payment -->
   <div class="pay-section">
-    <h2>Scan &amp; pay <span class="red">RM16.90</span></h2>
+    <h2>Scan &amp; pay <span class="red" id="pc-head">RM19.90</span></h2>
 
     <div class="qr-box">
       <img id="qr-img" src="duitnow-qr.jpg" alt="DuitNow QR" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
@@ -129,7 +129,7 @@
 
     <div class="steps">
       <div class="step">
-        <div class="step-body"><strong>Scan &amp; pay RM16.90</strong> via any banking app (Maybank, CIMB, Public Bank) or e-wallet (TNG, GrabPay, ShopeePay)</div>
+        <div class="step-body"><strong>Scan &amp; pay <span id="pc-step">RM19.90</span></strong> via any banking app (Maybank, CIMB, Public Bank) or e-wallet (TNG, GrabPay, ShopeePay)</div>
       </div>
       <div class="step">
         <div class="step-body"><strong>Screenshot</strong> the payment confirmation</div>
@@ -163,7 +163,22 @@
 
 <script>
   let phone = '60183679177';   // default; overridden by /api/config (admin-editable)
+  let PRICE = 'RM19.90';       // default; overridden by /api/config (admin-editable)
   function ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+  // Apply an admin-set price everywhere it appears. Accepts "19.90", "RM19.90",
+  // "RM 19.90" etc; normalises to "RM19.90" and recomputes the per-day figure.
+  function applyPrice(raw){
+    if(!raw) return;
+    const num = parseFloat(String(raw).replace(/[^0-9.]/g,''));
+    if(!isFinite(num) || num<=0) return;
+    PRICE = 'RM' + (Number.isInteger(num) ? num : num.toFixed(2));
+    const perDay = Math.round((num/30)*100); // sen/day
+    const set=(id,txt)=>{ const el=document.getElementById(id); if(el) el.textContent=txt; };
+    set('pc-amt', PRICE); set('pc-head', PRICE); set('pc-step', PRICE);
+    set('pc-perday', '≈ ' + perDay + ' sen a day');
+    refreshWa();
+  }
 
   // Pre-fill the WhatsApp receipt with everything the trainer needs to activate:
   // the payer's account email + name, and the exact 30-day window (start → end).
@@ -177,7 +192,7 @@
     if(u.expiry){ const e = new Date(u.expiry); if(!isNaN(e) && e > today){ start = new Date(e); start.setDate(start.getDate()+1); } }
     const end = new Date(start); end.setDate(end.getDate()+29); // 30-day inclusive span
     return [
-      "Hi DevFit! I've paid RM16.90 for Pro — please activate my account:",
+      "Hi DevFit! I've paid " + PRICE + " for Pro — please activate my account:",
       "",
       "• Email: " + (u.email || '(type your Gmail here)'),
       "• Name: "  + (u.name  || '(type your name here)'),
@@ -197,6 +212,7 @@
   // the endpoint is unset or offline.
   fetch('/api/config', { cache: 'no-store' }).then(function(r){ return r.json(); }).then(function(cfg){
     if(!cfg) return;
+    if(cfg.price){ applyPrice(cfg.price); }
     if(cfg.whatsapp){ phone = String(cfg.whatsapp).replace(/[^0-9]/g,'') || phone; }
     if(cfg.qr){
       var img = document.getElementById('qr-img');

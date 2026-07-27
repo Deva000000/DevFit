@@ -63,7 +63,13 @@
   .dev-item{font-size:11px;color:#aaa;padding:8px 0;border-bottom:1px dashed #262626;line-height:1.5}
   .dev-item:last-child{border-bottom:none}
   .dev-item b{color:#ddd}
+  .sub-row .tap{white-space:nowrap}
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:none;align-items:center;justify-content:center;padding:16px}
+  .modal-bg.show{display:flex}
+  .modal{background:#111;border:1px solid #333;border-top:3px solid #cc0000;border-radius:14px;padding:20px;max-width:420px;width:100%}
+  .modal h2{margin-bottom:6px}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -91,6 +97,8 @@
     <div id="view-manage">
       <div class="card" id="card-payment">
         <h2>Payment settings <span class="tap" id="pay-reload">reload</span></h2>
+        <label>Pro price (shown on pricing page &amp; receipts)</label>
+        <input type="text" id="pay-price" placeholder="RM19.90" autocomplete="off">
         <label>WhatsApp number for receipts (digits only)</label>
         <input type="text" id="pay-whatsapp" placeholder="60183679177" inputmode="numeric" autocomplete="off">
         <label>DuitNow QR image</label>
@@ -160,6 +168,19 @@
     </div>
 
     <button class="btn ghost" id="logout-btn">Lock panel</button>
+  </div>
+</div>
+
+<!-- INVOICE MODAL -->
+<div class="modal-bg" id="inv-modal">
+  <div class="modal">
+    <h2>Invoice</h2>
+    <div id="inv-summary" class="hint" style="font-size:13px;color:#ccc;line-height:1.8;margin:8px 0 16px">Building…</div>
+    <button class="btn" id="inv-download">⤓ Download PDF</button>
+    <button class="btn" id="inv-share">↗ Share (WhatsApp / Email)</button>
+    <button class="btn ghost" id="inv-close">Close</button>
+    <div class="msg" id="inv-msg"></div>
+    <div class="hint">On your phone, <b>Share</b> opens WhatsApp, Mail and more with the PDF attached. On desktop it downloads.</div>
   </div>
 </div>
 
@@ -245,6 +266,7 @@ function renderList(subs){
     return '<div class="sub-row">'+
       '<span class="em" title="'+s.email+'">'+s.email+'</span>'+ statusPill(s)+
       '<span class="tap" data-fill="'+encodeURIComponent(s.email)+'">edit</span>'+
+      '<span class="tap" data-invoice="'+encodeURIComponent(s.email)+'">🧾 invoice</span>'+
       '<span class="win">'+win+'</span>'+
     '</div>';
   }).join('');
@@ -257,6 +279,140 @@ function renderList(subs){
       $('email').scrollIntoView({behavior:'smooth'});
     });
   });
+  Array.prototype.forEach.call(box.querySelectorAll('[data-invoice]'), function(el){
+    el.addEventListener('click', function(){ openInvoice(decodeURIComponent(el.getAttribute('data-invoice'))); });
+  });
+}
+
+/* ---------- invoices ---------- */
+var invBuilt = null;  // { doc, filename, invNo, name, price }
+
+// Load a same-origin image as a small PNG data URL for jsPDF (null on failure).
+// Downscaled to <=160px so the embedded logo keeps the invoice PDF light (a full
+// 512px logo bloated it to ~1MB — bad for sharing over mobile data).
+function loadImgData(src){
+  return new Promise(function(res){
+    var img=new Image();
+    img.onload=function(){ try{
+      var max=160, w=img.naturalWidth, h=img.naturalHeight;
+      if(w>max||h>max){ if(w>=h){ h=Math.round(h*max/w); w=max; } else { w=Math.round(w*max/h); h=max; } }
+      var c=document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h); res(c.toDataURL('image/png'));
+    }catch(e){ res(null); } };
+    img.onerror=function(){ res(null); };
+    img.src=src;
+  });
+}
+// Stable invoice number per client + billing period (regenerating gives the same No.).
+function invNumber(sub){
+  var start=(sub.start_date||ymd(new Date())).replace(/-/g,'');
+  var h=0, e=String(sub.email||''); for(var i=0;i<e.length;i++){ h=(h*31+e.charCodeAt(i))>>>0; }
+  return 'DF-'+start+'-'+('000'+(h%10000)).slice(-4);
+}
+
+async function buildInvoiceDoc(sub){
+  var jsPDFctor = window.jspdf && window.jspdf.jsPDF;
+  if(!jsPDFctor) throw new Error('PDF library not loaded — check your connection.');
+  var doc = new jsPDFctor({ unit:'mm', format:'a4' });
+  var M=18, RIGHT=210-M;
+  var price = ($('pay-price').value || 'RM19.90').trim();
+  var waNum = ($('pay-whatsapp').value || '60183679177').replace(/[^0-9]/g,'') || '60183679177';
+  var name  = sub.name || String(sub.email||'').split('@')[0];
+  var email = sub.email || '';
+  var start = sub.start_date || '';
+  var end   = sub.expiry || '';
+  var plan  = sub.plan || 'Pro';
+  var days  = (start&&end) ? daysBetweenInclusive(start,end) : 30;
+  var wk    = days/7;
+  var wkTxt = (Number.isInteger(wk) ? wk : wk.toFixed(1)) + ' week' + (wk===1?'':'s');
+  var invNo = invNumber(sub);
+  var today = ymd(new Date());
+
+  var logo = await loadImgData('icon-512.png');
+  if(logo){ doc.addImage(logo,'PNG',M,13,20,20); }
+
+  doc.setFont('helvetica','bolditalic'); doc.setFontSize(22); doc.setTextColor(20,20,20);
+  doc.text('DEV', M+24, 24); var dw=doc.getTextWidth('DEV');
+  doc.setTextColor(204,0,0); doc.text('FIT', M+24+dw, 24);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(130,130,130);
+  doc.text('DOMINANCE THROUGH DISCIPLINE', M+24, 30);
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(20,20,20);
+  doc.text('INVOICE', RIGHT, 22, {align:'right'});
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(90,90,90);
+  doc.text('No.  '+invNo, RIGHT, 29, {align:'right'});
+  doc.text('Date  '+today, RIGHT, 34, {align:'right'});
+
+  doc.setDrawColor(204,0,0); doc.setLineWidth(0.8); doc.line(M, 40, RIGHT, 40);
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(130,130,130);
+  doc.text('BILL TO', M, 50);
+  doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(20,20,20);
+  doc.text(String(name), M, 57);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(90,90,90);
+  doc.text(String(email), M, 63);
+
+  var ty=80;
+  doc.setFillColor(244,244,245); doc.rect(M, ty-6, RIGHT-M, 9, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(70,70,70);
+  doc.text('DESCRIPTION', M+3, ty);
+  doc.text('AMOUNT', RIGHT-3, ty, {align:'right'});
+
+  var ry=ty+13;
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20,20,20);
+  doc.text('DevFit Pro Subscription — '+plan, M+3, ry);
+  doc.text(price, RIGHT-3, ry, {align:'right'});
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(110,110,110);
+  doc.text('Access period: '+(start||'?')+'  to  '+(end||'?')+'   ('+wkTxt+' · '+days+' days)', M+3, ry+6);
+
+  var toty=ry+24;
+  doc.setDrawColor(220,220,220); doc.setLineWidth(0.3); doc.line(M, toty-7, RIGHT, toty-7);
+  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(20,20,20);
+  doc.text('TOTAL', RIGHT-42, toty, {align:'left'});
+  doc.text(price, RIGHT-3, toty, {align:'right'});
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(22,101,52);
+  doc.text('STATUS:  PAID', M, toty);
+
+  var fy=282;
+  doc.setDrawColor(230,230,230); doc.setLineWidth(0.3); doc.line(M, fy-6, RIGHT, fy-6);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(140,140,140);
+  doc.text('DevFit · WhatsApp +'+waNum+' · devfitportal.vercel.app', M, fy);
+  doc.text('Thank you for training with DevFit.', RIGHT, fy, {align:'right'});
+
+  return { doc:doc, filename:'DevFit-Invoice-'+invNo+'.pdf', invNo:invNo, name:name, price:price };
+}
+
+async function openInvoice(email){
+  var sub=(currentSubs||[]).filter(function(x){return x.email===email;})[0];
+  if(!sub){ return; }
+  $('inv-msg').className='msg';
+  $('inv-summary').innerHTML='Building invoice…';
+  $('inv-modal').classList.add('show');
+  try{
+    invBuilt = await buildInvoiceDoc(sub);
+    $('inv-summary').innerHTML =
+      '<b style="color:#fff">'+invBuilt.invNo+'</b><br>'+
+      (sub.name||sub.email)+' &middot; '+sub.email+'<br>'+
+      'Plan: '+(sub.plan||'Pro')+'<br>'+
+      'Period: '+(sub.start_date||'?')+' → '+(sub.expiry||'?')+'<br>'+
+      'Amount: <b style="color:#fff">'+invBuilt.price+'</b>';
+  }catch(e){ invBuilt=null; $('inv-summary').innerHTML='Could not build invoice: '+(e.message||e); }
+}
+
+function downloadInvoice(){ if(invBuilt){ invBuilt.doc.save(invBuilt.filename); } }
+async function shareInvoice(){
+  if(!invBuilt) return;
+  try{
+    var blob = invBuilt.doc.output('blob');
+    var file = new File([blob], invBuilt.filename, { type:'application/pdf' });
+    var text = 'Hi '+invBuilt.name+', here is your DevFit Pro invoice ('+invBuilt.invNo+'). Thank you!';
+    if(navigator.canShare && navigator.canShare({ files:[file] })){
+      await navigator.share({ files:[file], title:'DevFit Invoice', text:text });
+    } else {
+      invBuilt.doc.save(invBuilt.filename);
+      msg($('inv-msg'), 'Direct file-share isn’t supported on this device — the invoice downloaded instead. Attach it in WhatsApp/email.', true);
+    }
+  }catch(e){ if(e && e.name!=='AbortError') msg($('inv-msg'), 'Share failed: '+(e.message||e), false); }
 }
 async function refreshList(){ var r=await call('list'); if(r.status===200) renderList(r.data.subscribers||[]); }
 
@@ -364,6 +520,7 @@ async function loadConfig(){
   var r = await call('getConfig');
   if(r.status !== 200) return;
   var c = (r.data && r.data.config) || {};
+  $('pay-price').value = c.price || 'RM19.90';
   $('pay-whatsapp').value = c.whatsapp || '';
   $('pay-note').value = c.note || '';
   payQrData = null;
@@ -398,6 +555,7 @@ function onQrFile(ev){
 async function savePayment(){
   var btn = $('pay-save'); btn.disabled = true; var t = btn.textContent; btn.textContent = 'Saving…';
   var extra = {
+    price: ($('pay-price').value || '').trim(),
     whatsapp: ($('pay-whatsapp').value || '').replace(/[^0-9]/g, ''),
     note: $('pay-note').value || ''
   };
@@ -410,6 +568,10 @@ async function savePayment(){
 
 /* ---------- wire ---------- */
 $('login-btn').addEventListener('click', doLogin);
+$('inv-download').addEventListener('click', downloadInvoice);
+$('inv-share').addEventListener('click', shareInvoice);
+$('inv-close').addEventListener('click', function(){ $('inv-modal').classList.remove('show'); });
+$('inv-modal').addEventListener('click', function(e){ if(e.target===$('inv-modal')) $('inv-modal').classList.remove('show'); });
 $('pay-save').addEventListener('click', savePayment);
 $('pay-reload').addEventListener('click', loadConfig);
 $('pay-qr-file').addEventListener('change', onQrFile);

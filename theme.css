@@ -770,25 +770,32 @@ html[data-theme="light"] .page [style*="color:#ff5f5f"]{color:#cc0000 !important
    =========================================================== */
 
 :root{
-  --df-track:rgba(255,255,255,0.055);
-  --df-track-line:rgba(255,255,255,0.10);
+  /* Surface steps have to be SEEN, not just measured for text contrast. A
+     neutral raised pill only cleared 1.1–1.4:1 against its own track — real but
+     imperceptible. The selected tab is crimson: unmistakable at a glance, it
+     matches the bottom nav and .food-tab.active that already worked this way,
+     and "selected" is exactly the accent job red is supposed to keep. */
+  --df-track:rgba(255,255,255,0.09);
+  --df-track-line:rgba(255,255,255,0.13);
   --df-tab-ink:rgba(255,255,255,0.66);
-  --df-tab-ink-hover:rgba(255,255,255,0.88);
-  --df-tab-on-bg:rgba(255,255,255,0.11);
+  --df-tab-ink-hover:rgba(255,255,255,0.92);
+  --df-tab-hover:rgba(255,255,255,0.13);
+  --df-tab-on-bg:#cc0000;
   --df-tab-on-ink:#ffffff;
-  --df-tab-on-shadow:0 2px 8px rgba(0,0,0,0.45),0 0 0 1px rgba(255,255,255,0.07);
+  --df-tab-on-shadow:0 4px 12px rgba(204,0,0,0.42),0 1px 2px rgba(0,0,0,0.35);
   --df-elev-1:0 1px 2px rgba(0,0,0,0.40),0 12px 32px rgba(0,0,0,0.42);
   --df-elev-2:0 8px 20px rgba(0,0,0,0.45),0 32px 64px rgba(0,0,0,0.50);
   --df-hairline:rgba(255,255,255,0.07);
 }
 html[data-theme="light"]{
-  --df-track:#efeae4;
-  --df-track-line:rgba(20,15,10,0.12);
-  --df-tab-ink:#6a6157;
+  --df-track:#e3dbd1;
+  --df-track-line:rgba(20,15,10,0.17);
+  --df-tab-ink:#5f564c;
   --df-tab-ink-hover:#14110e;
-  --df-tab-on-bg:#ffffff;
-  --df-tab-on-ink:#14110e;
-  --df-tab-on-shadow:0 2px 6px rgba(60,40,30,0.18),0 0 0 1px rgba(20,15,10,0.05);
+  --df-tab-hover:rgba(255,255,255,0.75);
+  --df-tab-on-bg:#cc0000;
+  --df-tab-on-ink:#ffffff;
+  --df-tab-on-shadow:0 4px 12px rgba(204,0,0,0.30),0 1px 2px rgba(60,40,30,0.18);
   --df-elev-1:0 1px 2px rgba(60,40,30,0.06),0 8px 24px rgba(60,40,30,0.09);
   --df-elev-2:0 8px 20px rgba(60,40,30,0.12),0 32px 64px rgba(60,40,30,0.16);
   --df-hairline:rgba(20,15,10,0.07);
@@ -832,7 +839,7 @@ nav.prog-subnav button:hover,
 .theme-btn:hover,
 .ds-tbtn:hover,
 .ws-tbtn:hover{
-  background:var(--df-tab-on-bg) !important;
+  background:var(--df-tab-hover) !important;
   color:var(--df-tab-ink-hover) !important;
 }
 /* Active = raised pill. This is the affordance: it looks pressed-out of the
@@ -848,27 +855,10 @@ nav.prog-subnav button.active,
   color:var(--df-tab-on-ink) !important;
   box-shadow:var(--df-tab-on-shadow) !important;
 }
-html[data-theme="light"] nav.prog-subnav button.active,
-html[data-theme="light"] .mode-btn.active,
-html[data-theme="light"] .ds-tab.active,
-html[data-theme="light"] .food-tab.active,
-html[data-theme="light"] .theme-btn.active,
-html[data-theme="light"] .ds-tbtn.active,
-html[data-theme="light"] .ws-tbtn.active{background:#ffffff !important;}
-/* The old crimson underline moves INSIDE the pill as a short accent bar — the
-   brand cue survives at a tenth of the ink. */
+/* The old underline is redundant now — and invisible red-on-red. */
 nav.prog-subnav button::after,
 .mode-btn::after,
-.ds-tab::after{
-  left:26% !important;
-  right:26% !important;
-  bottom:5px !important;
-  height:2.5px !important;
-  border-radius:2px !important;
-}
-nav.prog-subnav button.active::after,
-.mode-btn.active::after,
-.ds-tab.active::after{background:#cc0000 !important;}
+.ds-tab::after{display:none !important;}
 /* Tap feedback — the control should answer the finger */
 nav.prog-subnav button:active,
 .mode-btn:active,
@@ -893,7 +883,11 @@ details.setup-card>summary{
   border-bottom:1px solid transparent !important;
   transition:background .18s !important;
 }
-details.setup-card>summary:hover{background:var(--df-tab-on-bg) !important;}
+details.setup-card>summary:hover{background:var(--df-tab-hover) !important;}
+/* Summary sits on the track now, not on the card — the old #6a6157 subtitle
+   drops to 4.4:1 against that darker fill. */
+html[data-theme="light"] details.setup-card>summary span,
+html[data-theme="light"] details.setup-card>summary::after{color:#574e45 !important;}
 details.setup-card[open]>summary{border-bottom-color:var(--df-track-line) !important;}
 /* Chevron gets a chip so the hit target is legible */
 details.setup-card>summary::after{
@@ -902,7 +896,7 @@ details.setup-card>summary::after{
   justify-content:center;
   width:22px;height:22px;
   border-radius:7px;
-  background:var(--df-tab-on-bg) !important;
+  background:var(--df-tab-hover) !important;
   font-size:11px;
   line-height:1;
 }
@@ -921,7 +915,7 @@ html:not([data-theme="light"]) .df-theme-toggle{
 }
 html[data-theme="light"] .group-title.group-toggle:hover,
 html:not([data-theme="light"]) .group-title.group-toggle:hover{
-  background:var(--df-tab-on-bg) !important;
+  background:var(--df-tab-hover) !important;
 }
 html[data-theme="light"] .df-theme-opt:not(.active),
 html:not([data-theme="light"]) .df-theme-opt:not(.active){color:var(--df-tab-ink) !important;}
@@ -934,7 +928,7 @@ html:not([data-theme="light"]) .df-theme-opt:not(.active){color:var(--df-tab-ink
   border:1px solid var(--df-track-line) !important;
   transition:background .18s !important;
 }
-.calc-head:hover .calc-toggle{background:var(--df-tab-on-bg) !important;}
+.calc-head:hover .calc-toggle{background:var(--df-tab-hover) !important;}
 .calc-explain summary{
   display:inline-block !important;
   padding:5px 11px !important;
@@ -1052,10 +1046,3 @@ html:not([data-theme="light"]) .ws-tbtn.active{
   color:var(--df-tab-on-ink) !important;
   box-shadow:var(--df-tab-on-shadow) !important;
 }
-html[data-theme="light"] nav.prog-subnav button.active,
-html[data-theme="light"] .mode-btn.active,
-html[data-theme="light"] .ds-tab.active,
-html[data-theme="light"] .food-tab.active,
-html[data-theme="light"] .theme-btn.active,
-html[data-theme="light"] .ds-tbtn.active,
-html[data-theme="light"] .ws-tbtn.active{background:#ffffff !important;}

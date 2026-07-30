@@ -745,3 +745,317 @@ html[data-theme="light"] .page [style*="color:#ff5f5f"]{color:#cc0000 !important
    takes the label to 4.8:1 and still reads as the same sage-green. */
 .lib-load,.smeal-add,#serving-add,.toast{background:#268247 !important;}
 .lib-load:hover,.smeal-add:hover,#serving-add:hover{background:#1d6a39 !important;}
+
+/* ===========================================================
+   v4.63 — AFFORDANCE & RESTRAINT PASS
+
+   1. SEGMENTED TABS. Daily/Weekly/Analytics, the Training mode switch and the
+      Nutrition slicer were transparent rows of text over a 1px hairline. There
+      was nothing to say "these are buttons" — a first-time user reads them as
+      headings, not controls. They now sit in a filled, bordered track with the
+      active tab as a RAISED pill, which is the one control idiom every phone
+      user already knows. The affordance goes on the group, not on each card.
+
+   2. CRIMSON AS ACCENT, NOT DECORATION. Red was doing seven jobs at once: brand
+      bar, header stripe, every modal's top edge, tab underline, week-tab
+      outlines, CTA fills AND the over-target error state. When one colour means
+      everything it means nothing, and it reads loud rather than premium. Red is
+      now reserved for: active state, primary CTA, and error/over-target. The
+      decorative stripes are gone; the header lockup and its accent are
+      untouched.
+
+   3. ELEVATION OVER OUTLINES. Surfaces separate by shadow + fill step, with the
+      border reduced to a whisper. Hairline borders everywhere read as unstyled;
+      layered shadow reads as designed.
+   =========================================================== */
+
+:root{
+  --df-track:rgba(255,255,255,0.055);
+  --df-track-line:rgba(255,255,255,0.10);
+  --df-tab-ink:rgba(255,255,255,0.66);
+  --df-tab-ink-hover:rgba(255,255,255,0.88);
+  --df-tab-on-bg:rgba(255,255,255,0.11);
+  --df-tab-on-ink:#ffffff;
+  --df-tab-on-shadow:0 2px 8px rgba(0,0,0,0.45),0 0 0 1px rgba(255,255,255,0.07);
+  --df-elev-1:0 1px 2px rgba(0,0,0,0.40),0 12px 32px rgba(0,0,0,0.42);
+  --df-elev-2:0 8px 20px rgba(0,0,0,0.45),0 32px 64px rgba(0,0,0,0.50);
+  --df-hairline:rgba(255,255,255,0.07);
+}
+html[data-theme="light"]{
+  --df-track:#efeae4;
+  --df-track-line:rgba(20,15,10,0.12);
+  --df-tab-ink:#6a6157;
+  --df-tab-ink-hover:#14110e;
+  --df-tab-on-bg:#ffffff;
+  --df-tab-on-ink:#14110e;
+  --df-tab-on-shadow:0 2px 6px rgba(60,40,30,0.18),0 0 0 1px rgba(20,15,10,0.05);
+  --df-elev-1:0 1px 2px rgba(60,40,30,0.06),0 8px 24px rgba(60,40,30,0.09);
+  --df-elev-2:0 8px 20px rgba(60,40,30,0.12),0 32px 64px rgba(60,40,30,0.16);
+  --df-hairline:rgba(20,15,10,0.07);
+}
+
+/* -----------------------------------------------------------
+   1. SEGMENTED SECTION TABS
+   ----------------------------------------------------------- */
+nav.prog-subnav,
+.mode-switch,
+.diet-slicer,
+.food-tabs,
+.theme-picker,
+.ds-picker,
+.ws-picker{
+  display:flex !important;
+  gap:4px !important;
+  padding:4px !important;
+  border-radius:14px !important;
+  background:var(--df-track) !important;
+  border:1px solid var(--df-track-line) !important;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,0.05) !important;
+}
+nav.prog-subnav button,
+.mode-btn,
+.ds-tab,
+.food-tab,
+.theme-btn,
+.ds-tbtn,
+.ws-tbtn{
+  border:none !important;
+  border-radius:10px !important;
+  background:transparent !important;
+  color:var(--df-tab-ink) !important;
+  transition:background .18s cubic-bezier(.2,.8,.2,1),color .18s,box-shadow .18s !important;
+}
+nav.prog-subnav button:hover,
+.mode-btn:hover,
+.ds-tab:hover,
+.food-tab:hover,
+.theme-btn:hover,
+.ds-tbtn:hover,
+.ws-tbtn:hover{
+  background:var(--df-tab-on-bg) !important;
+  color:var(--df-tab-ink-hover) !important;
+}
+/* Active = raised pill. This is the affordance: it looks pressed-out of the
+   track, so the row reads as a switch even before you touch it. */
+nav.prog-subnav button.active,
+.mode-btn.active,
+.ds-tab.active,
+.food-tab.active,
+.theme-btn.active,
+.ds-tbtn.active,
+.ws-tbtn.active{
+  background:var(--df-tab-on-bg) !important;
+  color:var(--df-tab-on-ink) !important;
+  box-shadow:var(--df-tab-on-shadow) !important;
+}
+html[data-theme="light"] nav.prog-subnav button.active,
+html[data-theme="light"] .mode-btn.active,
+html[data-theme="light"] .ds-tab.active,
+html[data-theme="light"] .food-tab.active,
+html[data-theme="light"] .theme-btn.active,
+html[data-theme="light"] .ds-tbtn.active,
+html[data-theme="light"] .ws-tbtn.active{background:#ffffff !important;}
+/* The old crimson underline moves INSIDE the pill as a short accent bar — the
+   brand cue survives at a tenth of the ink. */
+nav.prog-subnav button::after,
+.mode-btn::after,
+.ds-tab::after{
+  left:26% !important;
+  right:26% !important;
+  bottom:5px !important;
+  height:2.5px !important;
+  border-radius:2px !important;
+}
+nav.prog-subnav button.active::after,
+.mode-btn.active::after,
+.ds-tab.active::after{background:#cc0000 !important;}
+/* Tap feedback — the control should answer the finger */
+nav.prog-subnav button:active,
+.mode-btn:active,
+.ds-tab:active,
+.food-tab:active{transform:scale(0.97);}
+
+/* Week tabs: inactive outlines were crimson too. Neutral at rest, crimson when
+   selected — same rule as everything else. */
+.wtab:not(.active){border-color:var(--df-track-line) !important;}
+.wtab:not(.active):hover{border-color:var(--df-tab-ink) !important;}
+.wtab.active{background:#cc0000 !important;border-color:#cc0000 !important;color:#fff !important;}
+.wtab-action{border-color:var(--df-track-line) !important;}
+html[data-theme="light"] .wtab:not(.active){color:#5a514a !important;}
+html:not([data-theme="light"]) .wtab:not(.active){color:rgba(255,255,255,0.72) !important;}
+html:not([data-theme="light"]) .wtab-action{color:rgba(255,255,255,0.72) !important;}
+
+/* -----------------------------------------------------------
+   2. COLLAPSIBLE HEADERS — these are buttons, so they must look like buttons
+   ----------------------------------------------------------- */
+details.setup-card>summary{
+  background:var(--df-track) !important;
+  border-bottom:1px solid transparent !important;
+  transition:background .18s !important;
+}
+details.setup-card>summary:hover{background:var(--df-tab-on-bg) !important;}
+details.setup-card[open]>summary{border-bottom-color:var(--df-track-line) !important;}
+/* Chevron gets a chip so the hit target is legible */
+details.setup-card>summary::after{
+  display:flex !important;
+  align-items:center;
+  justify-content:center;
+  width:22px;height:22px;
+  border-radius:7px;
+  background:var(--df-tab-on-bg) !important;
+  font-size:11px;
+  line-height:1;
+}
+html[data-theme="light"] details.setup-card>summary::after{background:#ffffff !important;box-shadow:0 1px 2px rgba(60,40,30,0.12);}
+
+/* Settings' two controls predate the track tokens and each invented their own
+   fill (rgba(0,0,0,.035) and #faf7f3 / rgba(20,20,24,.55)). Same family now, so
+   every control in the app reads as one system. */
+html[data-theme="light"] .group-title.group-toggle,
+html:not([data-theme="light"]) .group-title.group-toggle,
+html[data-theme="light"] .df-theme-toggle,
+html:not([data-theme="light"]) .df-theme-toggle{
+  background:var(--df-track) !important;
+  border:1px solid var(--df-track-line) !important;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,0.05) !important;
+}
+html[data-theme="light"] .group-title.group-toggle:hover,
+html:not([data-theme="light"]) .group-title.group-toggle:hover{
+  background:var(--df-tab-on-bg) !important;
+}
+html[data-theme="light"] .df-theme-opt:not(.active),
+html:not([data-theme="light"]) .df-theme-opt:not(.active){color:var(--df-tab-ink) !important;}
+
+/* Macro-calculator "show/hide" row */
+.calc-toggle{
+  padding:5px 12px !important;
+  border-radius:20px !important;
+  background:var(--df-track) !important;
+  border:1px solid var(--df-track-line) !important;
+  transition:background .18s !important;
+}
+.calc-head:hover .calc-toggle{background:var(--df-tab-on-bg) !important;}
+.calc-explain summary{
+  display:inline-block !important;
+  padding:5px 11px !important;
+  border-radius:20px !important;
+  background:var(--df-track) !important;
+  border:1px solid var(--df-track-line) !important;
+}
+
+/* -----------------------------------------------------------
+   3. CRIMSON REDUCTION + ELEVATION
+   ----------------------------------------------------------- */
+/* The 3px brand bar above the header stacked a third red line into the top
+   60px of every page, alongside the header's own top+left accents. */
+.page::before{display:none !important;}
+
+/* Modal top edges: seven decorative crimson stripes across the app. Sheets are
+   now separated by shadow, like every other surface. */
+.share-modal,.ws-modal,.ds-modal,.food-modal,.onb-card,.welcome-card,
+#devfit-install-guide .sheet{
+  border-top:1px solid var(--df-hairline) !important;
+  box-shadow:var(--df-elev-2) !important;
+}
+html[data-theme="light"] .welcome-card{border-top:1px solid var(--df-hairline) !important;}
+
+/* Cards: whisper border, layered shadow */
+.card,details.setup-card,.dash-tile{
+  border-color:var(--df-hairline) !important;
+  box-shadow:var(--df-elev-1) !important;
+}
+
+/* ---- specificity re-assert ----
+   The theme blocks above set background/border/box-shadow on these same
+   elements at html[data-theme=…] weight, which outranks a bare class. Matching
+   that weight here (and coming later in the file) is what actually lands the
+   track fill, the whisper borders and the layered shadows. Without this the
+   segmented track renders white — identical to its own active pill. */
+html[data-theme="light"] nav.prog-subnav,
+html[data-theme="light"] .mode-switch,
+html[data-theme="light"] .diet-slicer,
+html[data-theme="light"] .food-tabs,
+html[data-theme="light"] .theme-picker,
+html[data-theme="light"] .ds-picker,
+html[data-theme="light"] .ws-picker,
+html:not([data-theme="light"]) nav.prog-subnav,
+html:not([data-theme="light"]) .mode-switch,
+html:not([data-theme="light"]) .diet-slicer,
+html:not([data-theme="light"]) .food-tabs,
+html:not([data-theme="light"]) .theme-picker,
+html:not([data-theme="light"]) .ds-picker,
+html:not([data-theme="light"]) .ws-picker{
+  background:var(--df-track) !important;
+  border:1px solid var(--df-track-line) !important;
+  border-bottom:1px solid var(--df-track-line) !important;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,0.05) !important;
+}
+
+html[data-theme="light"] .card,
+html[data-theme="light"] details.setup-card,
+html[data-theme="light"] .dash-tile,
+html:not([data-theme="light"]) .card,
+html:not([data-theme="light"]) details.setup-card,
+html:not([data-theme="light"]) .dash-tile{
+  border:1px solid var(--df-hairline) !important;
+  box-shadow:var(--df-elev-1) !important;
+}
+
+html[data-theme="light"] .share-modal,
+html[data-theme="light"] .ws-modal,
+html[data-theme="light"] .ds-modal,
+html[data-theme="light"] .food-modal,
+html[data-theme="light"] .onb-card,
+html[data-theme="light"] .welcome-card,
+html:not([data-theme="light"]) .share-modal,
+html:not([data-theme="light"]) .ws-modal,
+html:not([data-theme="light"]) .ds-modal,
+html:not([data-theme="light"]) .food-modal,
+html:not([data-theme="light"]) .onb-card,
+html:not([data-theme="light"]) .welcome-card{
+  border:1px solid var(--df-hairline) !important;
+  box-shadow:var(--df-elev-2) !important;
+}
+
+html[data-theme="light"] nav.prog-subnav button,
+html[data-theme="light"] .mode-btn,
+html[data-theme="light"] .ds-tab,
+html[data-theme="light"] .food-tab,
+html[data-theme="light"] .theme-btn,
+html[data-theme="light"] .ds-tbtn,
+html[data-theme="light"] .ws-tbtn,
+html:not([data-theme="light"]) nav.prog-subnav button,
+html:not([data-theme="light"]) .mode-btn,
+html:not([data-theme="light"]) .ds-tab,
+html:not([data-theme="light"]) .food-tab,
+html:not([data-theme="light"]) .theme-btn,
+html:not([data-theme="light"]) .ds-tbtn,
+html:not([data-theme="light"]) .ws-tbtn{
+  background:transparent !important;
+  color:var(--df-tab-ink) !important;
+}
+html[data-theme="light"] nav.prog-subnav button.active,
+html[data-theme="light"] .mode-btn.active,
+html[data-theme="light"] .ds-tab.active,
+html[data-theme="light"] .food-tab.active,
+html[data-theme="light"] .theme-btn.active,
+html[data-theme="light"] .ds-tbtn.active,
+html[data-theme="light"] .ws-tbtn.active,
+html:not([data-theme="light"]) nav.prog-subnav button.active,
+html:not([data-theme="light"]) .mode-btn.active,
+html:not([data-theme="light"]) .ds-tab.active,
+html:not([data-theme="light"]) .food-tab.active,
+html:not([data-theme="light"]) .theme-btn.active,
+html:not([data-theme="light"]) .ds-tbtn.active,
+html:not([data-theme="light"]) .ws-tbtn.active{
+  background:var(--df-tab-on-bg) !important;
+  color:var(--df-tab-on-ink) !important;
+  box-shadow:var(--df-tab-on-shadow) !important;
+}
+html[data-theme="light"] nav.prog-subnav button.active,
+html[data-theme="light"] .mode-btn.active,
+html[data-theme="light"] .ds-tab.active,
+html[data-theme="light"] .food-tab.active,
+html[data-theme="light"] .theme-btn.active,
+html[data-theme="light"] .ds-tbtn.active,
+html[data-theme="light"] .ws-tbtn.active{background:#ffffff !important;}

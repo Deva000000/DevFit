@@ -125,6 +125,7 @@ html[data-theme="light"] .page [style*="color:#888"],
 html[data-theme="light"] .page [style*="color:#888888"],
 html[data-theme="light"] .page [style*="color:#999"],
 html[data-theme="light"] .page [style*="color:#94a3b8"],
+html[data-theme="light"] .page [style*="color:#9a9a9a"],
 html[data-theme="light"] .page [style*="color:#666"]{color:#6a6157 !important;}
 
 /* Dark inline backgrounds → light surface */
@@ -154,10 +155,12 @@ html:not([data-theme="light"]) .sets-grid input,
 html:not([data-theme="light"]) .cardio-fld input,
 html:not([data-theme="light"]) .input-cell,
 html:not([data-theme="light"]) .input-cell input,
-html:not([data-theme="light"]) .page input[style*="background:#fff"]{
-  background:#1f1f22 !important;
-  color:#f5f5f4 !important;
-  border-color:rgba(255,255,255,0.14) !important;
+html:not([data-theme="light"]) .page input[style*="background:#fff"],
+html:not([data-theme="light"]) .page select[style*="background:#fff"],
+html:not([data-theme="light"]) .page textarea[style*="background:#fff"]{
+  background:#2b2933 !important;
+  color:#f2f1f5 !important;
+  border-color:rgba(255,255,255,0.16) !important;
 }
 html:not([data-theme="light"]) .inp::placeholder,
 html:not([data-theme="light"]) .text-input::placeholder,
@@ -293,3 +296,452 @@ html[data-theme="light"] .add-btn{color:#475569 !important;border-color:rgba(20,
 html[data-theme="light"] .add-btn:hover{color:#cc0000 !important;border-color:#cc0000 !important;}
 html[data-theme="light"] .del-mini{color:#b0a89e !important;}
 html[data-theme="light"] .del-mini:hover{color:#cc0000 !important;}
+
+/* ===========================================================
+   v4.62 — CONTRAST & DEPTH PASS
+   Two readability faults, both fixed here rather than in the four
+   page files (this sheet loads last, so it wins):
+
+   DARK  the canvas was near-black (#08080a) with cards barely above
+         it, and crimson #cc0000 as *text* on that is only ~3:1 — the
+         "too black and too red" look. Canvas lifts to a neutral
+         charcoal, surfaces step up from it so cards read as elevated,
+         and crimson TEXT switches to #ff5f5f (~5.9:1). Crimson FILLS
+         keep #cc0000 (white on it is 5.9:1 and it is the brand red).
+
+   LIGHT  components built dark-first (chips, program-setup card,
+         calculator labels, bottom nav, share/food modals) still shipped
+         white-on-white text and dark panels on the light page. They now
+         follow the same ink ramp as the rest of light mode.
+
+   BRAND  the DEVFIT lockup is re-asserted at #cc0000 below — it must
+          never drift with these passes.
+   =========================================================== */
+
+:root{
+  --df-accent-ink:#ff5f5f;   /* crimson as TEXT on a dark surface */
+  --df-ink:#f2f1f5;
+  --df-ink-2:rgba(255,255,255,0.80);
+  --df-ink-3:rgba(255,255,255,0.66);
+  --df-surface-1:rgba(39,37,46,0.86);
+  --df-surface-2:#2b2933;
+  --df-line:rgba(255,255,255,0.10);
+}
+html[data-theme="light"]{
+  --df-accent-ink:#cc0000;
+  --df-ink:#14110e;
+  --df-ink-2:#3a352f;
+  --df-ink-3:#6a6157;
+  --df-surface-1:#ffffff;
+  --df-surface-2:#faf7f3;
+  --df-line:rgba(20,15,10,0.10);
+}
+
+/* -----------------------------------------------------------
+   DARK — canvas, elevation, ink
+   ----------------------------------------------------------- */
+html:not([data-theme="light"]) body{
+  background:linear-gradient(180deg,#16151b 0%,#1b1a21 55%,#151419 100%) !important;
+  background-attachment:fixed !important;
+  color:#e9e7ee !important;
+}
+
+/* Raised surfaces — one step above the canvas so cards have edges */
+html:not([data-theme="light"]) .card,
+html:not([data-theme="light"]) details.setup-card,
+html:not([data-theme="light"]) .dash-tile{
+  background:var(--df-surface-1) !important;
+  border:1px solid var(--df-line) !important;
+  box-shadow:0 14px 38px rgba(0,0,0,0.42),0 1px 0 rgba(255,255,255,0.05) inset !important;
+}
+html:not([data-theme="light"]) .header{background:#201e27 !important;}
+html:not([data-theme="light"]) .onb-card,
+html:not([data-theme="light"]) .share-modal,
+html:not([data-theme="light"]) .ws-modal,
+html:not([data-theme="light"]) .ds-modal,
+html:not([data-theme="light"]) .food-modal,
+html:not([data-theme="light"]) .serving-modal{
+  background:#221f29 !important;
+  border-color:var(--df-line) !important;
+}
+
+/* Inset panels — inputs, rows, chips, cells.
+   These also have to stay ABOVE the lifted modal/card behind them, or the
+   elevation inverts and rows read as holes punched in the sheet. */
+html:not([data-theme="light"]) .qa-cell,
+html:not([data-theme="light"]) .delta-cell,
+html:not([data-theme="light"]) .lib-row,
+html:not([data-theme="light"]) .onb-goal:not(.sel),
+html:not([data-theme="light"]) .onb-input,
+html:not([data-theme="light"]) .onb-select,
+html:not([data-theme="light"]) .onb-summary,
+html:not([data-theme="light"]) .session-empty,
+html:not([data-theme="light"]) .food-item,
+html:not([data-theme="light"]) .smeal-item,
+html:not([data-theme="light"]) .sv-chip:not(.active),
+html:not([data-theme="light"]) .sv-qty-btn,
+html:not([data-theme="light"]) .sv-grams-row,
+html:not([data-theme="light"]) .food-search-row input{
+  background:var(--df-surface-2) !important;
+  border-color:var(--df-line) !important;
+}
+html:not([data-theme="light"]) .food-item:hover,
+html:not([data-theme="light"]) .food-item:focus{
+  background:#363341 !important;
+  border-color:#cc0000 !important;
+}
+
+/* Segmented pickers sat on pure black inside a lifted card */
+html:not([data-theme="light"]) .theme-picker,
+html:not([data-theme="light"]) .ds-picker,
+html:not([data-theme="light"]) .ws-picker,
+html:not([data-theme="light"]) .food-tabs,
+html:not([data-theme="light"]) nav.devfit-tabnav{
+  background:rgba(255,255,255,0.05) !important;
+  border-color:var(--df-line) !important;
+}
+/* :not(.active) throughout — these overrides outrank the .active states, so
+   without it the selected red/green pills lose their fill. */
+html:not([data-theme="light"]) .chip:not(.active){
+  background:rgba(255,255,255,0.07) !important;
+  border-color:rgba(255,255,255,0.14) !important;
+  color:#dcdae2 !important;
+}
+html:not([data-theme="light"]) .chip:not(.active) small{color:rgba(255,255,255,0.60) !important;}
+
+/* Glass bottom nav — was a black slab on black */
+html:not([data-theme="light"]) .devfit-bottomnav{
+  background:rgba(34,32,41,0.80) !important;
+  border-color:rgba(255,255,255,0.12) !important;
+  box-shadow:0 16px 44px rgba(0,0,0,0.50),0 1px 0 rgba(255,255,255,0.07) inset !important;
+}
+html:not([data-theme="light"]) .devfit-bottomnav a{color:rgba(255,255,255,0.76) !important;}
+html:not([data-theme="light"]) .devfit-bottomnav a.active{color:#fff !important;}
+
+/* Small greys that were tuned against pure black — lift to ~5.8:1 */
+html:not([data-theme="light"]) .smeal-macros,
+html:not([data-theme="light"]) .food-item-macros,
+html:not([data-theme="light"]) .food-item-brand,
+html:not([data-theme="light"]) .qa-cell .qa-lbl,
+html:not([data-theme="light"]) .delta-cell .lbl,
+html:not([data-theme="light"]) .food-modal-close,
+html:not([data-theme="light"]) .scanner-hdr button,
+html:not([data-theme="light"]) .btn-close,
+html:not([data-theme="light"]) .ds-close,
+html:not([data-theme="light"]) .ws-close,
+html:not([data-theme="light"]) .session-empty,
+html:not([data-theme="light"]) .sv-chip:not(.active),
+html:not([data-theme="light"]) .ex-head,
+html:not([data-theme="light"]) .sets-grid .h,
+html:not([data-theme="light"]) .sets-grid .last-cell,
+html:not([data-theme="light"]) .cardio-fld label,
+html:not([data-theme="light"]) .empty-msg,
+html:not([data-theme="light"]) .chart-empty,
+html:not([data-theme="light"]) .calc-head .ch,
+html:not([data-theme="light"]) .calc-row .chint,
+html:not([data-theme="light"]) .calc-explain summary,
+html:not([data-theme="light"]) .calc-explain .ex-body,
+html:not([data-theme="light"]) .cr-meta,
+html:not([data-theme="light"]) .cr-macro .mu,
+html:not([data-theme="light"]) .cr-tdee .cap{
+  color:var(--df-ink-3) !important;
+}
+html:not([data-theme="light"]) .btn-close,
+html:not([data-theme="light"]) .ds-close,
+html:not([data-theme="light"]) .ws-close{border-color:rgba(255,255,255,0.16) !important;}
+
+/* White-card islands (.day-card, .cal-summary, .calc-num, the meal diary rows)
+   stay white in BOTH themes by design — so their sublabels must NOT get the
+   dark-mode ink ramp, or they go white-on-white. Give them the light ink
+   instead, which also drags them up from the #888-on-white 3.5:1 they shipped
+   at in both themes. */
+html:not([data-theme="light"]) .cal-summary-eq,
+html:not([data-theme="light"]) .mi-sub,
+html:not([data-theme="light"]) .day-lbl,
+html:not([data-theme="light"]) .calc-num .unit{color:#6a6157 !important;}
+
+/* Same islands, theme-agnostic: these shipped at 1.7–1.9:1 on their own white
+   card in BOTH themes — "No food logged yet." was effectively invisible. */
+.meal-empty{color:#6a6157 !important;}
+.meal-del,.mi-del{color:#8a7f74 !important;}   /* 3.9:1 — visible glyph, still subordinate */
+.meal-del:hover,.mi-del:hover{color:#cc0000 !important;}
+
+/* Nutrition sheet labels shipped at #444–#666 on a #111 modal — 1.5–2.9:1, i.e.
+   "Serving size", "Qty", the "= g" conversion and the scanner hint were all but
+   unreadable in either theme. They live on dark sheets, so they take dark ink. */
+html:not([data-theme="light"]) .food-disclaimer,
+html:not([data-theme="light"]) .qa-cell .qa-unit,
+html:not([data-theme="light"]) .scanner-hint,
+html:not([data-theme="light"]) .serving-per100,
+html:not([data-theme="light"]) .sv-size-lbl,
+html:not([data-theme="light"]) .sv-qty-lbl,
+html:not([data-theme="light"]) .sv-grams-eq,
+html:not([data-theme="light"]) .serving-g-unit,
+html:not([data-theme="light"]) #serving-cancel{color:var(--df-ink-3) !important;}
+
+/* Crimson as TEXT — #cc0000 on charcoal is ~3:1, this is ~5.9:1 */
+html:not([data-theme="light"]) .page [style*="color:#cc0000"],
+html:not([data-theme="light"]) .calc-toggle,
+html:not([data-theme="light"]) .onb-eyebrow,
+html:not([data-theme="light"]) .session-empty strong,
+html:not([data-theme="light"]) .delta-cell .val.over,
+html:not([data-theme="light"]) .btn.danger,
+html:not([data-theme="light"]) .lib-btn.save,
+html:not([data-theme="light"]) .lib-del:hover,
+html:not([data-theme="light"]) .add-btn:hover,
+html:not([data-theme="light"]) .del-mini:hover{
+  color:var(--df-accent-ink) !important;
+}
+html:not([data-theme="light"]) .calc-explain summary::before{color:var(--df-accent-ink) !important;}
+/* …but the DEVFIT lockup keeps its exact brand crimson. Non-negotiable. */
+html:not([data-theme="light"]) .app-title span[style*="color:#cc0000"],
+html:not([data-theme="light"]) .onb-brand .f{color:#cc0000 !important;}
+
+/* -----------------------------------------------------------
+   LIGHT — components that were still dark-first
+   ----------------------------------------------------------- */
+
+/* Program setup (was a grey slab with unreadable field labels) */
+html[data-theme="light"] details.setup-card{
+  background:#ffffff !important;
+  border:1px solid rgba(20,15,10,0.10) !important;
+  box-shadow:0 8px 24px rgba(60,40,30,0.08) !important;
+}
+html[data-theme="light"] details.setup-card>summary{color:#14110e !important;}
+html[data-theme="light"] details.setup-card>summary span,
+html[data-theme="light"] details.setup-card>summary::after{color:#6a6157 !important;}
+
+/* Front dashboard tiles */
+html[data-theme="light"] .dash-tile{
+  background:#ffffff !important;
+  border:1px solid rgba(20,15,10,0.10) !important;
+  box-shadow:0 8px 24px rgba(60,40,30,0.08) !important;
+}
+html[data-theme="light"] .dash-lbl{color:#5a514a !important;}
+html[data-theme="light"] .dash-sub,
+html[data-theme="light"] .chart-empty{color:#6a6157 !important;}
+html[data-theme="light"] .ts-cyc b{color:#1d7a44 !important;}
+
+/* Glass bottom nav */
+html[data-theme="light"] .devfit-bottomnav{
+  background:rgba(255,255,255,0.90) !important;
+  border:1px solid rgba(20,15,10,0.10) !important;
+  box-shadow:0 16px 40px rgba(60,40,30,0.16),0 1px 0 rgba(255,255,255,0.9) inset !important;
+}
+html[data-theme="light"] .devfit-bottomnav a{color:#6a6157 !important;}
+html[data-theme="light"] .devfit-bottomnav a:hover{color:#14110e !important;}
+html[data-theme="light"] .devfit-bottomnav a.active{background:#cc0000 !important;color:#fff !important;}
+
+/* Macro calculator — labels and inactive chips were near-invisible */
+html[data-theme="light"] .calc-row .clbl{color:#3a352f !important;}
+html[data-theme="light"] .calc-row .chint,
+html[data-theme="light"] .calc-head .ch{color:#6a6157 !important;}
+html[data-theme="light"] .chip{
+  background:#f4efe9 !important;
+  border-color:rgba(20,15,10,0.14) !important;
+  color:#3a352f !important;
+}
+html[data-theme="light"] .chip small{color:#6a6157 !important;}
+html[data-theme="light"] .chip:hover{border-color:rgba(204,0,0,0.45) !important;color:#14110e !important;}
+html[data-theme="light"] .chip.active{background:#cc0000 !important;border-color:#cc0000 !important;color:#fff !important;}
+html[data-theme="light"] .chip.active small{color:rgba(255,255,255,0.90) !important;}
+
+/* Calculator result block */
+html[data-theme="light"] .cr-tdee .big{color:#14110e !important;}
+html[data-theme="light"] .cr-tdee .cap,
+html[data-theme="light"] .cr-meta,
+html[data-theme="light"] .cr-macro .mu,
+html[data-theme="light"] .calc-num .unit,
+html[data-theme="light"] .input-cell .unit{color:#6a6157 !important;}
+html[data-theme="light"] .cr-meta b{color:#14110e !important;}
+html[data-theme="light"] .cr-macro{background:#faf7f3 !important;border-color:rgba(20,15,10,0.10) !important;}
+html[data-theme="light"] .cr-apply{background:#f4efe9 !important;border-color:rgba(20,15,10,0.14) !important;color:#3a352f !important;}
+html[data-theme="light"] .cr-note{background:rgba(198,144,47,0.12) !important;border-color:rgba(198,144,47,0.35) !important;color:#6b5220 !important;}
+html[data-theme="light"] .cr-note b{color:#4a3712 !important;}
+html[data-theme="light"] .calc-explain{border-top-color:rgba(20,15,10,0.10) !important;}
+html[data-theme="light"] .calc-explain summary,
+html[data-theme="light"] .calc-explain .ex-body{color:#5a514a !important;}
+html[data-theme="light"] .calc-explain .ex-body b{color:#14110e !important;}
+html[data-theme="light"] .calc-explain .ex-body code{background:rgba(20,15,10,0.06) !important;color:#3a352f !important;}
+html[data-theme="light"] .calc-explain .ex-body .ref{color:#8a7f74 !important;}
+
+/* "+ Add Meal" dashed button — dark-tuned grey at 2.8:1 on the light page */
+html[data-theme="light"] .add-meal-btn{color:#5a514a !important;border-color:rgba(20,15,10,0.28) !important;}
+html[data-theme="light"] .add-meal-btn:hover{color:#cc0000 !important;border-color:#cc0000 !important;background:#fdf2f2 !important;}
+
+/* Nutrition diary rows */
+html[data-theme="light"] .delta-cell .lbl,
+html[data-theme="light"] .cal-summary-eq,
+html[data-theme="light"] .mi-sub,
+html[data-theme="light"] .smeal-macros,
+html[data-theme="light"] .food-item-macros{color:#6a6157 !important;}
+html[data-theme="light"] .delta-cell .val.muted{color:#9a9089 !important;}
+html[data-theme="light"] .food-item-brand{color:#8a7f74 !important;}
+html[data-theme="light"] .qa-cell .qa-lbl{color:#6a6157 !important;}
+html[data-theme="light"] .qa-cell input{color:#14110e !important;}
+html[data-theme="light"] .qa-cell .qa-unit{color:#6a6157 !important;}
+html[data-theme="light"] .food-search-row input{
+  background:#ffffff !important;
+  border-color:rgba(20,15,10,0.18) !important;
+  color:#14110e !important;
+}
+
+/* Share / food / diet modals — pickers were black bars inside white sheets */
+html[data-theme="light"] .food-tabs,
+html[data-theme="light"] .theme-picker,
+html[data-theme="light"] .ds-picker,
+html[data-theme="light"] .ws-picker{background:#f4efe9 !important;border-color:rgba(20,15,10,0.10) !important;}
+html[data-theme="light"] .food-tab,
+html[data-theme="light"] .theme-btn,
+html[data-theme="light"] .ds-tbtn,
+html[data-theme="light"] .ws-tbtn{color:#6a6157 !important;}
+html[data-theme="light"] .food-tab.active,
+html[data-theme="light"] .theme-btn.active,
+html[data-theme="light"] .ds-tbtn.active,
+html[data-theme="light"] .ws-tbtn.active{background:#cc0000 !important;color:#fff !important;}
+html[data-theme="light"] .ws-modal{
+  background:#ffffff !important;
+  border:1px solid rgba(20,15,10,0.10) !important;
+  color:#3a352f !important;
+}
+html[data-theme="light"] .share-modal h3,
+html[data-theme="light"] .ws-modal h3,
+html[data-theme="light"] .ds-modal h3{color:#14110e !important;}
+html[data-theme="light"] .btn-close,
+html[data-theme="light"] .ds-close,
+html[data-theme="light"] .ws-close{color:#6a6157 !important;border-color:rgba(20,15,10,0.18) !important;}
+/* white-on-white download buttons (.btn-download / .ds-dl / .ws-dl all ship
+   background:#fff, invisible once the sheet itself went white) */
+html[data-theme="light"] .btn-download,
+html[data-theme="light"] .ds-dl,
+html[data-theme="light"] .ws-dl{background:#14110e !important;color:#ffffff !important;}
+html[data-theme="light"] .btn-download:hover,
+html[data-theme="light"] .ds-dl:hover,
+html[data-theme="light"] .ws-dl:hover{background:#000000 !important;}
+html[data-theme="light"] .food-modal-close{color:#8a7f74 !important;}
+html[data-theme="light"] .share-preview,
+html[data-theme="light"] .ds-preview,
+html[data-theme="light"] .ws-preview{
+  background:repeating-conic-gradient(#e6e0d8 0% 25%,#f7f4f0 0% 50%) 50% / 20px 20px !important;
+}
+
+/* Serving sheet controls that kept dark surfaces on the white sheet */
+html[data-theme="light"] .sv-qty-btn{color:#3a352f !important;}
+html[data-theme="light"] .sv-qty-btn:hover,
+html[data-theme="light"] .sv-qty-btn:active{background:#f1ebe4 !important;color:#14110e !important;}
+html[data-theme="light"] .sv-grams-row{background:#faf7f3 !important;border-color:rgba(20,15,10,0.12) !important;}
+html[data-theme="light"] .sv-grams-eq,
+html[data-theme="light"] .serving-g-unit,
+html[data-theme="light"] .sv-size-lbl,
+html[data-theme="light"] .sv-qty-lbl,
+html[data-theme="light"] .serving-per100,
+html[data-theme="light"] .food-disclaimer{color:#6a6157 !important;}
+html[data-theme="light"] #serving-cancel{
+  background:#f4efe9 !important;
+  border-color:rgba(20,15,10,0.14) !important;
+  color:#3a352f !important;
+}
+html[data-theme="light"] #serving-cancel:hover{background:#e9e2d9 !important;color:#14110e !important;}
+
+/* The barcode scanner is a near-black camera viewfinder in BOTH themes, so its
+   overlay text must stay light — the generic light remap flipped it to dark ink
+   on black. Scoped back here. */
+html[data-theme="light"] .scanner-hdr span{color:#ffffff !important;}
+html[data-theme="light"] .scanner-hdr button{color:rgba(255,255,255,0.72) !important;}
+html[data-theme="light"] .scanner-hint{color:rgba(255,255,255,0.72) !important;}
+
+/* Workouts logger */
+html[data-theme="light"] .ex-head,
+html[data-theme="light"] .sets-grid .h,
+html[data-theme="light"] .sets-grid .last-cell,
+html[data-theme="light"] .cardio-fld label,
+html[data-theme="light"] .empty-msg{color:#6a6157 !important;}
+html[data-theme="light"] .session-empty{
+  background:#faf7f3 !important;
+  border-color:rgba(20,15,10,0.10) !important;
+  color:#6a6157 !important;
+}
+html[data-theme="light"] .reset-btn{border-color:rgba(20,15,10,0.18) !important;color:#6a6157 !important;}
+html[data-theme="light"] .reset-btn:hover{border-color:#cc0000 !important;color:#cc0000 !important;}
+
+/* First-run welcome card — kept #111 on the light page, and its emoji/heading
+   inherited the light body ink straight onto that dark surface. */
+html[data-theme="light"] .welcome-card{
+  background:#ffffff !important;
+  border:1px solid rgba(20,15,10,0.10) !important;
+  border-top:3px solid #cc0000 !important;
+}
+html[data-theme="light"] .welcome-name{color:#14110e !important;}
+html[data-theme="light"] .welcome-detail{color:#6a6157 !important;}
+html[data-theme="light"] .welcome-stat{
+  background:#faf7f3 !important;
+  border-color:rgba(20,15,10,0.12) !important;
+  color:#3a352f !important;
+}
+
+/* Onboarding wizard */
+html[data-theme="light"] .onb-card{
+  background:#ffffff !important;
+  border:1px solid rgba(20,15,10,0.10) !important;
+}
+/* Lockup stays two-tone: dark "DEV" + crimson "FIT", same as the page header */
+html[data-theme="light"] .onb-brand .d{color:#14110e !important;}
+html[data-theme="light"] .onb-p b{color:#14110e !important;}
+html[data-theme="light"] .onb-h,
+html[data-theme="light"] .onb-goal .gt,
+html[data-theme="light"] .onb-srow .v,
+html[data-theme="light"] .onb-input,
+html[data-theme="light"] .onb-select{color:#14110e !important;}
+html[data-theme="light"] .onb-p,
+html[data-theme="light"] .onb-label,
+html[data-theme="light"] .onb-goal .gs,
+html[data-theme="light"] .onb-srow .k{color:#6a6157 !important;}
+html[data-theme="light"] .onb-goal,
+html[data-theme="light"] .onb-input,
+html[data-theme="light"] .onb-select,
+html[data-theme="light"] .onb-summary{background:#faf7f3 !important;border-color:rgba(20,15,10,0.14) !important;}
+html[data-theme="light"] .onb-goal.sel{background:#fdf2f2 !important;border-color:#cc0000 !important;}
+html[data-theme="light"] .onb-srow{border-bottom-color:rgba(20,15,10,0.10) !important;}
+html[data-theme="light"] .onb-dot{background:#ddd5cc !important;}
+html[data-theme="light"] .onb-dot.on{background:#cc0000 !important;}
+html[data-theme="light"] .onb-btn.ghost{border-color:rgba(20,15,10,0.18) !important;color:#6a6157 !important;}
+html[data-theme="light"] .onb-btn.ghost:hover{border-color:#cc0000 !important;color:#14110e !important;}
+html[data-theme="light"] .onb-suffix>span{color:#8a7f74 !important;}
+
+/* .btn keeps --bg2 (#2d2d2d) — a dark pill stranded on the light page, with its
+   crimson "Clear this week" label at 2.3:1. Give it a light surface. */
+html[data-theme="light"] .btn{
+  background:#ffffff !important;
+  color:#3a352f !important;
+  border-color:rgba(20,15,10,0.18) !important;
+}
+html[data-theme="light"] .btn:hover{background:#f4efe9 !important;}
+html[data-theme="light"] .btn.danger{color:#cc0000 !important;border-color:rgba(204,0,0,0.45) !important;}
+html[data-theme="light"] .btn.danger:hover{background:#fdf2f2 !important;}
+/* Same pill in dark mode: --t1 (#111) on #2d2d2d is 1.5:1 */
+html:not([data-theme="light"]) .btn{
+  background:rgba(255,255,255,0.07) !important;
+  color:#e9e7ee !important;
+  border-color:rgba(255,255,255,0.16) !important;
+}
+html:not([data-theme="light"]) .btn.danger{border-color:rgba(255,95,95,0.45) !important;}
+html:not([data-theme="light"]) .btn.danger:hover{background:rgba(204,0,0,0.16) !important;}
+
+/* Settings group collapse chevron — white-on-white (1.1:1) in light mode, so the
+   collapsible groups looked like they had no control at all. */
+html[data-theme="light"] .group-title,
+html[data-theme="light"] .group-chev{color:#5a514a !important;}
+
+/* Bright dark-mode reds fail on white (~3.3:1) — pull back to brand crimson */
+html[data-theme="light"] .ov-viewall,
+html[data-theme="light"] .onb-err,
+html[data-theme="light"] .page [style*="color:#ff4444"],
+html[data-theme="light"] .page [style*="color:#ff4d4d"],
+html[data-theme="light"] .page [style*="color:#ff6b6b"],
+html[data-theme="light"] .page [style*="color:#ff5555"],
+html[data-theme="light"] .page [style*="color:#ff5f5f"]{color:#cc0000 !important;}
+
+/* Green filled buttons, both themes: white on #2f9e57 is only 3.4:1. #268247
+   takes the label to 4.8:1 and still reads as the same sage-green. */
+.lib-load,.smeal-add,#serving-add,.toast{background:#268247 !important;}
+.lib-load:hover,.smeal-add:hover,#serving-add:hover{background:#1d6a39 !important;}

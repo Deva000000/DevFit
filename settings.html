@@ -291,13 +291,34 @@ html.nosplash #devfit-splash{display:none!important}
   <!-- ============================ GUIDE ============================ -->
   <div class="group-title">How DevFit works</div>
   <div class="card" id="card-guide">
-    <div class="guide-list">
-      <div class="guide-item"><div class="gi-ic" style="background:rgba(47,158,87,0.16);color:#4ade80">◉</div><div class="gi-tx"><b>Progress (home)</b>Log bodyweight, steps and sleep each day. The <b>Today Overview</b> shows them vs your goals, and <b>Training Status</b> tells you if you're recovered enough to train (from last night's sleep) and which routine is next.</div></div>
-      <div class="guide-item"><div class="gi-ic" style="background:rgba(204,0,0,0.16);color:#ff6b6b">▦</div><div class="gi-tx"><b>Training</b>Build your plan in <b>Edit Plan</b> (add strength or cardio moves), log each session under <b>Log Session</b>, and track lifts over time in <b>Progress</b>. Generate a branded share card or program PDF.</div></div>
-      <div class="guide-item"><div class="gi-ic" style="background:rgba(59,130,246,0.16);color:#60a5fa">🍎</div><div class="gi-tx"><b>Nutrition</b>Use the <b>macro calculator</b> (Mifflin-St Jeor / Katch-McArdle + activity) to set calorie &amp; macro targets, then log food against them in the daily diary. Search a large food database by name or barcode.</div></div>
-      <div class="guide-item"><div class="gi-ic" style="background:rgba(198,144,47,0.16);color:#fbbf24">★</div><div class="gi-tx"><b>Score &amp; Analytics (Pro)</b>A weekly <b>True Progress Score</b> blends bodyweight direction, overload, diet, sleep, steps and stress with world-standard weights. Charts show your trend once you've logged a little data.</div></div>
-      <div class="guide-item"><div class="gi-ic" style="background:rgba(168,85,247,0.16);color:#c4b5fd">⤬</div><div class="gi-tx"><b>Share cards</b>Workout, cardio and weekly-progress cards in light, dark or transparent themes. Set your @handle and card font below under <b>Personal → Share Card</b>.</div></div>
-      <div class="guide-item"><div class="gi-ic" style="background:rgba(34,197,94,0.16);color:#86efac">☁</div><div class="gi-tx"><b>Cloud sync</b>Everything saves on this device and syncs to your account automatically, so logging in on another phone restores your data. No buttons to press.</div></div>
+
+    <!-- BRAND NEW? Three steps, in order, before any feature list. A first-time user
+         needs to know what to DO today, not what the app contains. -->
+    <div class="section-label">New here? Do these three things</div>
+    <div class="bill-steps" style="margin-top:2px">
+      <div class="bill-step"><div class="n">1</div><div class="tx"><b>Set your target.</b> Open <b>Progress → Program setup</b> and enter your start weight, goal weight and how many weeks you're giving it. Everything else in the app measures against this.</div></div>
+      <div class="bill-step"><div class="n">2</div><div class="tx"><b>Build one workout.</b> Go to <b>Training → Edit Plan</b>, add a routine (say "Push"), and add a few exercises with target sets × reps. You only have to do this once.</div></div>
+      <div class="bill-step"><div class="n">3</div><div class="tx"><b>Log today.</b> Enter this morning's bodyweight on <b>Progress</b>, tick off your sets under <b>Training → Log Session</b>, and add your meals in <b>Nutrition</b>. That's the daily habit — about two minutes.</div></div>
+    </div>
+    <div class="card-sub" style="margin-bottom:18px">Log for one week and the app starts telling you things you can't see day to day — whether your weight is genuinely moving, whether your lifts are climbing, and whether you're eating enough to recover.</div>
+
+    <div class="section-label">What each tab does</div>
+    <div class="guide-list" style="margin-top:2px">
+      <div class="guide-item"><div class="gi-ic" style="background:rgba(47,158,87,0.16);color:#4ade80">◉</div><div class="gi-tx"><b>Progress — your home tab</b>Log <b>bodyweight, steps and sleep</b> each day. <b>Today Overview</b> shows them against your goals. <b>Training Status</b> reads last night's sleep and your recent workload to tell you whether you're recovered enough to train hard today, and which routine is due next. The <b>Daily / Weekly / Analytics</b> tabs at the top switch between logging today, reviewing the week, and seeing your trend.</div></div>
+
+      <div class="guide-item"><div class="gi-ic" style="background:rgba(204,0,0,0.16);color:#ff6b6b">▦</div><div class="gi-tx"><b>Training — plan it, then log it</b>Two modes. <b>Edit Plan</b> is where you build routines and add moves — strength (sets × reps) or cardio (duration, distance, and sport-specific stats like rounds or goals). <b>Log Session</b> is where you fill in what you actually did. The <b>Last</b> column beside each set shows what you hit last time, so you always know what to beat, and a pill under each exercise tells you if your total volume went up, down or stayed flat. Save routines you reuse with <b>plan libraries</b>, and export the whole program as a PDF.</div></div>
+
+      <div class="guide-item"><div class="gi-ic" style="background:rgba(59,130,246,0.16);color:#60a5fa">🍎</div><div class="gi-tx"><b>Nutrition — targets, then a food diary</b>Start with the <b>macro calculator</b>: it works out your maintenance calories (Mifflin-St Jeor, or Katch-McArdle if you know your body fat) and multiplies by your activity level, then splits the result into protein, carbs and fat for your goal. Then log meals against those targets in the daily diary — search by name, or <b>scan a barcode</b> with your camera. The ring at the top shows how much of the day you have left.</div></div>
+
+      <div class="guide-item"><div class="gi-ic" style="background:rgba(198,144,47,0.16);color:#fbbf24">★</div><div class="gi-tx"><b>Score &amp; Analytics <span style="color:#fbbf24">(Pro)</span></b>Your weekly <b>True Progress Score</b> is one number out of 100, blending six signals — bodyweight direction, training overload, diet adherence, sleep, steps and stress — using standard coaching weights. It answers the question a scale can't: <i>is this plan working?</i> Charts plot your bodyweight and score over time, and you can export a weekly or full-program PDF report.</div></div>
+
+      <div class="guide-item"><div class="gi-ic" style="background:rgba(168,85,247,0.16);color:#c4b5fd">⤬</div><div class="gi-tx"><b>Share cards</b>Turn a session into a clean branded image you can post. Tap <b>Share today's win</b> at the bottom of Log Session for a workout or cardio card, or share a weekly progress card from Progress. Light, dark and transparent themes. Set your @handle and card font under <b>Personal → Share Card</b> below.</div></div>
+
+      <div class="guide-item"><div class="gi-ic" style="background:rgba(34,197,94,0.16);color:#86efac">☁</div><div class="gi-tx"><b>Your data &amp; sync</b>Everything saves on this phone instantly, then copies to your account on the DevFit server — a row tied to your email that only you can read or write. Sign in on a new phone and it all comes back. You can also force a backup, restore, or export a file you keep yourself under <b>Data &amp; Account</b> below.</div></div>
+
+      <div class="guide-item"><div class="gi-ic" style="background:rgba(148,163,184,0.16);color:#cbd5e1">⚙</div><div class="gi-tx"><b>Make it feel like an app</b>Under <b>App</b> below you can <b>install DevFit to your home screen</b> (it then runs full-screen and works offline), switch between <b>light and dark</b> themes, and turn on an <b>evening reminder</b> to log your day.</div></div>
+
+      <div class="guide-item"><div class="gi-ic" style="background:rgba(204,0,0,0.16);color:#ff6b6b">✦</div><div class="gi-tx"><b>Free vs Pro</b><b>Free</b> lets you log everything, every day, forever — it just shows you the current week. <b>Pro</b> (RM19.90/month) opens your full history, the True Progress Score, trend charts, per-exercise progression and PDF reports. Nothing you log is ever deleted: if a plan lapses, your history is kept safe and reappears the moment you renew.</div></div>
     </div>
     <div class="card-sub">Tap any group below to open its settings.</div>
   </div>
@@ -463,12 +484,24 @@ html.nosplash #devfit-splash{display:none!important}
 
   <div class="card" id="card-backup">
     <div class="section-label">Backup &amp; Restore</div>
+
+    <!-- "Where does this actually save?" was the #1 confusion. Answer it up front,
+         in plain words, before showing any buttons. -->
+    <div class="cloud-note" style="margin-bottom:12px">
+      <svg viewBox="0 0 24 24"><path d="M20 17.6A4 4 0 0 0 18 10a6 6 0 0 0-11.6-1.6A4.5 4.5 0 0 0 6 17.6"/><path d="M9 13l2 2 4-4"/></svg>
+      <div><b>Where your data lives.</b> Everything saves on this phone first, then copies to
+      DevFit's secure database on our server — into a row that belongs to your email alone.
+      Only your signed-in account can read or write it; no other user can reach your data, and
+      we never store it on someone else's device. This happens automatically every time you log
+      something. The buttons below are just manual control over the same thing.</div>
+    </div>
+
     <div id="backup-status" style="font-size:12px;line-height:1.5;padding:2px 2px 10px;color:var(--muted,#9aa0a6)">Checking cloud backup…</div>
     <button class="setting-btn" id="backup-now-btn" type="button">
       <div class="icon">☁</div>
       <div class="body">
         <div class="title">Back Up Now</div>
-        <div class="desc">Save all your data to the cloud, tied to your email</div>
+        <div class="desc">Push this phone's data to your account on the DevFit server, right now</div>
       </div>
       <div class="chev">›</div>
     </button>
@@ -476,7 +509,7 @@ html.nosplash #devfit-splash{display:none!important}
       <div class="icon">⟲</div>
       <div class="body">
         <div class="title">Restore from Cloud</div>
-        <div class="desc">Pull your saved data back onto this device</div>
+        <div class="desc">Pull your saved copy back down — use this on a new phone or after a reinstall</div>
       </div>
       <div class="chev">›</div>
     </button>
@@ -484,7 +517,7 @@ html.nosplash #devfit-splash{display:none!important}
       <div class="icon">↧</div>
       <div class="body">
         <div class="title">Export Backup File</div>
-        <div class="desc">Download a copy you keep — works even if your plan lapses</div>
+        <div class="desc">Save a .json file to your own phone — yours to keep, works offline and even if your plan lapses</div>
       </div>
       <div class="chev">›</div>
     </button>
@@ -492,11 +525,12 @@ html.nosplash #devfit-splash{display:none!important}
       <div class="icon">↥</div>
       <div class="body">
         <div class="title">Import Backup File</div>
-        <div class="desc">Restore from a backup file you exported earlier</div>
+        <div class="desc">Load a .json file you exported earlier back into the app</div>
       </div>
       <div class="chev">›</div>
     </button>
     <input type="file" id="import-file-input" accept="application/json,.json" style="display:none">
+    <div class="card-sub" style="margin-top:10px">Your logged data is never deleted when a plan ends — Free simply shows less of it.</div>
   </div>
 
   <div class="card" id="card-data">
@@ -521,7 +555,7 @@ html.nosplash #devfit-splash{display:none!important}
 
   <div class="footer">
     DevFit · Dominance Through Discipline<br>
-    <a href="https://wa.me/60183679177">Contact trainer</a> · v4.63.1
+    <a href="https://wa.me/60183679177">Contact trainer</a> · v4.64.0
   </div>
 
 
@@ -777,23 +811,8 @@ function fmtDate(d){ try{ const x=new Date(d); if(isNaN(x)) return '—'; return
     }
 
     // ---------- USAGE ----------
-    let weeksLogged=0, daysTracked=0;
-    for(let w=0; w<totalWeeks; w++){
-      let weekHas=false;
-      for(let d=0; d<7; d++){ if(appData.bw[w] && appData.bw[w][d]!==''){ daysTracked++; weekHas=true; } }
-      const ci=appData.weeklyCheckin[w];
-      if(ci && (ci.overload||ci.diet||ci.stress||ci.bf)) weekHas=true;
-      if(weekHas) weeksLogged++;
-    }
-    let workouts=0;
-    try{ workouts=(loadTraining().sessions||[]).length; }catch(e){}
-    let nutDays=0;
-    try{ const n=loadNutrition(); Object.keys(n.days||{}).forEach(k=>{ if(dayMacros(n.days[k])) nutDays++; }); }catch(e){}
+    paintUsage();
     const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
-    set('usage-weeks', weeksLogged);
-    set('usage-days', daysTracked);
-    set('usage-workouts', workouts);
-    set('usage-nutrition', nutDays);
     const since = user.startDate ? fmtDate(user.startDate) : '';
     set('usage-since', since ? ('Member since '+since) : 'Welcome to DevFit — start logging to build your history.');
 
@@ -953,6 +972,81 @@ function dayMacros(day){
   (day.meals||[]).forEach(m=>(m.items||[]).forEach(it=>{ cal+=Number(it.cal)||0; p+=Number(it.p)||0; c+=Number(it.c)||0; f+=Number(it.f)||0; n++; }));
   if(n===0) return null;
   return {cal:Math.round(cal),p:Math.round(p),c:Math.round(c),f:Math.round(f),items:n};
+}
+
+// ---------- USAGE (single source of truth) ----------
+// Counts real account activity from EVERY source, de-duplicated onto the calendar.
+// Two separate under-counts this replaces:
+//   1. Days/weeks came from appData.bw alone, so someone training 3× a week who
+//      doesn't weigh in daily read as "2 days tracked" next to 14 workouts.
+//   2. On Free, normalizeFreeTierWeeksView() collapses appData down to the ONE
+//      current week and parks every other week in appData._proHistory. A loop over
+//      the visible weeks could therefore only ever return "1 week logged" — which
+//      is exactly what a Pro→Free switch produced.
+// Usage is account history, not a paid feature: it must read the same on Free and
+// on Pro, for the same email. Both archives are scanned, each against its own
+// programStart anchor, so no week is missed and none is counted twice.
+function computeUsage(){
+  const days=new Set(), weeks=new Set();
+  const markWeek=k=>{ if(k) weeks.add(k); };
+  const markDay=ds=>{
+    if(!ds) return;
+    days.add(ds);
+    const m=mondayOf(new Date(ds+'T00:00:00'));
+    if(m) weeks.add(ymd(m));
+  };
+
+  // (a) Daily metric grids — bodyweight, steps OR sleep all count as "tracked".
+  function scanGrid(src, anchor){
+    if(!src || !Array.isArray(src.bw)) return;
+    const base = anchor ? mondayOf(new Date(anchor)) : null;
+    const row=(arr,w)=>Array.isArray(arr&&arr[w])?arr[w]:null;
+    for(let w=0; w<src.bw.length; w++){
+      for(let d=0; d<7; d++){
+        const filled=[src.bw,src.steps,src.sleep].some(a=>{ const r=row(a,w); return r && r[d]!=='' && r[d]!=null; });
+        if(!filled) continue;
+        // Unanchored (no programStart yet) → synthetic keys still give a correct
+        // COUNT, they just can't merge with calendar-dated sources.
+        if(base){ const dt=new Date(base); dt.setDate(base.getDate()+w*7+d); markDay(ymd(dt)); }
+        else { days.add('w'+w+'d'+d); weeks.add('w'+w); }
+      }
+      const ci=src.weeklyCheckin && src.weeklyCheckin[w];
+      if(ci && (ci.overload||ci.diet||ci.stress||ci.bf)){
+        if(base){ const dt=new Date(base); dt.setDate(base.getDate()+w*7); markWeek(ymd(dt)); }
+        else weeks.add('w'+w);
+      }
+    }
+  }
+  let acctStart=''; try{ acctStart=(JSON.parse(localStorage.getItem('devfit_user')||'{}').startDate)||''; }catch(e){}
+  scanGrid(appData, appData.programStart || acctStart);
+  scanGrid(appData._proHistory, appData._proHistory && appData._proHistory.programStart);
+
+  // (b) Training sessions — a session you actually logged is a tracked day.
+  let workouts=0;
+  try{
+    (loadTraining().sessions||[]).forEach(s=>{
+      const logged=(s.logs||[]).some(l=>(l.sets||[]).some(x=>
+        (Number(x.reps)||0)>0 || (Number(x.weight)||0)>0 ||
+        (Number(x.min)||0)>0  || (Number(x.km)||0)>0));
+      if(!logged) return;
+      workouts++; markDay(s.date);
+    });
+  }catch(e){}
+
+  // (c) Nutrition — a day with food logged is a tracked day.
+  let nutrition=0;
+  try{
+    const n=loadNutrition();
+    Object.keys(n.days||{}).forEach(k=>{ if(dayMacros(n.days[k])){ nutrition++; markDay(k); } });
+  }catch(e){}
+
+  return { weeks:weeks.size, days:days.size, workouts:workouts, nutrition:nutrition };
+}
+function paintUsage(){
+  const u=computeUsage();
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  set('usage-weeks',u.weeks);   set('usage-days',u.days);
+  set('usage-workouts',u.workouts); set('usage-nutrition',u.nutrition);
 }
 
 // ---------- WEEK PDF ----------
@@ -1526,9 +1620,9 @@ function refreshBackupStatus(){
   const ts = lastCloudBackupTs();
   if(ts){
     const d = new Date(ts);
-    el.innerHTML = 'Cloud backup for <strong>'+email+'</strong><br>Last saved '+d.toLocaleString('en-MY',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    el.innerHTML = 'Saved to the DevFit server under <strong>'+email+'</strong><br>Last backup '+d.toLocaleString('en-MY',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
   } else {
-    el.innerHTML = 'Cloud backup for <strong>'+email+'</strong><br>No cloud save yet — tap “Back Up Now”.';
+    el.innerHTML = 'Saved to the DevFit server under <strong>'+email+'</strong><br>Nothing backed up yet — tap “Back Up Now”.';
   }
 }
 
@@ -1717,22 +1811,10 @@ body{padding-bottom:104px!important}
         const s=localStorage.getItem('progressLog2');
         if(s){ appData=JSON.parse(s); totalWeeks=appData.bw.length||totalWeeks; }
       }catch(e){}
-      // Recompute the usage tiles with the freshly restored data.
-      try{
-        let weeksLogged=0, daysTracked=0;
-        for(let w=0; w<totalWeeks; w++){
-          let weekHas=false;
-          for(let d=0; d<7; d++){ if(appData.bw[w] && appData.bw[w][d]!==''){ daysTracked++; weekHas=true; } }
-          const ci=appData.weeklyCheckin[w];
-          if(ci && (ci.overload||ci.diet||ci.stress||ci.bf)) weekHas=true;
-          if(weekHas) weeksLogged++;
-        }
-        let workouts=0; try{ workouts=(loadTraining().sessions||[]).length; }catch(e){}
-        let nutDays=0; try{ const n=loadNutrition(); Object.keys(n.days||{}).forEach(k=>{ if(dayMacros(n.days[k])) nutDays++; }); }catch(e){}
-        const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
-        set('usage-weeks',weeksLogged); set('usage-days',daysTracked);
-        set('usage-workouts',workouts); set('usage-nutrition',nutDays);
-      }catch(e){}
+      // Recompute the usage tiles with the freshly restored data. Same function as
+      // the first paint — this used to be a second, drifting copy of the counting
+      // logic, so a fix in one place silently missed the other.
+      try{ paintUsage(); }catch(e){}
     }
     try{ refreshBackupStatus(); }catch(e){}
   }).catch(function(){});

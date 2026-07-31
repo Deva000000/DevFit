@@ -431,12 +431,7 @@ html:not([data-theme="light"]) .ds-close,
 html:not([data-theme="light"]) .ws-close,
 html:not([data-theme="light"]) .session-empty,
 html:not([data-theme="light"]) .sv-chip:not(.active),
-html:not([data-theme="light"]) .ex-head,
-html:not([data-theme="light"]) .sets-grid .h,
-html:not([data-theme="light"]) .sets-grid .last-cell,
-html:not([data-theme="light"]) .cardio-fld label,
 html:not([data-theme="light"]) .empty-msg,
-html:not([data-theme="light"]) .chart-empty,
 html:not([data-theme="light"]) .calc-head .ch,
 html:not([data-theme="light"]) .calc-row .chint,
 html:not([data-theme="light"]) .calc-explain summary,
@@ -465,6 +460,19 @@ html:not([data-theme="light"]) .calc-num .unit{color:#6a6157 !important;}
 .meal-empty{color:#6a6157 !important;}
 .meal-del,.mi-del{color:#8a7f74 !important;}   /* 3.9:1 — visible glyph, still subordinate */
 .meal-del:hover,.mi-del:hover{color:#cc0000 !important;}
+
+/* Workout logger set table — same white-island rule. .log-ex and .workout-card are
+   background:#fff in BOTH themes, so v4.62.0 sweeping these into the dark ink ramp
+   painted rgba(255,255,255,0.66) onto white: in dark mode the "Set / Reps / kg /
+   Last" header row and the entire LAST column (last session's reps × kg, the whole
+   point of the table) went invisible. Light ink, both themes — measured 6.07:1 on
+   the white card, so they now read better than the #94a3b8 (2.9:1) they originally
+   shipped at, in dark AND light. */
+.ex-head,
+.sets-grid .h,
+.sets-grid .last-cell,
+.cardio-fld label,
+.chart-empty{color:#6a6157 !important;}   /* .chart-empty lives on a white chart card too */
 
 /* Nutrition sheet labels shipped at #444–#666 on a #111 modal — 1.5–2.9:1, i.e.
    "Serving size", "Qty", the "= g" conversion and the scanner hint were all but
@@ -650,11 +658,8 @@ html[data-theme="light"] .scanner-hdr span{color:#ffffff !important;}
 html[data-theme="light"] .scanner-hdr button{color:rgba(255,255,255,0.72) !important;}
 html[data-theme="light"] .scanner-hint{color:rgba(255,255,255,0.72) !important;}
 
-/* Workouts logger */
-html[data-theme="light"] .ex-head,
-html[data-theme="light"] .sets-grid .h,
-html[data-theme="light"] .sets-grid .last-cell,
-html[data-theme="light"] .cardio-fld label,
+/* Workouts logger — .ex-head / .sets-grid .h / .last-cell / .cardio-fld label are
+   handled theme-agnostically above (they sit on white cards in both themes). */
 html[data-theme="light"] .empty-msg{color:#6a6157 !important;}
 html[data-theme="light"] .session-empty{
   background:#faf7f3 !important;

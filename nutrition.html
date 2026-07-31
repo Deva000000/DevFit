@@ -570,16 +570,19 @@ function applyNutritionTierGates(){
   // FREE TIER: keep weekly trend, BLOCK month view
   const monthBtn = document.querySelector('#range-toggle .rng-btn[data-range="30"]');
   if(monthBtn){
-    monthBtn.disabled = true;
-    monthBtn.style.opacity = '0.45';
-    monthBtn.style.cursor = 'not-allowed';
-    monthBtn.title = 'Pro only';
+    // NOT disabled. A disabled <button> dispatches no click event at all, so the
+    // handler below could never run — tapping "MONTH 🔒" did literally nothing.
+    // It stays enabled and reads as locked; the tap is what sells Pro.
+    monthBtn.style.opacity = '0.55';
+    monthBtn.style.cursor = 'pointer';
+    monthBtn.title = 'Pro — see your full monthly trend';
     monthBtn.innerHTML = 'MONTH 🔒';
+    // Straight to the Pro page. A native confirm() renders as "<domain> says:" —
+    // the cheapest-looking surface in the whole app, and it made the user answer a
+    // question instead of showing them the answer.
     monthBtn.addEventListener('click', (e) => {
       e.preventDefault(); e.stopPropagation();
-      if(confirm('See your full monthly nutrition trend — spot the real pattern beyond one week. Pro is RM19.90/mo (≈ 66 sen a day). View what Pro unlocks?')){
-        window.location.href = 'pricing.html';
-      }
+      window.location.href = 'pricing.html';
     }, true);
   }
   // Force range back to 7 if user previously set 30

@@ -148,7 +148,12 @@
   .progress-pill.new{background:#e0e7ff;color:#3730a3}
 
   /* SHARE BUTTON */
-  .share-btn{width:100%;background:#cc0000;color:#fff;border:none;border-radius:var(--radius);padding:13px;font-family:'DM Sans',system-ui,sans-serif;font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;margin-top:10px;transition:all .15s;box-shadow:0 4px 12px rgba(204,0,0,0.25)}
+  /* Two-line CTA: the headline says what it does, the sub-line shows what you
+     actually did today. The numbers are the hook — nobody taps "Share Workout
+     Card", everybody taps "6,240 kg moved". */
+  .share-btn{width:100%;display:flex;flex-direction:column;align-items:center;gap:3px;background:#cc0000;color:#fff;border:none;border-radius:var(--radius);padding:11px 13px;font-family:'DM Sans',system-ui,sans-serif;font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;margin-top:10px;transition:all .15s;box-shadow:0 4px 12px rgba(204,0,0,0.25)}
+  .share-btn .sb-main{font-size:13px;font-weight:800;letter-spacing:.06em;line-height:1.2}
+  .share-btn .sb-sub{font-size:10px;font-weight:600;letter-spacing:.02em;text-transform:none;opacity:.88;line-height:1.35}
   .share-btn:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(204,0,0,0.35)}
   .share-btn:disabled{background:#666;box-shadow:none;cursor:not-allowed;transform:none}
 
@@ -306,7 +311,10 @@ html.nosplash #devfit-splash{display:none!important}
       </div>
       <div id="log-workout-chips" class="wk-chips"></div>
       <div id="log-area"></div>
-      <button class="share-btn" id="share-btn" disabled>Share Workout Card</button>
+      <button class="share-btn" id="share-btn" disabled>
+        <span class="sb-main">Share today's win</span>
+        <span class="sb-sub" id="share-btn-sub">Tap to make your card</span>
+      </button>
       <button class="reset-btn" id="del-session-btn" style="display:none">&#128465; Delete this day's log</button>
       <button class="reset-btn" id="reset-history-btn">&#8634; Reset session history</button>
     </div>
@@ -409,12 +417,27 @@ function getUserTier(){
 function isPro(){ return getUserTier() === 'pro'; }
 
 function paywallHTML(featureName){
+  // Count what the user has ALREADY logged — a locked chart is far more persuasive
+  // when it names the sessions sitting behind it than when it lists generic perks.
+  let n=0;
+  try{ n=((data && data.sessions)||[]).length; }catch(e){}
+  const hook = n>1
+    ? `You've logged <b style="color:#fff">${n} sessions</b>. This chart turns them into a strength curve — every lift, week over week, so you can see what's climbing and what's stalled.`
+    : `Every session you log becomes a strength curve here — lift by lift, week over week, so you can see what's climbing and what's stalled.`;
   return `<div style="background:linear-gradient(135deg,#1a0000,#2a0000);border:1px solid #cc0000;border-radius:14px;padding:24px;text-align:center;margin:8px 0">
     <div style="font-size:11px;font-weight:800;letter-spacing:.08em;color:#ff8888;margin-bottom:8px">PRO FEATURE</div>
     <div style="font-size:16px;color:#fff;font-weight:800;margin-bottom:8px">${featureName}</div>
-    <div style="font-size:13px;color:#ccc;line-height:1.6;margin-bottom:12px">Track every session across weeks, watch your strength climb, and share clean workout cards — the stuff that keeps you consistent.</div>
+    <div style="font-size:13px;color:#ccc;line-height:1.6;margin-bottom:12px">${hook}</div>
+    <div style="font-size:12.5px;color:#ccc;line-height:1.75;text-align:left;max-width:270px;margin:0 auto 14px">
+      <div>✓ Per-exercise progression charts</div>
+      <div>✓ Your full session history, every week</div>
+      <div>✓ True Progress Score &amp; bodyweight trends</div>
+      <div>✓ Weekly + full-program PDF reports</div>
+      <div>✓ Auto cloud backup &amp; multi-device sync</div>
+    </div>
     <div style="font-size:12px;color:#888;margin-bottom:14px">Everything unlocked for <b style="color:#fff">≈ 66 sen a day</b> · RM19.90/mo · cancel anytime</div>
-    <a href="pricing.html" style="display:inline-block;background:#cc0000;color:#fff;text-decoration:none;padding:10px 22px;border-radius:20px;font-weight:700;font-size:13px">See what Pro unlocks →</a>
+    <a href="pricing.html" style="display:inline-block;background:#cc0000;color:#fff;text-decoration:none;padding:10px 22px;border-radius:20px;font-weight:700;font-size:13px">Unlock Pro — RM19.90/mo →</a>
+    <div style="font-size:11px;color:#888;margin-top:11px;line-height:1.5">DuitNow QR from any bank or e-wallet · activated within 24 hours</div>
   </div>`;
 }
 
@@ -1311,6 +1334,25 @@ function renderLog(jumpToLast){
   updateShareBtn();
 }
 
+// Live one-line summary of what's been logged this session — the thing that makes
+// the share button worth tapping. Strength and cardio both contribute, so a mixed
+// day reads "12 sets · 4,100 kg moved · 30 min".
+function sessionHeadline(sess){
+  let sets=0, vol=0, min=0, km=0;
+  (sess.logs||[]).forEach(l=>(l.sets||[]).forEach(s=>{
+    const r=Number(s.reps)||0, w=Number(s.weight)||0;
+    if(r>0||w>0){ sets++; vol+=r*w; }
+    min+=Number(s.min)||0;
+    km +=Number(s.km)||0;
+  }));
+  const bits=[];
+  if(sets)  bits.push(sets+' set'+(sets===1?'':'s'));
+  if(vol>0) bits.push(Math.round(vol).toLocaleString()+' kg moved');
+  if(min>0) bits.push(Math.round(min)+' min');
+  if(km>0)  bits.push((Math.round(km*10)/10)+' km');
+  return bits.join(' · ');
+}
+
 function updateShareBtn(){
   const btn=document.getElementById('share-btn');
   const delBtn=document.getElementById('del-session-btn');
@@ -1318,7 +1360,12 @@ function updateShareBtn(){
   // Allow share if any set has reps/weight (strength) OR min/km (cardio) logged
   const hasData=currentSession.sess.logs.some(l=>l.sets.some(s=>(Number(s.reps)||0)>0||(Number(s.weight)||0)>0||(Number(s.min)||0)>0||(Number(s.km)||0)>0));
   btn.disabled=!hasData;
-  btn.style.display=hasData?'block':'none';
+  btn.style.display=hasData?'flex':'none';
+  const sub=document.getElementById('share-btn-sub');
+  if(sub){
+    const head=sessionHeadline(currentSession.sess);
+    sub.textContent = head ? (head+' — tap to make your card') : 'Tap to make your card';
+  }
   // Show "delete this day's log" only once the session is actually saved with data.
   if(delBtn) delBtn.style.display=(!currentSession.isNew && hasData)?'block':'none';
 }

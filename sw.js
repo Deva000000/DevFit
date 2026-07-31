@@ -10,7 +10,7 @@
    - Apps Script / /api/*: network-only (never cached).
 */
 
-const VERSION = 'devfit-v4.63.1';
+const VERSION = 'devfit-v4.64.0';
 const APP_SHELL = 'devfit-shell-' + VERSION;
 const RUNTIME = 'devfit-runtime-' + VERSION;
 
@@ -22,6 +22,7 @@ const SHELL_FILES = [
   './workouts.html',
   './settings.html',
   './landing.html',
+  './pricing.html',
   // ── Manifest + icons ────────────────────────────────────────────────
   './manifest.json',
   './icon-touch.png',
@@ -119,12 +120,38 @@ async function networkFirst(req) {
     const cached = await cache.match(req) || await cache.match(req, { ignoreSearch: true });
     if (cached) return cached;
     if (req.mode === 'navigate') {
-      const shell = await cache.match('./index.html');
-      if (shell) return shell;
+      // Only ever stand in for the app ROOT. Serving index.html in place of a
+      // *named* page silently drops the user on a different screen — that is
+      // exactly why "Unlock Pro" read as doing nothing / bouncing to the home
+      // page: pricing.html wasn't precached, so every offline tap on the CTA
+      // rendered the Progress page under a pricing.html URL. A named page we
+      // genuinely don't have must say so, not impersonate another page.
+      const p = new URL(req.url).pathname;
+      if (p === '/' || /\/(index\.html)?$/.test(p)) {
+        const shell = await cache.match('./index.html');
+        if (shell) return shell;
+      }
+      return new Response(OFFLINE_PAGE, {
+        status: 503,
+        headers: { 'Content-Type': 'text/html; charset=utf-8' }
+      });
     }
     return new Response('Offline', { status: 503 });
   }
 }
+
+const OFFLINE_PAGE = `<!DOCTYPE html><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DevFit — Offline</title>
+<style>body{font-family:'DM Sans',system-ui,sans-serif;background:#0d0d10;color:#e8e8ea;
+display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0;padding:24px;text-align:center}
+.b{font-size:22px;font-weight:800;letter-spacing:.02em}.b i{color:#cc0000;font-style:italic}
+p{color:#9a9aa2;font-size:14px;line-height:1.6;margin:12px 0 22px;max-width:320px}
+a{display:inline-block;background:#cc0000;color:#fff;text-decoration:none;font-weight:700;
+font-size:14px;padding:12px 26px;border-radius:22px}</style>
+<div><div class="b">DEV<i>FIT</i></div>
+<p>You're offline, so this page can't load right now. Your logged data is safe on this device.</p>
+<a href="./index.html">Back to DevFit</a></div>`;
 
 async function cacheFirst(req) {
   const cache = await caches.open(APP_SHELL);

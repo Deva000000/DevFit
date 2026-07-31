@@ -720,7 +720,8 @@ html.nosplash #devfit-splash{display:none!important}
   <!-- PRO UPGRADE BANNER (shown to free users) -->
   <div class="pro-locked card" style="text-align:center;padding:28px 16px;background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid #334155;">
     <div style="font-size:22px;margin-bottom:8px;">📈</div>
-    <div style="font-size:15px;font-weight:800;color:#f1f5f9;margin-bottom:8px;">See if your plan is actually working</div>
+    <div id="pro-hook" style="font-size:15px;font-weight:800;color:#f1f5f9;margin-bottom:6px;line-height:1.35;">See if your plan is actually working</div>
+    <div id="pro-hook-sub" style="font-size:12px;color:#cbd5e1;margin-bottom:12px;line-height:1.55;">Free shows you today. Pro shows you the direction you're heading.</div>
     <!-- Teaser: real 4-week bodyweight shape, blurred + unlabelled, so free users
          see they HAVE a trend without the paid numbers. Hidden if too little data. -->
     <div id="teaser-spark-wrap" style="display:none;position:relative;max-width:280px;margin:0 auto 14px;">
@@ -729,14 +730,17 @@ html.nosplash #devfit-splash{display:none!important}
         <span style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#fff;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.25);border-radius:20px;padding:5px 12px;">🔒 Your trend — unlock to see</span>
       </div>
     </div>
-    <div style="font-size:12.5px;color:#cbd5e1;margin-bottom:14px;line-height:1.7;text-align:left;max-width:280px;margin-left:auto;margin-right:auto;">
-      <div style="margin-bottom:5px;">✓ <b>True Progress Score</b> — one number from 6 signals</div>
-      <div style="margin-bottom:5px;">✓ <b>Full history</b> — every week, not just today</div>
-      <div style="margin-bottom:5px;">✓ <b>Trend charts</b> — bodyweight &amp; score over time</div>
-      <div>✓ <b>PDF reports</b> you can keep or share</div>
+    <div style="font-size:12.5px;color:#cbd5e1;margin-bottom:14px;line-height:1.7;text-align:left;max-width:290px;margin-left:auto;margin-right:auto;">
+      <div style="margin-bottom:5px;">✓ <b>True Progress Score</b> — one number from 6 signals: weight, overload, diet, sleep, steps, stress</div>
+      <div style="margin-bottom:5px;">✓ <b>Every week you've logged</b> — the whole timeline, not just this week</div>
+      <div style="margin-bottom:5px;">✓ <b>Trend charts</b> — bodyweight &amp; score, so you see the direction early</div>
+      <div style="margin-bottom:5px;">✓ <b>Training history</b> — every session + per-exercise progression</div>
+      <div style="margin-bottom:5px;">✓ <b>Month-long nutrition trends</b>, not a single week</div>
+      <div>✓ <b>PDF reports</b> — weekly and full-program, yours to keep</div>
     </div>
-    <div style="font-size:12px;color:#94a3b8;margin-bottom:14px;">Everything unlocked for <b style="color:#f1f5f9;">≈ 66 sen a day</b> — RM19.90/month, cancel anytime.</div>
-    <a href="pricing.html" style="display:inline-block;background:#2f9e57;color:#fff;font-weight:700;font-size:13px;padding:11px 26px;border-radius:20px;text-decoration:none;">Unlock Pro →</a>
+    <div style="font-size:12px;color:#94a3b8;margin-bottom:6px;">Everything unlocked for <b style="color:#f1f5f9;">≈ 66 sen a day</b> — RM19.90/month, cancel anytime.</div>
+    <a href="pricing.html" style="display:inline-block;background:#2f9e57;color:#fff;font-weight:700;font-size:13px;padding:11px 26px;border-radius:20px;text-decoration:none;margin-top:8px;">Unlock Pro →</a>
+    <div style="font-size:11px;color:#94a3b8;margin-top:11px;line-height:1.55;">Pay by DuitNow QR from any bank or e-wallet · activated within 24 hours</div>
   </div>
 
   <!-- FEEDBACK (Pro) -->
@@ -1203,6 +1207,36 @@ function last4WeeksBwAvgs(){
   s.push(weekAvgBw(appData.bw && appData.bw[0]));
   return s.filter(function(v){return v!=null;}).slice(-4);
 }
+// Free-tier hook. The strongest and most honest reason to upgrade is that the
+// user's own history ALREADY EXISTS and is merely hidden — v4.58.0 stopped
+// deleting it. Generic benefit copy converts badly; "4 weeks are waiting for you"
+// is specific, true, and theirs.
+function lockedWeekCount(){
+  var H=appData._proHistory, n=0;
+  if(H && Array.isArray(H.bw)){
+    for(var i=0;i<H.bw.length;i++){
+      if(weekHasData({ bw:H.bw[i], steps:H.steps&&H.steps[i], sleep:H.sleep&&H.sleep[i] })) n++;
+    }
+  }
+  return n;
+}
+function paintProHook(){
+  var h=document.getElementById('pro-hook'), s=document.getElementById('pro-hook-sub');
+  if(!h || !s) return;
+  var n=lockedWeekCount(), sessions=0;
+  try{
+    var t=JSON.parse(localStorage.getItem('devfitTrainingV1')||'null');
+    sessions=((t && t.sessions)||[]).length;
+  }catch(e){}
+  if(n>0){
+    h.textContent = n+' week'+(n===1?'':'s')+' of your history '+(n===1?'is':'are')+' saved — and hidden.';
+    s.textContent = 'Nothing was deleted. Free shows this week only; Pro opens your whole timeline'+
+                    (sessions ? ' and all '+sessions+' logged sessions' : '')+' the moment you unlock it.';
+  } else {
+    h.textContent = 'See if your plan is actually working';
+    s.textContent = "Free shows you today. Pro shows you the direction you're heading.";
+  }
+}
 function drawTeaserSparkline(){
   var wrap=document.getElementById('teaser-spark-wrap'), cv=document.getElementById('teaser-spark');
   if(!wrap||!cv) return;
@@ -1275,8 +1309,8 @@ function lockCard(card, title){
   overlay.innerHTML = `
     <div class="devfit-lock-badge">★ Pro</div>
     <div class="devfit-lock-title">${title}</div>
-    <div class="devfit-lock-sub">Everything unlocked for ≈ 66 sen/day · RM19.90/mo</div>
-    <a class="devfit-lock-cta" href="pricing.html">See what Pro unlocks →</a>`;
+    <div class="devfit-lock-sub">Full history, trend charts, True Progress Score and PDF reports — ≈ 66 sen/day, RM19.90/mo</div>
+    <a class="devfit-lock-cta" href="pricing.html">Unlock Pro →</a>`;
   card.appendChild(overlay);
 }
 
@@ -1697,6 +1731,7 @@ function renderExtraCards(){
   } else {
     proSections.forEach(el=>el.style.display='none');
     locked.forEach(el=>el.style.display='');
+    try{ paintProHook(); }catch(e){}
     try{ drawTeaserSparkline(); }catch(e){}
   }
 }

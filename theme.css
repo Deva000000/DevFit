@@ -1061,3 +1061,102 @@ html:not([data-theme="light"]) .ws-tbtn.active{
   color:var(--df-tab-on-ink) !important;
   box-shadow:var(--df-tab-on-shadow) !important;
 }
+
+/* ===========================================================================
+   GLOW RESTRAINT  (v4.66.0)
+   ---------------------------------------------------------------------------
+   The crimson bloom had spread onto every active pill, chip, badge, icon and
+   hover state. Twenty things glowing means nothing is emphasised, and on the
+   light theme the red haze sat over content and muddied the text underneath.
+
+   The rule from here on: the HEADLINE BAR is the only element allowed a red
+   glow. Everything else keeps red as FILL (so "selected" is still obvious at a
+   glance) but casts a neutral shadow — depth comes from elevation, emphasis
+   comes from colour, and the two stop competing.
+   =========================================================================== */
+
+html:not([data-theme="light"]){
+  --df-lift-1:0 2px 6px rgba(0,0,0,0.38);
+  --df-lift-2:0 6px 18px rgba(0,0,0,0.46);
+  --df-glow-head:0 10px 30px rgba(204,0,0,0.16),0 1px 0 rgba(255,255,255,0.06) inset;
+}
+html[data-theme="light"]{
+  --df-lift-1:0 2px 6px rgba(60,40,30,0.12);
+  --df-lift-2:0 6px 18px rgba(60,40,30,0.16);
+  --df-glow-head:0 8px 24px rgba(204,0,0,0.10),0 1px 0 rgba(255,255,255,0.7) inset;
+}
+
+/* 1 — the one place a glow survives. Specificity matched to the light-theme
+   header rule further up so this single token governs BOTH themes. */
+html[data-theme="light"] .header,
+html:not([data-theme="light"]) .header{box-shadow:var(--df-glow-head) !important;}
+
+/* 2 — selected tabs/pills: red fill, neutral shadow */
+html:not([data-theme="light"]),
+html[data-theme="light"]{
+  --df-tab-on-shadow:var(--df-lift-1);
+}
+nav.devfit-tabnav a.active,
+.devfit-bottomnav a.active,
+.wk-chip.active,
+.chip.active,
+.font-chip.active,
+.df-theme-opt.active,
+.onb-goal.sel{
+  box-shadow:var(--df-lift-1) !important;
+}
+
+/* 3 — primary buttons and their hovers: lift, don't bloom */
+.share-btn,
+.share-btn:hover,
+.diet-share-btn,
+.diet-share-btn:hover,
+.wk-share-btn,
+.wk-share-btn:hover,
+.upgrade-btn,
+.upgrade-btn:hover,
+.calc-go,
+.calc-go:hover,
+.onb-btn.primary,
+.pw-cta,
+.lib-load{
+  box-shadow:var(--df-lift-1) !important;
+}
+
+/* 4 — decorative chrome that had no business glowing at all */
+.setting-btn .icon,
+.profile-avatar,
+.tier-badge.pro,
+.plan-badge.pro,
+.devfit-lock-badge,
+#devfit-splash img{
+  box-shadow:var(--df-lift-1) !important;
+}
+.setting-btn:hover{box-shadow:var(--df-lift-1) !important;}
+.input-cell:focus-within{box-shadow:var(--df-lift-1) !important;}
+
+/* ---------------------------------------------------------------------------
+   HIERARCHY — with the haze gone, ranking has to come from edges and weight.
+
+   Deliberately NOT touched here: .log-ex-name, .stat-val, .stat-lbl,
+   .workout-head input, .ex-head, .sets-grid .h/.last-cell. Those live on cards
+   that are background:#fff in BOTH themes, so sweeping them into a theme ink
+   ramp paints white-on-white in dark mode — that is what killed the LAST column
+   in v4.62.0. They keep their fixed dark ink. See the white-island block above.
+   --------------------------------------------------------------------------- */
+html:not([data-theme="light"]){ --df-hairline:rgba(255,255,255,0.10); }
+html[data-theme="light"]{ --df-hairline:rgba(20,15,10,0.11); }
+
+/* Section labels read as labels — tracked and heavy, not another line of body
+   text. Colour is left to the existing per-theme rules, which are island-safe. */
+.section-label{letter-spacing:.09em !important;font-weight:800 !important;}
+
+/* Stacked cards separate a little more firmly now that nothing glows. */
+.card,
+details.setup-card,
+.dash-tile{border-color:var(--df-hairline) !important;}
+
+/* The two header lines are on the themed header surface, so they can take the
+   ink ramp safely — this is what re-establishes the top of the page hierarchy. */
+.app-sub{color:var(--df-ink-3) !important;}
+html[data-theme="light"] .app-sub{color:#6a6157 !important;}

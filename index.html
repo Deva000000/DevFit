@@ -39,9 +39,12 @@
   .page::before{content:'';display:block;height:3px;background:#cc0000;border-radius:2px;margin-bottom:12px;}
 
   /* HEADER */
-  .header{background:#111111;border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:1rem;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;border-left:5px solid #cc0000;border-top:3px solid #cc0000;}
-  .app-title{font-family:'DM Sans',system-ui,sans-serif;font-size:22px;font-weight:800;color:#fff;line-height:1.1}
-  .app-sub{font-size:13px;color:rgba(255,255,255,0.75);margin-top:2px}
+  /* Matches every other page's header exactly — this one used to be noticeably
+     taller than Nutrition/Training/Settings, so the app changed size as you moved. */
+  .header{background:#111111;border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:10px;display:flex;align-items:center;gap:12px;border-left:5px solid #cc0000;border-top:3px solid #cc0000;}
+  .header-logo{height:50px;width:50px;border-radius:10px;background:#fff;flex-shrink:0;object-fit:contain}
+  .app-title{font-family:'DM Sans',system-ui,sans-serif;font-size:18px;font-weight:800;color:#fff;line-height:1.1}
+  .app-sub{font-size:12px;color:rgba(255,255,255,0.7);margin-top:2px}
   .week-tabs{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
   .wtab{font-size:12px;font-weight:500;padding:6px 14px;border-radius:20px;border:1.5px solid rgba(220,38,38,0.5);background:transparent;color:rgba(255,255,255,0.8);cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif}
   .wtab.active{background:#dc2626;color:#ffffff;border-color:#dc2626;font-weight:700}
@@ -334,7 +337,8 @@
     body{padding:.5rem;overflow-x:hidden}
     .page{max-width:100%}
     .header{padding:14px 16px}
-    .app-title{font-size:18px}
+    .app-title{font-size:15px}
+    .header-logo{height:38px;width:38px}
     .metric-grid{gap:3px}
     .day-card{padding:6px 2px;min-width:0;overflow:hidden}
     .day-card input{font-size:12px;min-width:0;width:100%}
@@ -428,14 +432,10 @@ html.nosplash #devfit-splash{display:none!important}
 
   <!-- HEADER -->
   <div class="header">
-    <div style="display:flex;align-items:center;gap:14px;">
-      <img src="logo-header.png" alt="DevFit"
-        style="height:50px;width:50px;object-fit:contain;border-radius:10px;background:#fff;flex-shrink:0;"
-        onerror="this.style.display='none'">
-      <div>
-        <div class="app-title" style="font-size:18px;line-height:1.2;"><span style="font-family:'Inter',system-ui,sans-serif;font-style:italic;font-weight:700;letter-spacing:.005em;"><span style="color:#fff;">DEV</span><span style="color:#cc0000;">FIT</span></span> <span style="color:#fff;">Progress Log</span></div>
-        <div class="app-sub" style="font-size:12px;margin-top:3px;">Dominance Through Discipline</div>
-      </div>
+    <img src="logo-header.png" alt="DevFit" class="header-logo" onerror="this.style.display='none'">
+    <div>
+      <div class="app-title"><span style="font-family:'Inter',system-ui,sans-serif;font-style:italic;font-weight:700;letter-spacing:.005em;"><span style="color:#fff;">DEV</span><span style="color:#cc0000;">FIT</span></span> <span style="color:#fff;">Progress Log</span></div>
+      <div class="app-sub">Dominance Through Discipline</div>
     </div>
   </div>
 
@@ -2985,8 +2985,14 @@ document.addEventListener('visibilitychange',function(){
 
   const sb=document.getElementById('wk-share-btn');
   if(sb) sb.addEventListener('click',openModal);
+  // FREE gets the plain white card only — dark + transparent are Pro.
   document.querySelectorAll('.ws-tbtn').forEach(btn=>{
+    if(btn.dataset.theme!=='light' && !isPro()){
+      btn.style.opacity='0.5';
+      if(!/🔒/.test(btn.textContent)) btn.textContent=btn.textContent.trim()+' 🔒';
+    }
     btn.addEventListener('click',()=>{
+      if(btn.dataset.theme!=='light' && !isPro()){ window.location.href='pricing.html'; return; }
       wsTheme=btn.dataset.theme;
       document.querySelectorAll('.ws-tbtn').forEach(b=>b.classList.toggle('active',b===btn));
       rerender();

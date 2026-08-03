@@ -21,9 +21,11 @@
   .wrap{max-width:560px;margin:0 auto}
 
   /* Header */
-  .header{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:8px}
-  .header img{width:54px;height:54px;border-radius:10px;object-fit:cover;background:#fff}
-  .header-text{text-align:left}
+  /* Renamed off ".header" on purpose: theme.css paints .header white in light mode,
+     which put a white pill behind the white DEVFIT wordmark on this permanently-dark page. */
+  .brand-head{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:8px}
+  .brand-head img{width:54px;height:54px;border-radius:10px;object-fit:cover;background:#fff}
+  .brand-head-text{text-align:left}
   .brand-name{font-size:22px;font-weight:800;color:#fff;line-height:1.1;letter-spacing:.02em}
   .brand-tag{font-size:11px;color:#cc0000;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-top:3px}
   .divider{width:50px;height:2px;background:#cc0000;margin:18px auto 22px;border-radius:2px}
@@ -74,6 +76,25 @@
 
   .footer{text-align:center;font-size:12px;color:#555;padding-top:16px}
   .footer a{color:#cc0000;text-decoration:none;font-weight:700}
+
+  /* Free vs Pro breakdown — the honest version of what each tier actually does,
+     grouped the same way the app is (Progress / Nutrition / Training / General). */
+  .cmp{background:#111;border:1px solid #2a2a2a;border-radius:16px;padding:24px 20px;margin-bottom:24px}
+  .cmp h2{font-size:18px;font-weight:800;color:#fff;text-align:center;margin-bottom:4px}
+  .cmp .cmp-sub{font-size:12px;color:#888;text-align:center;margin-bottom:20px;line-height:1.5}
+  .cmp-grp{margin-bottom:18px}
+  .cmp-grp:last-of-type{margin-bottom:0}
+  .cmp-grp h3{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#cc0000;margin-bottom:10px}
+  .cmp-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .cmp-col{background:#171717;border:1px solid #242424;border-radius:10px;padding:12px 13px}
+  .cmp-col.pro{border-color:rgba(204,0,0,0.35)}
+  .cmp-tier{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#888;margin-bottom:8px}
+  .cmp-col.pro .cmp-tier{color:#cc0000}
+  .cmp-col ul{list-style:none;margin:0;padding:0}
+  .cmp-col li{font-size:12px;color:#c7c2bd;line-height:1.45;padding:4px 0 4px 15px;position:relative}
+  .cmp-col li::before{content:"\2713";position:absolute;left:0;top:4px;color:#5a5a5a;font-weight:800;font-size:10px}
+  .cmp-col.pro li::before{color:#cc0000}
+  @media(max-width:460px){ .cmp-cols{grid-template-columns:1fr} }
 </style>
 <!-- Shared theme: early-apply (no flash) + override stylesheet + controller -->
 <script>try{if(localStorage.getItem('devfit_theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
@@ -85,9 +106,9 @@
 <div class="wrap">
 
   <!-- Header -->
-  <div class="header">
+  <div class="brand-head">
     <img src="icon-192.png" alt="DevFit" onerror="this.style.display='none'">
-    <div class="header-text">
+    <div class="brand-head-text">
       <div class="brand-name">DEVFIT</div>
       <div class="brand-tag">Dominance Through Discipline</div>
     </div>
@@ -108,13 +129,134 @@
     <div class="price-note"><span id="pc-perday">≈ 66 sen a day</span> &middot; 30 days full access &middot; DuitNow QR</div>
     <ul>
       <li><b>See if it's working</b> — six-signal True Progress Score</li>
-      <li><b>Your whole journey</b> — every week of history, not just today</li>
-      <li><b>Spot the trend</b> — live bodyweight, score &amp; nutrition graphs</li>
-      <li><b>Proof you can hold</b> — PDF reports (weekly + full program)</li>
+      <li><b>Your whole journey</b> — full history, trends &amp; plateau detection</li>
+      <li><b>Every lift charted</b> — progression, estimated 1RM &amp; personal records</li>
+      <li><b>Nutrition that adapts</b> — barcode scanning, saved meals, calorie cycling</li>
+      <li><b>Proof you can hold</b> — weekly, monthly &amp; full-program PDF reports</li>
       <li><b>Never lose data</b> — auto cloud backup &amp; multi-device sync</li>
-      <li><b>Full training log</b> — sessions across weeks + progression</li>
       <li>Install as an app &middot; works offline</li>
     </ul>
+  </div>
+
+  <!-- Free vs Pro -->
+  <div class="cmp">
+    <h2>What's in each plan</h2>
+    <div class="cmp-sub">Free is a complete daily logger — today's numbers, always yours.<br>Pro is what turns those numbers into a trend you can act on.</div>
+
+    <div class="cmp-grp">
+      <h3>Progress</h3>
+      <div class="cmp-cols">
+        <div class="cmp-col">
+          <div class="cmp-tier">Free</div>
+          <ul>
+            <li>Program setup</li>
+            <li>Current-week weight logging</li>
+            <li>Current-week step logging</li>
+            <li>Current-week sleep logging</li>
+            <li>Current-week overview</li>
+            <li>Basic weekly check-in</li>
+          </ul>
+        </div>
+        <div class="cmp-col pro">
+          <div class="cmp-tier">Pro</div>
+          <ul>
+            <li>Full historical timeline</li>
+            <li>True Progress Score</li>
+            <li>Weight-trend smoothing</li>
+            <li>Weekly &amp; monthly comparisons</li>
+            <li>Goal-projection estimate</li>
+            <li>Body-measurement trends</li>
+            <li>Custom date ranges</li>
+            <li>Adherence analysis</li>
+            <li>Plateau detection</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="cmp-grp">
+      <h3>Nutrition</h3>
+      <div class="cmp-cols">
+        <div class="cmp-col">
+          <div class="cmp-tier">Free</div>
+          <ul>
+            <li>Daily calorie &amp; macro targets</li>
+            <li>Food logging</li>
+            <li>Custom foods</li>
+            <li>Basic food database</li>
+            <li>Current 7-day calorie trend</li>
+          </ul>
+        </div>
+        <div class="cmp-col pro">
+          <div class="cmp-tier">Pro</div>
+          <ul>
+            <li>30-day &amp; full-history trends</li>
+            <li>Macro adherence trends</li>
+            <li>Meal copying &amp; full-day copying</li>
+            <li>Saved meals &amp; recipes</li>
+            <li>Barcode scanning</li>
+            <li>Advanced food database</li>
+            <li>Weekly calorie averaging</li>
+            <li>Adjustable calorie cycling</li>
+            <li>Training-day / rest-day targets</li>
+            <li>Nutrition PDF reports</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="cmp-grp">
+      <h3>Training</h3>
+      <div class="cmp-cols">
+        <div class="cmp-col">
+          <div class="cmp-tier">Free</div>
+          <ul>
+            <li>Log unlimited workouts</li>
+            <li>Last session's numbers on every lift</li>
+            <li>Current week / session history</li>
+          </ul>
+        </div>
+        <div class="cmp-col pro">
+          <div class="cmp-tier">Pro</div>
+          <ul>
+            <li>Per-exercise progression charts</li>
+            <li>Full session history</li>
+            <li>Estimated 1RM</li>
+            <li>Personal records</li>
+            <li>Volume &amp; intensity trends</li>
+            <li>Exercise notes</li>
+            <li>Multiple programs</li>
+            <li>Exercise substitutions</li>
+            <li>Deload recommendations</li>
+            <li>Workout PDF export</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="cmp-grp">
+      <h3>General</h3>
+      <div class="cmp-cols">
+        <div class="cmp-col">
+          <div class="cmp-tier">Free</div>
+          <ul>
+            <li>White share card on every page</li>
+            <li>No PDF report export</li>
+            <li>No monthly progress data</li>
+          </ul>
+        </div>
+        <div class="cmp-col pro">
+          <div class="cmp-tier">Pro</div>
+          <ul>
+            <li>Cloud sync</li>
+            <li>Automatic backup</li>
+            <li>Complete PDF export</li>
+            <li>Trainer / client sync</li>
+            <li>Advanced share cards</li>
+          </ul>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Payment -->

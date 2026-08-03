@@ -567,6 +567,12 @@ function isPro(){ return getUserTier() === 'pro'; }
 
 function applyNutritionTierGates(){
   if(isPro()) return;
+  // No PDF export on Free — the button stays tappable and sells Pro.
+  const pdfBtn = document.getElementById('diet-pdf-btn');
+  if(pdfBtn && !/🔒/.test(pdfBtn.textContent)){
+    pdfBtn.textContent = 'Export PDF 🔒';
+    pdfBtn.style.opacity = '0.6';
+  }
   // FREE TIER: keep weekly trend, BLOCK month view
   const monthBtn = document.querySelector('#range-toggle .rng-btn[data-range="30"]');
   if(monthBtn){
@@ -1126,6 +1132,7 @@ function deleteDietPlan(id){
 document.getElementById('save-diet-btn').addEventListener('click',saveDietPlan);
 
 function generateNutritionPDF(){
+  if(!isPro()){ window.location.href='pricing.html'; return; }   // PDF export is Pro
   const jsPDFlib=window.jspdf&&window.jspdf.jsPDF;
   if(!jsPDFlib){ alert('PDF library not loaded. Check your connection.'); return; }
   const dm=getDayMacros(currentDate);
@@ -1837,8 +1844,14 @@ applyNutritionTierGates();
   }
 
   document.getElementById('diet-share-btn').addEventListener('click',openModal);
+  // FREE gets the plain white card only — dark + transparent are Pro.
   document.querySelectorAll('.ds-tbtn').forEach(btn=>{
+    if(btn.dataset.theme!=='light' && !isPro()){
+      btn.style.opacity='0.5';
+      if(!/🔒/.test(btn.textContent)) btn.textContent=btn.textContent.trim()+' 🔒';
+    }
     btn.addEventListener('click',()=>{
+      if(btn.dataset.theme!=='light' && !isPro()){ window.location.href='pricing.html'; return; }
       dsTheme=btn.dataset.theme;
       document.querySelectorAll('.ds-tbtn').forEach(b=>b.classList.toggle('active',b===btn));
       rerender();

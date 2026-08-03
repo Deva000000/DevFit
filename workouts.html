@@ -297,7 +297,7 @@ html.nosplash #devfit-splash{display:none!important}
   <div class="header">
     <img src="logo-header.png" alt="DevFit" class="header-logo" onerror="this.style.display='none'">
     <div>
-      <div class="app-title">DevFit Training</div>
+      <div class="app-title"><span style="font-family:'Inter',system-ui,sans-serif;font-style:italic;font-weight:700;letter-spacing:.005em;"><span style="color:#fff;">DEV</span><span style="color:#cc0000;">FIT</span></span> <span style="color:#fff;">Training</span></div>
       <div class="app-sub">Plan, log, and progress</div>
     </div>
   </div>
@@ -453,10 +453,11 @@ function paywallHTML(featureName){
     <div class="pw-title">${featureName}</div>
     <div class="pw-hook">${hook}</div>
     <div class="pw-list">
-      <div>✓ Per-exercise progression charts</div>
-      <div>✓ Your full session history, every week</div>
+      <div>✓ Per-exercise progression charts &amp; estimated 1RM</div>
+      <div>✓ Full session history + personal records</div>
       <div>✓ True Progress Score &amp; bodyweight trends</div>
-      <div>✓ Weekly + full-program PDF reports</div>
+      <div>✓ Weekly, monthly + full-program PDF reports</div>
+      <div>✓ Every share-card style, not just white</div>
       <div>✓ Auto cloud backup &amp; multi-device sync</div>
     </div>
     <div class="pw-price">Everything unlocked for <b>≈ 66 sen a day</b> · RM19.90/mo · cancel anytime</div>
@@ -472,7 +473,11 @@ function load(){
   try{const raw=localStorage.getItem(KEY);if(raw) return JSON.parse(raw);}catch(e){}
   return {plan:{workouts:[]},sessions:[]};
 }
-function save(){try{localStorage.setItem(KEY,JSON.stringify(data));}catch(e){} if(typeof DevFitDB!=='undefined') DevFitDB.cloudSave('workouts',data);}
+function save(){
+  if(typeof invalidateExNames==='function') invalidateExNames();
+  try{localStorage.setItem(KEY,JSON.stringify(data));}catch(e){}
+  if(typeof DevFitDB!=='undefined') DevFitDB.cloudSave('workouts',data);
+}
 function uid(){return Math.random().toString(36).slice(2,10);}
 function todayStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function escapeHTML(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -688,6 +693,7 @@ document.getElementById('clear-plan-btn').addEventListener('click',clearCurrentP
 document.getElementById('share-plan-btn').addEventListener('click',exportPlanPDF);
 
 function exportPlanPDF(){
+  if(!isPro()){ window.location.href='pricing.html'; return; }   // PDF export is Pro
   const jsPDFlib = window.jspdf && window.jspdf.jsPDF;
   if(!jsPDFlib){ alert('PDF library not loaded. Check your connection and try again.'); return; }
   const workouts=(data.plan.workouts||[]).filter(w=>w.name || (w.exercises&&w.exercises.length));
@@ -842,23 +848,71 @@ function logHasData(log){
   if(!log || !log.sets || !log.sets.length) return false;
   return log.sets.some(s=>(Number(s.reps)||0)>0 || (Number(s.weight)||0)>0 || (Number(s.min)||0)>0 || (Number(s.km)||0)>0);
 }
-// Last time this exercise was actually performed before `beforeDate`.
-// Two things this must NOT do, both of which caused real history to read as
-// "First time logged" while the Progress chart happily showed it:
-//   1. stop at the most recent session that merely CONTAINS the exercise —
-//      if that day was skipped (blank row) we keep walking backwards;
-//   2. refuse to look outside the current workout day — if a lift got moved to
-//      another day, its history follows the lift. Same-day matches still win.
+// ---------- EXERCISE IDENTITY ----------
+// A lift is identified by its NAME, not by the random id the plan editor happened
+// to give it. Ids churn constantly in real use: rebuild the plan for a new block,
+// delete and re-add a row, load a saved routine — every one of those mints fresh
+// ids while the client is still doing the same Close Grip Lat Pulldown. Matching
+// on id alone silently orphans months of history.
+function exKey(name){
+  return String(name||'')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g,' ')   // punctuation/spacing differences don't matter
+    .trim();
+}
+// exId → exercise name, rebuilt from every place a name has ever been recorded:
+// the live plan, saved plans in the library, archived mesocycles, and (for data
+// logged from v4.66 on) the name stamped onto the log row itself.
+let _exNameCache=null;
+function exNameIndex(){
+  if(_exNameCache) return _exNameCache;
+  const m=new Map();
+  const eat=wks=>(wks||[]).forEach(w=>(w.exercises||[]).forEach(e=>{
+    if(e && e.id && e.name && !m.has(e.id)) m.set(e.id,e.name);
+  }));
+  eat(data.plan && data.plan.workouts);
+  (data.planLibrary||[]).forEach(p=>eat(p.plan && p.plan.workouts));
+  (data.cycleArchive||[]).forEach(a=>(a.sessions||[]).forEach(s=>(s.logs||[]).forEach(l=>{
+    if(l && l.exId && l.name && !m.has(l.exId)) m.set(l.exId,l.name);
+  })));
+  (data.sessions||[]).forEach(s=>(s.logs||[]).forEach(l=>{
+    if(l && l.exId && l.name && !m.has(l.exId)) m.set(l.exId,l.name);
+  }));
+  _exNameCache=m;
+  return m;
+}
+function invalidateExNames(){ _exNameCache=null; }
+// Does this log row refer to the same exercise? Same id, or same name.
+function logIsExercise(log,exId,key){
+  if(!log) return false;
+  if(log.exId===exId) return true;
+  if(!key) return false;
+  const nm = log.name || exNameIndex().get(log.exId);
+  return !!nm && exKey(nm)===key;
+}
+// Last time this exercise was actually performed before `beforeDate`. Never
+// returns a blank row, never gives up because the gap was long, and never loses
+// the thread when ids change underneath it. Preference order, best first:
+//   1. same workout day + same exercise id   (the normal week-to-week case)
+//   2. any workout day + same exercise id    (lift was moved between days)
+//   3. any workout day + same exercise name  (plan rebuilt, ids regenerated)
+// Within each tier the most recent session wins, however many months back it is.
 function lastSessionFor(wId,exId,beforeDate){
+  const key=exKey(exNameIndex().get(exId)||'');
   const older=data.sessions.filter(s=>s.date<beforeDate).sort((a,b)=>b.date.localeCompare(a.date));
-  let crossDay=null;
+  let sameId=null, byName=null;
   for(const s of older){
-    const log=(s.logs||[]).find(l=>l.exId===exId);
-    if(!logHasData(log)) continue;
-    if(s.workoutId===wId) return {session:s,log};
-    if(!crossDay) crossDay={session:s,log};
+    for(const log of (s.logs||[])){
+      if(!logHasData(log)) continue;
+      if(log.exId===exId){
+        if(s.workoutId===wId) return {session:s,log};   // tier 1 — can't be beaten
+        if(!sameId) sameId={session:s,log};             // tier 2
+      } else if(!byName && logIsExercise(log,exId,key)){
+        byName={session:s,log};                          // tier 3
+      }
+    }
   }
-  return crossDay;
+  return sameId || byName;
 }
 // Estimated 1-rep max (Epley). Captures BOTH weight and reps so that e.g.
 // 30kg×10 correctly scores higher than 32.5kg×4. Bodyweight sets (no weight)
@@ -909,9 +963,12 @@ function isTimedActivity(name){ return activityCategory(name)!=='distance'; }
 // "+ Cardio" button without needing a magic keyword.
 function exIsCardio(ex){ return !!ex && (ex.type==='cardio' || isCardio(ex.name)); }
 // One log "set" for cardio holds {min, km}; pace is derived.
+// The exercise NAME is stamped onto every log row. Ids are regenerated whenever a
+// plan is rebuilt, so the name is the only durable link back to the lift — without
+// it, a fresh plan means a client's history stops being findable.
 function freshLog(ex){
-  if(exIsCardio(ex)) return {exId:ex.id, sets:[{min:'',km:''}]};
-  return {exId:ex.id, sets:Array.from({length:Number(ex.tSets)||3},()=>({reps:'',weight:''}))};
+  if(exIsCardio(ex)) return {exId:ex.id, name:ex.name||'', sets:[{min:'',km:''}]};
+  return {exId:ex.id, name:ex.name||'', sets:Array.from({length:Number(ex.tSets)||3},()=>({reps:'',weight:''}))};
 }
 function cardioPace(min,km){
   const m=Number(min)||0, d=Number(km)||0;
@@ -1319,11 +1376,13 @@ function renderLog(jumpToLast){
     sess={id:uid(),date,workoutId:wId,logs:w.exercises.map(ex=>freshLog(ex)),notes:''};
     currentSession={sess,isNew:true};
   } else {
+    let dirty=false;
     w.exercises.forEach(ex=>{
-      if(!sess.logs.find(l=>l.exId===ex.id)){
-        sess.logs.push(freshLog(ex));
-      }
+      const l=sess.logs.find(l=>l.exId===ex.id);
+      if(!l){ sess.logs.push(freshLog(ex)); dirty=true; }
+      else if(!l.name && ex.name){ l.name=ex.name; dirty=true; }   // backfill older rows
     });
+    if(dirty) save();   // one-time write; after this the rows carry their names
     currentSession={sess,isNew:false};
   }
 
@@ -1559,9 +1618,12 @@ function drawProgressChart(){
   const exId=document.getElementById('prog-ex').value;
   const content=document.getElementById('prog-content');
   if(!exId){content.innerHTML='';return;}
+  // Same identity rules as the log page's "Last" — id first, then name — so the
+  // chart and the log can never disagree about what counts as this exercise.
+  const key=exKey(exNameIndex().get(exId)||'');
   const points=[];
   data.sessions.forEach(s=>{
-    const log=s.logs.find(l=>l.exId===exId);
+    const log=(s.logs||[]).find(l=>logIsExercise(l,exId,key));
     if(!log) return;
     const best=bestSet(log.sets), vol=totalVolume(log.sets);
     if(best) points.push({date:s.date,w:best.w,r:best.r,e:Math.round(best.e),vol});
@@ -1641,34 +1703,32 @@ function rerenderShareCard(){
   document.getElementById('share-preview-img').src=dataURL;
 }
 
-// Theme picker — gate "transparent" behind Pro
+// Theme picker — FREE gets the plain white card only; dark + transparent are Pro.
+// The check lives INSIDE the handler on purpose: a second "gate" listener added
+// later can't reliably pre-empt this one (during the at-target phase listeners
+// fire in registration order, capture flag or not), so the guard has to be here.
 document.querySelectorAll('.theme-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
-    if(btn.dataset.theme === 'transparent' && !isPro()){
-      const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
-      const msg = encodeURIComponent('Hi, I\'d like to upgrade DevFit to Pro. My account: ' + (u.email||'(my email)'));
-      if(confirm('Transparent share card is a Pro feature. Open WhatsApp to upgrade?')){
-        window.open('https://wa.me/60183679177?text=' + msg, '_blank');
-      }
-      return;
-    }
+    if(btn.dataset.theme !== 'light' && !isPro()){ window.location.href='pricing.html'; return; }
     currentShareTheme = btn.dataset.theme;
     document.querySelectorAll('.theme-btn').forEach(b=>b.classList.toggle('active', b===btn));
     rerenderShareCard();
   });
 });
 
-// Visually mark transparent button as locked for free users
-(function lockTransparentForFree(){
+// Mark the Pro-only surfaces as locked for free users.
+(function markFreeLocks(){
   if(isPro()) return;
-  const tBtn = document.querySelector('.theme-btn[data-theme="transparent"]');
-  if(tBtn){
-    tBtn.style.opacity = '0.5';
-    tBtn.innerHTML = 'Transparent 🔒';
-  }
+  document.querySelectorAll('.theme-btn').forEach(btn=>{
+    if(btn.dataset.theme === 'light') return;
+    btn.style.opacity = '0.5';
+    if(!/🔒/.test(btn.textContent)) btn.textContent = btn.textContent.trim() + ' 🔒';
+  });
+  const pdf = document.getElementById('share-plan-btn');
+  if(pdf){ pdf.textContent = '⤓ Share Program PDF 🔒'; pdf.style.opacity = '0.6'; }
   // Hide compare-progress UI for free
-  const compareEls = document.querySelectorAll('[data-pro-compare], #progress-compare, .compare-progress');
-  compareEls.forEach(el => el.style.display = 'none');
+  document.querySelectorAll('[data-pro-compare], #progress-compare, .compare-progress')
+    .forEach(el => el.style.display = 'none');
 })();
 
 // MINIMAL HEVY-STYLE SHARE CARD
@@ -2178,6 +2238,7 @@ body{padding-bottom:104px!important}
 if(typeof DevFitDB!=='undefined'){
   DevFitDB.cloudSync('workouts','devfitTrainingV1',function(d){
     data=d;
+    if(typeof invalidateExNames==='function') invalidateExNames();
     if(typeof renderLog==='function') renderLog();
     if(typeof renderMesoCard==='function') renderMesoCard();
   });

@@ -174,6 +174,21 @@
   .lib-del:hover{color:#cc0000}
   .lib-empty{font-size:12px;color:rgba(255,255,255,0.72);font-style:italic;padding:6px 2px}
   .lib-hint{font-size:11px;color:#aaa;margin-top:8px;line-height:1.4}
+  .meso-state{font-size:12px;color:rgba(255,255,255,0.72);margin-bottom:10px;line-height:1.45}
+
+  /* PAYWALL CARD — class-based on purpose. Inline colours here get remapped by the
+     light-theme inline-style rules in theme.css, which turned the white text on this
+     permanently-dark card invisible. */
+  .pw-card{background:linear-gradient(135deg,#1a0000,#2a0000);border:1px solid #cc0000;border-radius:14px;padding:24px;text-align:center;margin:8px 0}
+  .pw-kicker{font-size:11px;font-weight:800;letter-spacing:.08em;color:#ff8888;margin-bottom:8px}
+  .pw-title{font-size:16px;color:#fff;font-weight:800;margin-bottom:8px}
+  .pw-hook{font-size:13px;color:#d8d2cc;line-height:1.6;margin-bottom:12px}
+  .pw-hook b,.pw-price b{color:#fff}
+  .pw-list{font-size:12.5px;color:#d8d2cc;line-height:1.75;text-align:left;max-width:270px;margin:0 auto 14px}
+  .pw-price{font-size:12px;color:#a89e94;margin-bottom:14px}
+  .pw-cta{display:inline-block;background:#cc0000;color:#fff;text-decoration:none;padding:10px 22px;border-radius:20px;font-weight:700;font-size:13px}
+  .pw-cta:hover{background:#a30000;color:#fff}
+  .pw-foot{font-size:11px;color:#a89e94;margin-top:11px;line-height:1.5}
 
   /* RESET HISTORY BUTTON */
   .reset-btn{width:100%;background:transparent;border:1px solid rgba(255,255,255,0.14);color:rgba(255,255,255,0.72);border-radius:var(--radius);padding:9px;font-family:'DM Sans',system-ui,sans-serif;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;margin-top:8px;transition:all .15s}
@@ -343,6 +358,15 @@ html.nosplash #devfit-splash{display:none!important}
       <div class="lib-hint">Save your routine under a name — keep several mesocycles, or build a client's plan, share the PDF, then load your own back.</div>
     </div>
     <div class="card">
+      <div class="section-label">New mesocycle</div>
+      <div id="meso-state" class="meso-state"></div>
+      <button class="lib-btn save" id="new-meso-btn" type="button" style="width:100%">↻ Start a new mesocycle</button>
+      <div class="lib-hint">Archives every logged session, clears the “Last” comparisons and progression charts, and restarts the week counter — so the new block starts from a clean slate. Your plan and saved routines stay. The archive can be restored if you tap it by mistake.</div>
+      <div id="meso-restore-wrap" style="display:none;margin-top:10px">
+        <button class="lib-btn clear" id="restore-meso-btn" type="button" style="width:100%">⤺ Undo — restore archived sessions</button>
+      </div>
+    </div>
+    <div class="card">
       <div class="section-label">Summary / coach notes</div>
       <textarea id="plan-notes" class="inp" rows="3" placeholder="Add any guidance — warm-up, rest times, progression rules, cardio, diet reminders…" style="resize:vertical;min-height:70px;font-family:'DM Sans',system-ui,sans-serif"></textarea>
       <button class="share-btn" id="share-plan-btn" style="margin-top:12px">⤓ Share Program PDF</button>
@@ -422,22 +446,22 @@ function paywallHTML(featureName){
   let n=0;
   try{ n=((data && data.sessions)||[]).length; }catch(e){}
   const hook = n>1
-    ? `You've logged <b style="color:#fff">${n} sessions</b>. This chart turns them into a strength curve — every lift, week over week, so you can see what's climbing and what's stalled.`
+    ? `You've logged <b>${n} sessions</b>. This chart turns them into a strength curve — every lift, week over week, so you can see what's climbing and what's stalled.`
     : `Every session you log becomes a strength curve here — lift by lift, week over week, so you can see what's climbing and what's stalled.`;
-  return `<div style="background:linear-gradient(135deg,#1a0000,#2a0000);border:1px solid #cc0000;border-radius:14px;padding:24px;text-align:center;margin:8px 0">
-    <div style="font-size:11px;font-weight:800;letter-spacing:.08em;color:#ff8888;margin-bottom:8px">PRO FEATURE</div>
-    <div style="font-size:16px;color:#fff;font-weight:800;margin-bottom:8px">${featureName}</div>
-    <div style="font-size:13px;color:#ccc;line-height:1.6;margin-bottom:12px">${hook}</div>
-    <div style="font-size:12.5px;color:#ccc;line-height:1.75;text-align:left;max-width:270px;margin:0 auto 14px">
+  return `<div class="pw-card">
+    <div class="pw-kicker">PRO FEATURE</div>
+    <div class="pw-title">${featureName}</div>
+    <div class="pw-hook">${hook}</div>
+    <div class="pw-list">
       <div>✓ Per-exercise progression charts</div>
       <div>✓ Your full session history, every week</div>
       <div>✓ True Progress Score &amp; bodyweight trends</div>
       <div>✓ Weekly + full-program PDF reports</div>
       <div>✓ Auto cloud backup &amp; multi-device sync</div>
     </div>
-    <div style="font-size:12px;color:#888;margin-bottom:14px">Everything unlocked for <b style="color:#fff">≈ 66 sen a day</b> · RM19.90/mo · cancel anytime</div>
-    <a href="pricing.html" style="display:inline-block;background:#cc0000;color:#fff;text-decoration:none;padding:10px 22px;border-radius:20px;font-weight:700;font-size:13px">Unlock Pro — RM19.90/mo →</a>
-    <div style="font-size:11px;color:#888;margin-top:11px;line-height:1.5">DuitNow QR from any bank or e-wallet · activated within 24 hours</div>
+    <div class="pw-price">Everything unlocked for <b>≈ 66 sen a day</b> · RM19.90/mo · cancel anytime</div>
+    <a href="pricing.html" class="pw-cta">Unlock Pro — RM19.90/mo →</a>
+    <div class="pw-foot">DuitNow QR from any bank or e-wallet · activated within 24 hours</div>
   </div>`;
 }
 
@@ -465,7 +489,7 @@ document.querySelectorAll('.mode-btn').forEach(btn=>{
     document.getElementById('view-plan').style.display    = currentMode==='plan'?'':'none';
     document.getElementById('view-progress').style.display= currentMode==='progress'?'':'none';
     if(currentMode==='log')      renderLog(true);
-    if(currentMode==='plan')   { renderPlan(); loadPlanMeta(); renderPlanLibrary(); }
+    if(currentMode==='plan')   { renderPlan(); loadPlanMeta(); renderPlanLibrary(); renderMesoCard(); }
     if(currentMode==='progress') renderProgressView();
   });
 });
@@ -810,13 +834,31 @@ function exportPlanPDF(){
 let currentSession=null;
 
 function findSession(date,wId){return data.sessions.find(s=>s.date===date && s.workoutId===wId);}
+// A log ROW exists for every exercise in the day the moment any field on that day
+// is touched — so "has a sets array" is NOT the same as "was actually performed".
+// Skipping one lift used to leave a blank row behind, and that blank row was the
+// thing "Last" landed on. Only rows with a real number count as history.
+function logHasData(log){
+  if(!log || !log.sets || !log.sets.length) return false;
+  return log.sets.some(s=>(Number(s.reps)||0)>0 || (Number(s.weight)||0)>0 || (Number(s.min)||0)>0 || (Number(s.km)||0)>0);
+}
+// Last time this exercise was actually performed before `beforeDate`.
+// Two things this must NOT do, both of which caused real history to read as
+// "First time logged" while the Progress chart happily showed it:
+//   1. stop at the most recent session that merely CONTAINS the exercise —
+//      if that day was skipped (blank row) we keep walking backwards;
+//   2. refuse to look outside the current workout day — if a lift got moved to
+//      another day, its history follows the lift. Same-day matches still win.
 function lastSessionFor(wId,exId,beforeDate){
-  const matches=data.sessions.filter(s=>s.workoutId===wId && s.date<beforeDate).sort((a,b)=>b.date.localeCompare(a.date));
-  for(const s of matches){
-    const log=s.logs.find(l=>l.exId===exId);
-    if(log && log.sets && log.sets.length) return {session:s,log};
+  const older=data.sessions.filter(s=>s.date<beforeDate).sort((a,b)=>b.date.localeCompare(a.date));
+  let crossDay=null;
+  for(const s of older){
+    const log=(s.logs||[]).find(l=>l.exId===exId);
+    if(!logHasData(log)) continue;
+    if(s.workoutId===wId) return {session:s,log};
+    if(!crossDay) crossDay={session:s,log};
   }
-  return null;
+  return crossDay;
 }
 // Estimated 1-rep max (Epley). Captures BOTH weight and reps so that e.g.
 // 30kg×10 correctly scores higher than 32.5kg×4. Bodyweight sets (no weight)
@@ -1112,13 +1154,107 @@ function autoPickWorkout(date){
 document.getElementById('reset-history-btn').addEventListener('click',()=>{
   const n=data.sessions.length;
   if(!n){toast('No logged sessions to clear');return;}
-  if(!confirm('Delete ALL '+n+' logged session'+(n>1?'s':'')+'?\n\nYour workout plan stays. Progress history and "Last" comparisons will be cleared. This cannot be undone.')) return;
+  if(!confirm('Delete ALL '+n+' logged session'+(n>1?'s':'')+' permanently?\n\nYour workout plan stays. Progress history and "Last" comparisons will be cleared. This cannot be undone.\n\nStarting a new block instead? Edit Plan → “Start a new mesocycle” does the same thing but keeps a restorable archive.')) return;
   data.sessions=[];
   currentSession=null;
   save();
   renderLog();
   if(currentMode==='progress') renderProgressView();
   toast('Session history cleared');
+});
+
+// ---------- NEW MESOCYCLE ----------
+// Starting a new block means the old numbers have to get out of the way: "Last"
+// comparisons, progression charts and week counting all have to start over, or
+// week 1 of the new meso reads as a huge regression against the peak of the old
+// one. Destructive by nature, so the sessions are archived rather than dropped
+// and a single tap puts them back.
+function getCycleArchive(){ if(!Array.isArray(data.cycleArchive)) data.cycleArchive=[]; return data.cycleArchive; }
+function readProgramStart(){
+  try{ return JSON.parse(localStorage.getItem('progressLog2')||'{}').programStart||null; }catch(e){ return null; }
+}
+function writeProgramStart(val){
+  try{
+    const pl=JSON.parse(localStorage.getItem('progressLog2')||'{}');
+    if(val) pl.programStart=val; else delete pl.programStart;
+    localStorage.setItem('progressLog2',JSON.stringify(pl));
+    if(typeof DevFitDB!=='undefined') DevFitDB.cloudSave('progress',pl);
+    return true;
+  }catch(e){ return false; }
+}
+function renderMesoCard(){
+  const st=document.getElementById('meso-state');
+  const wrap=document.getElementById('meso-restore-wrap');
+  if(!st) return;
+  const n=data.sessions.length;
+  const dates=data.sessions.map(s=>s.date).sort();
+  st.textContent = n
+    ? n+' logged session'+(n>1?'s':'')+' in the current block'+(dates.length?' · '+dates[0]+' → '+dates[dates.length-1]:'')
+    : 'No sessions logged yet — nothing to archive.';
+  const arch=getCycleArchive();
+  if(wrap){
+    wrap.style.display = arch.length ? 'block' : 'none';
+    const b=document.getElementById('restore-meso-btn');
+    if(b && arch.length) b.textContent='⤺ Undo — restore '+arch[0].count+' archived session'+(arch[0].count>1?'s':'');
+  }
+}
+document.getElementById('new-meso-btn').addEventListener('click',()=>{
+  const n=data.sessions.length;
+  if(!n){ toast('No logged sessions to archive'); return; }
+  const dates=data.sessions.map(s=>s.date).sort();
+  if(!confirm(
+    'Start a new mesocycle?\n\n'+
+    '• '+n+' logged session'+(n>1?'s':'')+' ('+dates[0]+' → '+dates[dates.length-1]+') are archived and cleared\n'+
+    '• “Last” comparisons and progression charts start from zero\n'+
+    '• Your workout plan and saved plans are untouched\n\n'+
+    'You can undo this straight afterwards.'
+  )) return;
+
+  const oldStart=readProgramStart();
+  let newStart=null;
+  if(confirm(
+    'Also restart the week counter at Week 1 from today?\n\n'+
+    'OK = today becomes week 1 everywhere (Training, Progress, Nutrition all share one date anchor, so your existing weight & nutrition weeks get re-numbered too).\n\n'+
+    'Cancel = keep the current program dates and only clear the workout logs.'
+  )){
+    newStart=todayStr();
+  }
+
+  const arch=getCycleArchive();
+  arch.unshift({
+    id:uid(),
+    name:(data.plan.name||'Mesocycle').slice(0,50),
+    savedAt:Date.now(),
+    from:dates[0], to:dates[dates.length-1], count:n,
+    programStart:oldStart,
+    restartedWeeks:!!newStart,
+    sessions:JSON.parse(JSON.stringify(data.sessions))
+  });
+  data.cycleArchive=arch.slice(0,5);   // keep storage sane
+  data.sessions=[];
+  currentSession=null;
+  if(newStart) writeProgramStart(newStart);
+  save();
+  renderLog();
+  renderMesoCard();
+  if(currentMode==='progress') renderProgressView();
+  toast(newStart?'New mesocycle — week 1 starts today':'New mesocycle started');
+});
+document.getElementById('restore-meso-btn').addEventListener('click',()=>{
+  const arch=getCycleArchive();
+  if(!arch.length) return;
+  const a=arch[0];
+  if(!confirm('Restore '+a.count+' archived session'+(a.count>1?'s':'')+' ('+a.from+' → '+a.to+')?\n\nThey are merged back into your logged history.')) return;
+  const have=new Set(data.sessions.map(s=>s.id));
+  (a.sessions||[]).forEach(s=>{ if(!have.has(s.id)) data.sessions.push(s); });
+  if(a.restartedWeeks) writeProgramStart(a.programStart);
+  data.cycleArchive=arch.slice(1);
+  currentSession=null;
+  save();
+  renderLog();
+  renderMesoCard();
+  if(currentMode==='progress') renderProgressView();
+  toast('Sessions restored');
 });
 
 // Delete ONLY the currently-viewed day's log (the clean way to remove a test entry).
@@ -2043,6 +2179,7 @@ if(typeof DevFitDB!=='undefined'){
   DevFitDB.cloudSync('workouts','devfitTrainingV1',function(d){
     data=d;
     if(typeof renderLog==='function') renderLog();
+    if(typeof renderMesoCard==='function') renderMesoCard();
   });
 }
 </script>

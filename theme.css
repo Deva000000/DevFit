@@ -668,6 +668,16 @@ html[data-theme="light"] .session-empty{
 }
 html[data-theme="light"] .reset-btn{border-color:rgba(20,15,10,0.18) !important;color:#6a6157 !important;}
 html[data-theme="light"] .reset-btn:hover{border-color:#cc0000 !important;color:#cc0000 !important;}
+/* Session date pill — white text on a translucent-white chip, i.e. an empty-looking
+   box on the light page. Give it a real surface and dark ink, and stop inverting
+   the native calendar icon (inverted = white icon on white). */
+html[data-theme="light"] input.log-date{
+  background:#ffffff !important;
+  color:#14110e !important;
+  border-color:rgba(20,15,10,0.16) !important;
+}
+html[data-theme="light"] input.log-date::-webkit-calendar-picker-indicator{filter:none !important;opacity:.75;}
+html[data-theme="light"] .meso-state{color:#3a352f !important;}
 
 /* First-run welcome card — kept #111 on the light page, and its emoji/heading
    inherited the light body ink straight onto that dark surface. */

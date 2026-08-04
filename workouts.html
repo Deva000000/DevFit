@@ -497,19 +497,84 @@ function paywallHTML(featureName){
 }
 
 const KEY='devfitTrainingV1';
-let data=load();
 
+// ---------- LOCAL SAFETY NET ----------
+// This device is the only copy now, so the two ways storage silently eats a
+// training history both have to be closed off.
+//
+// 1. Unreadable data must never become an empty document. The old load() caught a
+//    JSON parse failure and returned {sessions:[]} — and the next keystroke saved
+//    that empty object straight over the top. One unreadable byte turned into a
+//    permanent wipe with no message.
+// 2. Any write that REMOVES sessions takes a snapshot of what was there first, so
+//    a destructive change is always recoverable from the device itself.
+const SNAP_KEY=KEY+'__safety';
+const QUAR_KEY=KEY+'__unreadable';
+let loadFailed=false, saveWarned=false;
+function snapshots(){
+  try{ const a=JSON.parse(localStorage.getItem(SNAP_KEY)||'[]'); return Array.isArray(a)?a:[]; }
+  catch(e){ return []; }
+}
 function load(){
-  try{const raw=localStorage.getItem(KEY);if(raw) return JSON.parse(raw);}catch(e){}
+  let raw=null;
+  try{ raw=localStorage.getItem(KEY); }catch(e){}
+  if(raw){
+    try{ return JSON.parse(raw); }catch(e){
+      // Keep the unreadable bytes — they are the only copy, and a human can often
+      // still pull numbers out of them. Then try the newest safety snapshot.
+      try{ localStorage.setItem(QUAR_KEY,raw); }catch(_){}
+      for(const s of snapshots()){
+        try{ const d=JSON.parse(s.raw); console.warn('[DevFit] recovered from snapshot',new Date(s.ts)); return d; }catch(_){}
+      }
+      // Nothing readable anywhere. Come up empty but REFUSE to save over the
+      // original, so whatever is still in storage stays recoverable.
+      loadFailed=true;
+      setTimeout(()=>{ try{ alert('DevFit could not read your saved training data on this device.\n\nTo protect it, saving is paused — nothing will be overwritten. Go to Settings → Export backup file, then send it over so it can be recovered.'); }catch(_){} },600);
+    }
+  }
   return {plan:{workouts:[]},sessions:[]};
 }
+// Called before every write. Cheap in the normal case: it only copies anything
+// when the session count is about to go DOWN.
+function safetySnapshot(){
+  try{
+    const raw=localStorage.getItem(KEY);
+    if(!raw) return;
+    const before=(JSON.parse(raw).sessions||[]).length;
+    const after=(data.sessions||[]).length;
+    if(after>=before) return;                    // nothing is being lost
+    const snaps=snapshots();
+    snaps.unshift({ts:Date.now(),sessions:before,raw});
+    localStorage.setItem(SNAP_KEY,JSON.stringify(snaps.slice(0,3)));
+  }catch(e){ /* corrupt or full — never let the snapshot block the real save */ }
+}
+
+// Declared after load() is defined but BEFORE it runs: the failure path touches
+// loadFailed and the quarantine key, and a temporal-dead-zone error thrown from
+// inside a catch block would take the whole page down.
+let data=load();
 function save(){
   if(typeof invalidateExNames==='function') invalidateExNames();
   // Stamp the day being edited. The cloud merge unions sessions from every
   // device, so it needs to know a session was touched just now — that is what
   // lets a real edit outrank a delete that happened elsewhere earlier.
   try{ if(currentSession && currentSession.sess) currentSession.sess.mts=Date.now(); }catch(e){}
-  try{localStorage.setItem(KEY,JSON.stringify(data));}catch(e){}
+  // Storage held data we could not read. Writing now would destroy it.
+  if(loadFailed) return;
+  safetySnapshot();
+  try{
+    localStorage.setItem(KEY,JSON.stringify(data));
+  }catch(e){
+    // Full or blocked. This used to be swallowed, so the user logged a whole
+    // session, watched the numbers appear, and lost the lot on reload with no
+    // warning at any point.
+    if(!saveWarned){
+      saveWarned=true;
+      try{ alert('Could not save to this device — storage may be full, or private browsing is blocking it.\n\nWhat you just logged is on screen but NOT saved. Free up space, then re-enter it.'); }catch(_){}
+    }
+    return;
+  }
+  saveWarned=false;
   if(typeof DevFitDB!=='undefined') DevFitDB.cloudSave('workouts',data);
 }
 // Deleting has to be explicit, because sync merges rather than overwrites: a day

@@ -31,6 +31,26 @@
 (function (global) {
   'use strict';
 
+  // ══ CLOUD DATA SYNC IS OFF ═══════════════════════════════════════════════
+  // Deliberate product decision (v4.69.0), not a bug: training/nutrition/progress
+  // data now lives ONLY in localStorage on the user's own device. One shared
+  // Supabase row was a single point of failure across every client at once, and a
+  // single bad write to it was unrecoverable because the row has no history.
+  //
+  // What replaces it, on-device and with no network involved:
+  //   • a safety snapshot taken before any write that would REMOVE sessions, so a
+  //     destructive change is always recoverable (Settings → Recover)
+  //   • Export/Import backup file, which the user controls
+  //
+  // The whole sync implementation below is left intact and inert. Flipping this
+  // one flag back to true restores it — and it is now merge-based, so it can no
+  // longer overwrite a good copy with a stale one.
+  //
+  // NOTE: this switch covers app DATA only. Login and Pro verification still talk
+  // to the server (devfit-auth.js → /api/verify); without that there is no way to
+  // check a subscription at all.
+  const CLOUD_SYNC_ENABLED = false;
+
   const DATA_API = '/api/data';
 
   // dataType → the localStorage key holding that document.
@@ -40,7 +60,10 @@
     workouts: 'devfitTrainingV1'
   };
 
+  // With sync off this returns '' for every caller, which every entry point below
+  // already treats as "stay local" — the same path used when a user is offline.
   function getToken() {
+    if (!CLOUD_SYNC_ENABLED) return '';
     try { return localStorage.getItem('devfit_token') || ''; } catch (e) { return ''; }
   }
   function getEmail() {
@@ -283,6 +306,7 @@
 
   // ── Sync indicator dot (injected into header automatically) ──────────────
   function injectDot() {
+    if (!CLOUD_SYNC_ENABLED) return;   // nothing syncs, so no status to report
     if (document.getElementById('devfit-cloud-dot')) return;
     const header = document.querySelector('.header') || document.querySelector('header');
     if (!header) return;
@@ -443,6 +467,7 @@
    * Returns { ok, updated, reason? }.
    */
   async function forceSyncAll() {
+    if (!CLOUD_SYNC_ENABLED) return { ok: false, reason: 'Cloud sync is off — your data is saved on this device', off: true };
     if (!getToken()) return { ok: false, reason: 'Not signed in' };
     setIndicator('syncing');
     try {
@@ -533,6 +558,7 @@
     setIndicator: setIndicator,
     backupPrefs: backupPrefs,
     restorePrefs: restorePrefs,
+    enabled: CLOUD_SYNC_ENABLED,
     // Exposed so the training page can reuse the exact identity rules the merge
     // uses when it repairs id-orphaned rows locally.
     _merge: mergeDoc

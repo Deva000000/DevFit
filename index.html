@@ -1256,10 +1256,22 @@ function drawTeaserSparkline(){
   pts.forEach(function(v,i){ var p=xy(v,i); ctx.beginPath(); ctx.arc(p[0],p[1],3.2,0,Math.PI*2); ctx.fillStyle='#4ade80'; ctx.fill(); });
 }
 
+// Unreadable data must never silently become a blank program — save() would then
+// write that blank over the only copy on the device. Quarantine and stop writing.
+let loadFailed=false, saveWarned=false;
 function loadData(){
   try{
     const s=localStorage.getItem('progressLog2');
-    if(s){ appData=JSON.parse(s); totalWeeks=appData.bw.length||4; }
+    if(s){
+      try{ appData=JSON.parse(s); }
+      catch(parseErr){
+        try{ localStorage.setItem('progressLog2__unreadable',s); }catch(_){}
+        loadFailed=true;
+        setTimeout(()=>{ try{ alert('DevFit could not read your saved progress data on this device.\n\nSaving is paused so nothing gets overwritten. Go to Settings → Export backup file and send it over to recover it.'); }catch(_){} },600);
+        return;
+      }
+      totalWeeks=(appData.bw&&appData.bw.length)||4;
+    }
     // Pro → restore full history + open on the current week; Free → single rolling
     // week (non-destructive: Pro history is preserved for re-upgrade).
     reconcileTierWeeks();
@@ -1331,7 +1343,17 @@ function save(){
   appData.programDuration=document.getElementById('programDuration').value;
   const _ts=document.getElementById('targetSteps'); if(_ts) appData.targetSteps=_ts.value;
   const _sl=document.getElementById('targetSleep'); if(_sl) appData.targetSleep=_sl.value;
-  try{localStorage.setItem('progressLog2',JSON.stringify(appData));}catch(e){}
+  if(loadFailed) return;   // storage holds data we could not read — do not clobber it
+  try{
+    localStorage.setItem('progressLog2',JSON.stringify(appData));
+  }catch(e){
+    if(!saveWarned){
+      saveWarned=true;
+      try{ alert('Could not save to this device — storage may be full, or private browsing is blocking it.\n\nYour latest changes are on screen but NOT saved. Free up space, then re-enter them.'); }catch(_){}
+    }
+    return;
+  }
+  saveWarned=false;
   if(typeof DevFitDB!=='undefined') DevFitDB.cloudSave('progress',appData);
 }
 

@@ -131,6 +131,11 @@
   .log-ex-meta{font-size:10px;color:#666;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;font-weight:600}
   .log-ex-target{display:inline-block;background:#fef2f2;color:#991b1b;border-radius:10px;padding:2px 8px;font-size:10px;font-weight:700;margin-right:6px}
   .log-ex-last{display:inline-block;background:#f1f5f9;color:#475569;border-radius:10px;padding:2px 8px;font-size:10px;font-weight:700}
+  /* Orphaned history. .log-ex is a white card in BOTH themes, so this stays on the dark ink ramp. */
+  .orphan-row{display:flex;justify-content:space-between;gap:10px;align-items:baseline;padding:5px 0;border-top:1px solid var(--bd)}
+  .orphan-name{font-family:'DM Sans',system-ui,sans-serif;font-size:12px;font-weight:700;color:#111}
+  .orphan-sets{font-size:11px;font-weight:700;color:#475569;text-align:right;white-space:nowrap}
+  .orphan-note{font-size:10px;color:#666;margin-top:7px;line-height:1.45}
 
   .sets-grid{display:grid;grid-template-columns:32px 1fr 1fr 1fr 28px;gap:6px;align-items:center;margin-top:6px}
   .sets-grid .h{font-size:9px;color:#94a3b8;font-weight:700;text-align:center;text-transform:uppercase;letter-spacing:.04em}
@@ -500,8 +505,26 @@ function load(){
 }
 function save(){
   if(typeof invalidateExNames==='function') invalidateExNames();
+  // Stamp the day being edited. The cloud merge unions sessions from every
+  // device, so it needs to know a session was touched just now — that is what
+  // lets a real edit outrank a delete that happened elsewhere earlier.
+  try{ if(currentSession && currentSession.sess) currentSession.sess.mts=Date.now(); }catch(e){}
   try{localStorage.setItem(KEY,JSON.stringify(data));}catch(e){}
   if(typeof DevFitDB!=='undefined') DevFitDB.cloudSave('workouts',data);
+}
+// Deleting has to be explicit, because sync merges rather than overwrites: a day
+// that simply went missing from one device is treated as "that device hasn't seen
+// it yet" and comes back. A tombstone is how we say we meant it.
+function tombstone(list){
+  if(!Array.isArray(data._deleted)) data._deleted=[];
+  const now=Date.now();
+  (list||[]).forEach(s=>{ if(s && s.date) data._deleted.unshift({k:s.date+'|'+(s.workoutId||''),ts:now}); });
+  data._deleted=data._deleted.slice(0,400);
+}
+function untombstone(list){
+  if(!Array.isArray(data._deleted)) return;
+  const keys=new Set((list||[]).map(s=>s.date+'|'+(s.workoutId||'')));
+  data._deleted=data._deleted.filter(t=>!keys.has(t.k));
 }
 function uid(){return Math.random().toString(36).slice(2,10);}
 function todayStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
@@ -864,7 +887,32 @@ function exportPlanPDF(){
 // ---------- LOG VIEW ----------
 let currentSession=null;
 
-function findSession(date,wId){return data.sessions.find(s=>s.date===date && s.workoutId===wId);}
+// The day's session for a workout. Workout ids churn exactly like exercise ids do
+// — rebuild the plan, load a saved routine, delete and re-add a day — and the
+// session logged yesterday stops "belonging" to anything on screen. Matching on
+// id alone made a logged day look untouched, and then a brand-new empty session
+// was written for the same date on top of it. Same rule as everywhere else in
+// this file: id first, then name, and re-link permanently once found.
+let _relinked=false;
+function findSession(date,wId){
+  const sameDay=data.sessions.filter(s=>s.date===date);
+  if(!sameDay.length) return null;
+  const byId=sameDay.find(s=>s.workoutId===wId);
+  if(byId) return byId;
+  const w=data.plan.workouts.find(x=>x.id===wId);
+  const key=exKey((w&&w.name)||'');
+  if(!key) return null;
+  // Only adopt a session that isn't already spoken for by a workout still in the plan.
+  const live=new Set(data.plan.workouts.map(x=>x.id));
+  const byName=sameDay.find(s=>!live.has(s.workoutId) &&
+    exKey(s.workoutName||wkNameIndex().get(s.workoutId)||'')===key);
+  if(byName){
+    byName.workoutId=wId;
+    byName.workoutName=(w&&w.name)||byName.workoutName||'';
+    _relinked=true;
+  }
+  return byName||null;
+}
 // A log ROW exists for every exercise in the day the moment any field on that day
 // is touched — so "has a sets array" is NOT the same as "was actually performed".
 // Skipping one lift used to leave a blank row behind, and that blank row was the
@@ -906,7 +954,21 @@ function exNameIndex(){
   _exNameCache=m;
   return m;
 }
-function invalidateExNames(){ _exNameCache=null; }
+// workoutId → workout name, same idea one level up: which DAY a session belonged
+// to has to survive the ids being regenerated too.
+let _wkNameCache=null;
+function wkNameIndex(){
+  if(_wkNameCache) return _wkNameCache;
+  const m=new Map();
+  const eat=wks=>(wks||[]).forEach(w=>{ if(w && w.id && w.name && !m.has(w.id)) m.set(w.id,w.name); });
+  eat(data.plan && data.plan.workouts);
+  (data.planLibrary||[]).forEach(p=>eat(p.plan && p.plan.workouts));
+  (data.sessions||[]).forEach(s=>{ if(s && s.workoutId && s.workoutName && !m.has(s.workoutId)) m.set(s.workoutId,s.workoutName); });
+  (data.cycleArchive||[]).forEach(a=>(a.sessions||[]).forEach(s=>{ if(s && s.workoutId && s.workoutName && !m.has(s.workoutId)) m.set(s.workoutId,s.workoutName); }));
+  _wkNameCache=m;
+  return m;
+}
+function invalidateExNames(){ _exNameCache=null; _wkNameCache=null; }
 // Does this log row refer to the same exercise? Same id, or same name.
 function logIsExercise(log,exId,key){
   if(!log) return false;
@@ -954,6 +1016,59 @@ function exerciseHistory(exId,beforeDate){
     });
   return out;
 }
+// ---------- HISTORY REPAIR ----------
+// Sessions used to be written with nothing on them but the plan's random ids, and
+// the name backfill only ever ran on the day you happened to open. So rebuilding a
+// plan orphaned every session you hadn't looked at since: "Last" went blank, the
+// progression chart dropped to a single point, and the numbers sat in storage with
+// no id anyone referenced any more. Nothing was deleted — it had just become
+// unaddressable. This walks the whole history (live and archived), stamps the name
+// on every row it can still resolve, and folds away the blank duplicate rows that
+// got appended on top. Idempotent, and silent once there is nothing left to fix.
+function fillSetsFrom(target,donor){
+  const ds=(donor&&donor.sets)||[];
+  if(!Array.isArray(target.sets)) target.sets=[];
+  for(let i=0;i<ds.length;i++){
+    if(!target.sets[i]){ target.sets[i]=ds[i]; continue; }
+    Object.keys(ds[i]||{}).forEach(k=>{
+      const v=target.sets[i][k];
+      if(v===''||v===null||typeof v==='undefined') target.sets[i][k]=ds[i][k];
+    });
+  }
+  if(!target.name && donor.name) target.name=donor.name;
+}
+function repairHistory(){
+  let recovered=0, changed=false;
+  const wkIdx=wkNameIndex(), exIdx=exNameIndex();
+  const fixSession=s=>{
+    if(!s) return;
+    if(!s.workoutName){ const n=wkIdx.get(s.workoutId); if(n){ s.workoutName=n; changed=true; } }
+    (s.logs||[]).forEach(l=>{
+      if(l && !l.name){ const n=exIdx.get(l.exId); if(n){ l.name=n; changed=true; if(logHasData(l)) recovered++; } }
+    });
+    // Same lift twice in one day: usually the orphaned row holding the real
+    // numbers plus the blank one written over it. Fold ONLY when one side is
+    // empty — two rows that both have numbers are two real sets of work.
+    const by=new Map(), keep=[];
+    (s.logs||[]).forEach(l=>{
+      const k=exKey(l.name||'')||('#'+l.exId);
+      const prev=by.get(k);
+      if(!prev){ by.set(k,l); keep.push(l); return; }
+      if(logHasData(prev) && logHasData(l)){ keep.push(l); return; }
+      const rich=logHasData(prev)?prev:l;
+      const poor=rich===prev?l:prev;
+      fillSetsFrom(rich,poor);
+      if(rich!==prev){ keep[keep.indexOf(prev)]=rich; by.set(k,rich); }
+      changed=true;
+      if(logHasData(rich)) recovered++;
+    });
+    if(keep.length!==(s.logs||[]).length){ s.logs=keep; changed=true; }
+  };
+  (data.sessions||[]).forEach(fixSession);
+  (data.cycleArchive||[]).forEach(a=>(a.sessions||[]).forEach(fixSession));
+  return {changed,recovered};
+}
+
 // Estimated 1-rep max (Epley). Captures BOTH weight and reps so that e.g.
 // 30kg×10 correctly scores higher than 32.5kg×4. Bodyweight sets (no weight)
 // fall back to rep count so more reps still reads as progress.
@@ -1272,6 +1387,7 @@ document.getElementById('reset-history-btn').addEventListener('click',()=>{
   const n=data.sessions.length;
   if(!n){toast('No logged sessions to clear');return;}
   if(!confirm('Delete ALL '+n+' logged session'+(n>1?'s':'')+' permanently?\n\nYour workout plan stays. Progress history and "Last" comparisons will be cleared. This cannot be undone.\n\nStarting a new block instead? Edit Plan → “Start a new mesocycle” does the same thing but keeps a restorable archive.')) return;
+  tombstone(data.sessions);
   data.sessions=[];
   currentSession=null;
   save();
@@ -1348,6 +1464,7 @@ document.getElementById('new-meso-btn').addEventListener('click',()=>{
     sessions:JSON.parse(JSON.stringify(data.sessions))
   });
   data.cycleArchive=arch.slice(0,5);   // keep storage sane
+  tombstone(data.sessions);
   data.sessions=[];
   currentSession=null;
   if(newStart) writeProgramStart(newStart);
@@ -1363,7 +1480,9 @@ document.getElementById('restore-meso-btn').addEventListener('click',()=>{
   const a=arch[0];
   if(!confirm('Restore '+a.count+' archived session'+(a.count>1?'s':'')+' ('+a.from+' → '+a.to+')?\n\nThey are merged back into your logged history.')) return;
   const have=new Set(data.sessions.map(s=>s.id));
-  (a.sessions||[]).forEach(s=>{ if(!have.has(s.id)) data.sessions.push(s); });
+  const back=(a.sessions||[]).filter(s=>!have.has(s.id));
+  back.forEach(s=>{ s.mts=Date.now(); data.sessions.push(s); });
+  untombstone(back);   // undo the archive's delete markers, or sync re-removes them
   if(a.restartedWeeks) writeProgramStart(a.programStart);
   data.cycleArchive=arch.slice(1);
   currentSession=null;
@@ -1382,6 +1501,7 @@ document.getElementById('del-session-btn').addEventListener('click',()=>{
   if(idx<0){ toast('Nothing logged on this day'); return; }
   const wName=(data.plan.workouts.find(w=>w.id===wId)||{}).name||'this workout';
   if(!confirm('Delete the '+wName+' log for '+date+'?\n\nThis removes just this one day. It cannot be undone.')) return;
+  tombstone([data.sessions[idx]]);
   data.sessions.splice(idx,1);
   currentSession=null;
   save();
@@ -1438,16 +1558,48 @@ function renderLog(jumpToLast){
   if(!w){area.innerHTML='';return;}
 
   let sess=findSession(date,wId);
+  // exercise id → the log row showing its numbers. Built here rather than looked
+  // up per exercise so a row can only ever be claimed once.
+  let byEx=new Map();
   if(!sess){
-    sess={id:uid(),date,workoutId:wId,logs:w.exercises.map(ex=>freshLog(ex)),notes:''};
+    sess={id:uid(),date,workoutId:wId,workoutName:w.name||'',logs:w.exercises.map(ex=>freshLog(ex)),notes:'',mts:Date.now()};
+    w.exercises.forEach((ex,i)=>byEx.set(ex.id,sess.logs[i]));
     currentSession={sess,isNew:true};
   } else {
-    let dirty=false;
+    // Claim each exercise a row, in strict priority order. The old code went
+    // straight from "no row with this id" to "append a blank one", which is how a
+    // plan rebuild buried a logged day under empty rows: the numbers were still
+    // in storage, addressed by an id nothing referenced any more.
+    let dirty=_relinked; _relinked=false;
+    const taken=new Array(sess.logs.length).fill(false);
+    const claim=pred=>{
+      for(let i=0;i<sess.logs.length;i++){
+        if(!taken[i] && pred(sess.logs[i])){ taken[i]=true; return sess.logs[i]; }
+      }
+      return null;
+    };
+    // 1. Exact id match — settle these first so a rename can't steal another
+    //    exercise's row out from under it.
+    w.exercises.forEach(ex=>{ const l=claim(x=>x.exId===ex.id); if(l) byEx.set(ex.id,l); });
+    // 2. Whatever is left links up by name, and takes the current id with it.
     w.exercises.forEach(ex=>{
-      const l=sess.logs.find(l=>l.exId===ex.id);
-      if(!l){ sess.logs.push(freshLog(ex)); dirty=true; }
-      else if(!l.name && ex.name){ l.name=ex.name; dirty=true; }   // backfill older rows
+      if(byEx.has(ex.id)) return;
+      const key=exKey(ex.name||'');
+      if(!key) return;
+      const l=claim(x=>exKey(x.name||exNameIndex().get(x.exId)||'')===key);
+      if(l){ l.exId=ex.id; byEx.set(ex.id,l); dirty=true; }
     });
+    // 3. Genuinely new to the plan — now a blank row is the right answer.
+    w.exercises.forEach(ex=>{
+      if(byEx.has(ex.id)) return;
+      const l=freshLog(ex); sess.logs.push(l); byEx.set(ex.id,l); dirty=true;
+    });
+    // Stamp names on everything matched, so the next rebuild has a durable handle.
+    w.exercises.forEach(ex=>{
+      const l=byEx.get(ex.id);
+      if(l && !l.name && ex.name){ l.name=ex.name; dirty=true; }
+    });
+    if(!sess.workoutName && w.name){ sess.workoutName=w.name; dirty=true; }
     if(dirty) save();   // one-time write; after this the rows carry their names
     currentSession={sess,isNew:false};
   }
@@ -1459,7 +1611,7 @@ function renderLog(jumpToLast){
   }
 
   w.exercises.forEach(ex=>{
-    const log=sess.logs.find(l=>l.exId===ex.id);
+    const log=byEx.get(ex.id) || sess.logs.find(l=>l.exId===ex.id) || freshLog(ex);
     const last=lastSessionFor(wId,ex.id,date);
     const card=document.createElement('div');
     card.className='log-ex';
@@ -1547,6 +1699,35 @@ function renderLog(jumpToLast){
     });
     refreshPill(ex.id,log,last);
   });
+
+  // Work logged on this day that no exercise in the current plan could claim —
+  // a lift since renamed or dropped, or (for rows written before names were
+  // stamped) one whose id nothing references any more. We deliberately do NOT
+  // guess which exercise it belongs to: attaching someone's squat numbers to the
+  // wrong lift is worse than showing nothing, because a coach programs off it.
+  // Read-only, so the work is at least visible instead of silently gone.
+  const claimedRows=new Set(byEx.values());
+  const orphans=(sess.logs||[]).filter(l=>!claimedRows.has(l) && logHasData(l));
+  if(orphans.length){
+    const fmtSets=l=>(l.sets||[]).map(s=>{
+      const mi=Number(s.min)||0, km=Number(s.km)||0;
+      if(mi>0||km>0) return [mi>0?mi+'min':'',km>0?km+'km':''].filter(Boolean).join(' · ');
+      const r=Number(s.reps)||0, wt=Number(s.weight)||0;
+      if(!r&&!wt) return '';
+      return wt>0 ? r+'×'+wt+'kg' : r+' reps';
+    }).filter(Boolean).join('  ·  ');
+    const card=document.createElement('div');
+    card.className='log-ex';
+    card.innerHTML='<div class="log-ex-name">Also logged this day</div>'+
+      '<div class="log-ex-meta"><span class="log-ex-target">Not in the current plan</span></div>'+
+      orphans.map(l=>{
+        const nm=l.name||exNameIndex().get(l.exId)||'Unnamed exercise';
+        return '<div class="orphan-row"><div class="orphan-name">'+escapeHTML(nm)+
+               '</div><div class="orphan-sets">'+escapeHTML(fmtSets(l))+'</div></div>';
+      }).join('')+
+      '<div class="orphan-note">Kept from an earlier version of this plan. Add the exercise back to the plan under the same name and it reconnects to your history automatically.</div>';
+    area.appendChild(card);
+  }
 
   area.querySelectorAll('input[data-f]').forEach(inp=>{
     inp.addEventListener('input',e=>{
@@ -2327,6 +2508,17 @@ if('serviceWorker' in navigator){
   window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 }
 
+// Re-link anything a past plan rebuild orphaned BEFORE the first render, so the
+// log opens with the history already attached rather than showing blanks first.
+(function(){
+  try{
+    const r=repairHistory();
+    if(r.changed){
+      save();
+      if(r.recovered) setTimeout(()=>toast('Recovered '+r.recovered+' earlier '+(r.recovered===1?'entry':'entries')),900);
+    }
+  }catch(e){ console.warn('[DevFit] history repair skipped:',e); }
+})();
 renderLog(true);
 // Resume scroll position if the OS reloaded a backgrounded session (same day).
 (function(){
@@ -2364,8 +2556,20 @@ if(typeof DevFitDB!=='undefined'){
   DevFitDB.cloudSync('workouts','devfitTrainingV1',function(d){
     data=d;
     if(typeof invalidateExNames==='function') invalidateExNames();
-    if(typeof renderLog==='function') renderLog();
-    if(typeof renderMesoCard==='function') renderMesoCard();
+    // The merged copy can contain sessions this device has never rendered, so
+    // re-link them by name before anything reads them.
+    try{ if(typeof repairHistory==='function' && repairHistory().changed) save(); }catch(e){}
+    // Re-rendering yanks the keyboard away and drops a half-typed number, so if
+    // the user is in a field we wait until they are out of it. Their input is
+    // already saved and already in the merged copy — this is only about redraw.
+    const busy=document.activeElement && document.activeElement.tagName==='INPUT';
+    const draw=()=>{
+      if(typeof renderLog==='function') renderLog();
+      if(typeof renderMesoCard==='function') renderMesoCard();
+      if(typeof currentMode!=='undefined' && currentMode==='progress' && typeof renderProgressView==='function') renderProgressView();
+    };
+    if(busy) document.activeElement.addEventListener('blur',draw,{once:true});
+    else draw();
   });
 }
 </script>

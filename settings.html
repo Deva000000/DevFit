@@ -1638,7 +1638,7 @@ async function backupNow(){
 
 async function restoreFromCloud(){
   if(typeof DevFitDB==='undefined' || !DevFitDB.forceSyncAll){ toast('Cloud not ready — check connection', true); return; }
-  if(!confirm('Restore your data from the cloud? This replaces anything on this device with your saved cloud copy.')) return;
+  if(!confirm('Restore your data from the cloud?\n\nYour cloud copy is merged into this device — logged sessions and food days from both are kept, so nothing on either side is lost.')) return;
   toast('Restoring…');
   try{
     const res = await DevFitDB.forceSyncAll();

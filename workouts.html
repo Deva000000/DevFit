@@ -79,6 +79,12 @@
   input.log-date{-webkit-appearance:none;appearance:none;min-width:0;width:auto;flex:0 0 auto;
     font-size:12px;font-weight:700;padding:6px 10px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.14);border-radius:9px}
   input.log-date::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.6;cursor:pointer}
+  /* FREE: the date picker is replaced by a locked "Today" chip — free logs only
+     ever land on today, so there is no date to choose. */
+  .log-date-lock{flex:0 0 auto;font-family:'DM Sans',system-ui,sans-serif;font-size:12px;font-weight:700;
+    padding:6px 10px;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.72);
+    border:1px solid rgba(255,255,255,0.14);border-radius:9px;cursor:pointer;white-space:nowrap}
+  .log-date-lock:hover{border-color:#cc0000;color:#ff6b6b}
   /* Day selector — single horizontal scroll row (saves space with many days) */
   .wk-chips{display:flex;flex-wrap:nowrap;gap:8px;margin-bottom:12px;overflow-x:auto;overflow-y:hidden;
     padding:2px 2px 8px;scrollbar-width:thin;scrollbar-color:#cc0000 transparent;-webkit-overflow-scrolling:touch}
@@ -184,7 +190,9 @@
   .pw-title{font-size:16px;color:#fff;font-weight:800;margin-bottom:8px}
   .pw-hook{font-size:13px;color:#d8d2cc;line-height:1.6;margin-bottom:12px}
   .pw-hook b,.pw-price b{color:#fff}
-  .pw-list{font-size:12.5px;color:#d8d2cc;line-height:1.75;text-align:left;max-width:270px;margin:0 auto 14px}
+  .pw-list{font-size:12.5px;color:#d8d2cc;line-height:1.7;text-align:left;max-width:290px;margin:0 auto 14px}
+  .pw-grp{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#ff8888;margin:12px 0 4px}
+  .pw-grp:first-child{margin-top:0}
   .pw-price{font-size:12px;color:#a89e94;margin-bottom:14px}
   .pw-cta{display:inline-block;background:#cc0000;color:#fff;text-decoration:none;padding:10px 22px;border-radius:20px;font-weight:700;font-size:13px}
   .pw-cta:hover{background:#a30000;color:#fff}
@@ -323,6 +331,7 @@ html.nosplash #devfit-splash{display:none!important}
       <div class="log-head">
         <div class="section-label" id="log-session-label">Today's session</div>
         <input type="date" class="inp log-date" id="log-date">
+        <button type="button" class="log-date-lock" id="log-date-lock" style="display:none">Today 🔒</button>
       </div>
       <div id="log-workout-chips" class="wk-chips"></div>
       <div id="log-area"></div>
@@ -453,12 +462,28 @@ function paywallHTML(featureName){
     <div class="pw-title">${featureName}</div>
     <div class="pw-hook">${hook}</div>
     <div class="pw-list">
-      <div>✓ Per-exercise progression charts &amp; estimated 1RM</div>
-      <div>✓ Full session history + personal records</div>
-      <div>✓ True Progress Score &amp; bodyweight trends</div>
-      <div>✓ Weekly, monthly + full-program PDF reports</div>
-      <div>✓ Every share-card style, not just white</div>
-      <div>✓ Auto cloud backup &amp; multi-device sync</div>
+      <div class="pw-grp">Training</div>
+      <div>✓ Per-exercise progression charts</div>
+      <div>✓ Full session history — go back weeks or months</div>
+      <div>✓ Estimated 1RM &amp; personal records</div>
+      <div>✓ Volume &amp; intensity trends</div>
+      <div>✓ Plateau detection &amp; deload recommendations</div>
+      <div>✓ Exercise notes, substitutions &amp; multiple programs</div>
+      <div>✓ Workout PDF export</div>
+      <div class="pw-grp">Progress</div>
+      <div>✓ Full historical timeline &amp; True Progress Score</div>
+      <div>✓ Weight-trend smoothing &amp; goal projection</div>
+      <div>✓ Weekly + monthly comparisons, custom date ranges</div>
+      <div>✓ Body-measurement trends &amp; adherence analysis</div>
+      <div class="pw-grp">Nutrition</div>
+      <div>✓ 30-day &amp; full-history trends, macro adherence</div>
+      <div>✓ Barcode scanning &amp; the advanced food database</div>
+      <div>✓ Saved meals, recipes, meal &amp; full-day copying</div>
+      <div>✓ Calorie cycling · training-day / rest-day targets</div>
+      <div>✓ Nutrition PDF reports</div>
+      <div class="pw-grp">Data</div>
+      <div>✓ Cloud sync, automatic backup &amp; trainer/client sync</div>
+      <div>✓ Complete PDF export &amp; advanced share cards</div>
     </div>
     <div class="pw-price">Everything unlocked for <b>≈ 66 sen a day</b> · RM19.90/mo · cancel anytime</div>
     <a href="pricing.html" class="pw-cta">Unlock Pro — RM19.90/mo →</a>
@@ -914,6 +939,21 @@ function lastSessionFor(wId,exId,beforeDate){
   }
   return sameId || byName;
 }
+// Every prior performance of this exercise, newest first. Same identity rules as
+// lastSessionFor — used by plateau detection and anything else that needs a run
+// of sessions rather than just the previous one.
+function exerciseHistory(exId,beforeDate){
+  const key=exKey(exNameIndex().get(exId)||'');
+  const out=[];
+  data.sessions
+    .filter(s=>s.date<beforeDate)
+    .sort((a,b)=>b.date.localeCompare(a.date))
+    .forEach(s=>{
+      const log=(s.logs||[]).find(l=>logHasData(l) && logIsExercise(l,exId,key));
+      if(log) out.push({session:s,log});
+    });
+  return out;
+}
 // Estimated 1-rep max (Epley). Captures BOTH weight and reps so that e.g.
 // 30kg×10 correctly scores higher than 32.5kg×4. Bodyweight sets (no weight)
 // fall back to rep count so more reps still reads as progress.
@@ -1148,6 +1188,26 @@ function sportStats(name){
 document.getElementById('log-date').value=todayStr();
 document.getElementById('log-date').addEventListener('change',()=>renderLog(false));
 
+// ---------- FREE TIER: today only ----------
+// Browsing back through past sessions is Pro. On Free the log is pinned to today
+// and the picker is swapped for a locked chip — the previous numbers are still
+// right there in the LAST column of every row, which is all you need to beat
+// them. Nothing is hidden or deleted: the data stays, the time machine is Pro.
+function dateNavLocked(){ return !isPro(); }
+(function applyDateLock(){
+  const inp=document.getElementById('log-date');
+  const chip=document.getElementById('log-date-lock');
+  if(!dateNavLocked()) return;
+  inp.value=todayStr();
+  inp.style.display='none';
+  if(chip){
+    chip.style.display='';
+    chip.textContent=fmtDate(todayStr())+' 🔒';
+    chip.title='Logging past days is a Pro feature';
+    chip.addEventListener('click',()=>{ window.location.href='pricing.html'; });
+  }
+})();
+
 // Unified date anchor (shared with Progress page via progressLog2.programStart).
 function progStart(){
   let base=null;
@@ -1334,6 +1394,12 @@ function renderLog(jumpToLast){
   // Log session + share (light/dark) are FREE; transparent theme is locked elsewhere
   const chips=document.getElementById('log-workout-chips');
   let date=document.getElementById('log-date').value||todayStr();
+  // FREE is pinned to today no matter what put a date in the field (resume,
+  // a stale value, an old cloud sync) — the single place that guarantees it.
+  if(dateNavLocked() && date!==todayStr()){
+    date=todayStr();
+    document.getElementById('log-date').value=date;
+  }
   const _lbl=document.getElementById('log-session-label');
   const area=document.getElementById('log-area');
   const shareBtn=document.getElementById('share-btn');
@@ -1420,13 +1486,13 @@ function renderLog(jumpToLast){
       const fields = timed
         ? `<div class="cardio-grid" style="grid-template-columns:1fr">
              <div class="cardio-fld"><label>Duration (min)</label>
-               <input type="number" inputmode="decimal" step="1" placeholder="min" value="${cs.min??''}" data-ex="${ex.id}" data-cf="min"></div>
+               <input type="number" inputmode="decimal" step="1" placeholder="···" value="${cs.min??''}" data-ex="${ex.id}" data-cf="min"></div>
            </div>`
         : `<div class="cardio-grid">
              <div class="cardio-fld"><label>Duration (min)</label>
-               <input type="number" inputmode="decimal" step="1" placeholder="min" value="${cs.min??''}" data-ex="${ex.id}" data-cf="min"></div>
+               <input type="number" inputmode="decimal" step="1" placeholder="···" value="${cs.min??''}" data-ex="${ex.id}" data-cf="min"></div>
              <div class="cardio-fld"><label>Distance (km)</label>
-               <input type="number" inputmode="decimal" step="0.1" placeholder="km" value="${cs.km??''}" data-ex="${ex.id}" data-cf="km"></div>
+               <input type="number" inputmode="decimal" step="0.1" placeholder="···" value="${cs.km??''}" data-ex="${ex.id}" data-cf="km"></div>
              <div class="cardio-pace" data-pace="${ex.id}">${cardioPace(cs.min,cs.km)}</div>
            </div>`;
       // Sport-specific optional stats (goals / rounds / matches / elevation …)
@@ -1434,7 +1500,7 @@ function renderLog(jumpToLast){
       let extra='';
       if(sp.fields.length){
         extra='<div class="cardio-grid" style="grid-template-columns:repeat('+sp.fields.length+',1fr);margin-top:8px">'+
-          sp.fields.map(f=>`<div class="cardio-fld"><label>${f.label}</label><input type="number" inputmode="numeric" step="1" placeholder="0" value="${cs[f.key]??''}" data-ex="${ex.id}" data-cf="${f.key}"></div>`).join('')+
+          sp.fields.map(f=>`<div class="cardio-fld"><label>${f.label}</label><input type="number" inputmode="numeric" step="1" placeholder="···" value="${cs[f.key]??''}" data-ex="${ex.id}" data-cf="${f.key}"></div>`).join('')+
           '</div>';
       }
       card.innerHTML=`
@@ -1450,7 +1516,9 @@ function renderLog(jumpToLast){
     if(ex.tSets&&ex.tReps) metaParts.push(`<span class="log-ex-target">Target ${ex.tSets}×${ex.tReps}</span>`);
     if(last){
       const lb=bestSet(last.log.sets);
-      if(lb) metaParts.push(`<span class="log-ex-last">Last: ${lb.r}×${lb.w}kg · ${last.session.date}</span>`);
+      // A set logged without a weight is "9 reps", not "9×0kg" — printing the zero
+      // made it look like a real load of nothing.
+      if(lb) metaParts.push(`<span class="log-ex-last">Last: ${lb.w>0?`${lb.r}×${lb.w}kg`:`${lb.r} reps`} · ${last.session.date}</span>`);
     }
     card.innerHTML=`
       <div class="log-ex-name">${escapeHTML(ex.name||'(unnamed)')}</div>
@@ -1464,14 +1532,15 @@ function renderLog(jumpToLast){
     const setsDiv=card.querySelector('.sets-list');
     log.sets.forEach((set,i)=>{
       const lastSet=last && last.log.sets[i] ? last.log.sets[i] : null;
-      const lastTxt=lastSet&&(lastSet.reps||lastSet.weight)?`${lastSet.reps||'-'}×${lastSet.weight||'-'}`:'—';
+      const _lr=Number(lastSet&&lastSet.reps)||0, _lw=Number(lastSet&&lastSet.weight)||0;
+      const lastTxt = (_lr||_lw) ? (_lw>0 ? `${_lr||'-'}×${_lw}` : `${_lr} reps`) : '—';
       const row=document.createElement('div');
       row.className='sets-grid';
       row.style.marginTop='4px';
       row.innerHTML=`
         <div class="set-num">${i+1}</div>
-        <input type="number" inputmode="decimal" step="0.5" placeholder="${ex.tReps||'reps'}" value="${set.reps??''}" data-ex="${ex.id}" data-i="${i}" data-f="reps">
-        <input type="number" inputmode="decimal" step="0.5" placeholder="kg"   value="${set.weight??''}" data-ex="${ex.id}" data-i="${i}" data-f="weight">
+        <input type="number" inputmode="decimal" step="0.5" placeholder="···" value="${set.reps??''}" data-ex="${ex.id}" data-i="${i}" data-f="reps">
+        <input type="number" inputmode="decimal" step="0.5" placeholder="···" value="${set.weight??''}" data-ex="${ex.id}" data-i="${i}" data-f="weight">
         <div class="last-cell">${lastTxt}</div>
         <button class="del-mini" data-del-set="${ex.id}|${i}" aria-label="Delete set">×</button>`;
       setsDiv.appendChild(row);
@@ -1565,6 +1634,24 @@ function updateShareBtn(){
   if(delBtn) delBtn.style.display=(!currentSession.isNew && hasData)?'block':'none';
 }
 
+// What KIND of work was this — weighted, or reps only? Two sessions can only be
+// compared as percentages if they are the same kind. Mixing them is what produced
+// "+807%" and "+1000%": a session logged as 9 reps at 0kg scores an estimated 1RM
+// of 9 (rep-count scale), so 68kg × 6 (81.6, kilogram scale) looked like an
+// eight-fold improvement. It wasn't progress — it was two different units.
+function setsKind(sets){
+  if((sets||[]).some(s=>(Number(s.weight)||0)>0)) return 'load';
+  if((sets||[]).some(s=>(Number(s.reps)||0)>0))   return 'reps';
+  return null;
+}
+function pct(now,then){ return ((now-then)/then)*100; }
+// A percentage over ~3× stops meaning anything to a reader — usually it's a set
+// count that changed, not strength. Say so in words instead of a silly number.
+function pctLabel(p){
+  const r=Math.round(Math.abs(p));
+  return r>300 ? 'a lot' : r+'%';
+}
+
 function refreshPill(exId,log,last){
   const el=document.querySelector(`[data-pill="${exId}"]`);
   if(!el) return;
@@ -1573,26 +1660,64 @@ function refreshPill(exId,log,last){
   if(!last){el.innerHTML='<span class="progress-pill new">First time logged</span>';return;}
   const lb=bestSet(last.log.sets);
   if(!lb){el.innerHTML='<span class="progress-pill new">First time logged</span>';return;}
-  // PRIMARY metric = TOTAL VOLUME (sets × reps × kg) — the honest measure of work
-  // done. So 30kg×12 (360) correctly beats last week's 34kg×1 (34) instead of
-  // reading as "down 4kg". Falls back to estimated 1-rep max only for bodyweight
-  // sets (no weight to multiply), where more reps still counts as progress.
-  const curVol=totalVolume(log.sets), lastVol=totalVolume(last.log.sets);
+
+  const curKind=setsKind(log.sets), lastKind=setsKind(last.log.sets);
   const TOL=1.5;
-  if(curVol>0 && lastVol>0){
-    const volPct=((curVol-lastVol)/lastVol)*100;
-    const tip=`This ${Math.round(curVol)}kg total volume vs last ${Math.round(lastVol)}kg (sets×reps×kg)`;
-    if(volPct>TOL)      el.innerHTML=`<span class="progress-pill up"   title="${tip}">▲ More volume +${Math.round(volPct)}%</span>`;
-    else if(volPct<-TOL)el.innerHTML=`<span class="progress-pill down" title="${tip}">▼ Less volume ${Math.round(volPct)}%</span>`;
-    else                el.innerHTML=`<span class="progress-pill flat" title="${tip}">— Same volume</span>`;
+
+  // Different units — state the change honestly rather than inventing a ratio.
+  if(curKind!==lastKind){
+    el.innerHTML = curKind==='load'
+      ? `<span class="progress-pill up" title="Last time this was logged without a weight">▲ Now lifting weight</span>`
+      : `<span class="progress-pill flat" title="Last time this was logged with a weight">— Bodyweight this time</span>`;
     return;
   }
-  // Bodyweight / no-weight sets → rank by estimated 1-rep max (reps-driven).
-  const ePct=lb.e?((cur.e-lb.e)/lb.e)*100:0;
-  const tip=`This ${cur.w}kg×${cur.r} vs last ${lb.w}kg×${lb.r}`;
-  if(ePct>TOL)       el.innerHTML=`<span class="progress-pill up"   title="${tip}">▲ Stronger +${Math.round(ePct)}%</span>`;
-  else if(ePct<-TOL) el.innerHTML=`<span class="progress-pill down" title="${tip}">▼ Down ${Math.round(Math.abs(ePct))}%</span>`;
-  else               el.innerHTML=`<span class="progress-pill flat">— Maintained</span>`;
+
+  // WEIGHTED: total volume (sets × reps × kg) is the honest measure of work done,
+  // so 30kg×12 (360) correctly beats last week's 34kg×1 (34).
+  if(curKind==='load'){
+    const curVol=totalVolume(log.sets), lastVol=totalVolume(last.log.sets);
+    if(curVol>0 && lastVol>0){
+      const p=pct(curVol,lastVol);
+      const tip=`This ${Math.round(curVol)}kg total volume vs last ${Math.round(lastVol)}kg (sets×reps×kg)`;
+      if(p>TOL)       el.innerHTML=`<span class="progress-pill up"   title="${tip}">▲ More volume +${pctLabel(p)}</span>`;
+      else if(p<-TOL) el.innerHTML=`<span class="progress-pill down" title="${tip}">▼ Less volume −${pctLabel(p)}</span>`;
+      else            el.innerHTML=plateauPill(exId,log,last,tip);
+      return;
+    }
+  }
+
+  // BODYWEIGHT / reps-only on BOTH sides — rank by total reps.
+  const curReps=totalReps(log.sets), lastReps=totalReps(last.log.sets);
+  if(curReps>0 && lastReps>0){
+    const p=pct(curReps,lastReps);
+    const tip=`This ${curReps} reps vs last ${lastReps} reps`;
+    if(p>TOL)       el.innerHTML=`<span class="progress-pill up"   title="${tip}">▲ More reps +${pctLabel(p)}</span>`;
+    else if(p<-TOL) el.innerHTML=`<span class="progress-pill down" title="${tip}">▼ Fewer reps −${pctLabel(p)}</span>`;
+    else            el.innerHTML=plateauPill(exId,log,last,tip);
+    return;
+  }
+  el.innerHTML='';
+}
+
+// PLATEAU DETECTION (Pro). "Same volume" once is a normal week. The same numbers
+// three sessions running is the signal a coach actually needs — it means the load
+// hasn't moved and the block needs a change.
+function plateauPill(exId,log,last,tip){
+  const flat=`<span class="progress-pill flat" title="${tip}">— Same as last time</span>`;
+  if(!isPro()) return flat;
+  const date=(currentSession&&currentSession.sess&&currentSession.sess.date)||todayStr();
+  const hist=exerciseHistory(exId,date).slice(0,2);      // the two before this one
+  if(hist.length<2) return flat;
+  const measure=s=>setsKind(s)==='load'?totalVolume(s):totalReps(s);
+  const now=measure(log.sets);
+  if(!(now>0)) return flat;
+  const stuck=hist.every(h=>{
+    const v=measure(h.log.sets);
+    return v>0 && Math.abs(pct(v,now))<=2.5;
+  });
+  return stuck
+    ? `<span class="progress-pill down" title="Three sessions at the same load — time to change something">■ Plateau · 3 sessions</span>`
+    : flat;
 }
 
 // ---------- PROGRESS VIEW ----------

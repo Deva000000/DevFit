@@ -677,6 +677,13 @@ html[data-theme="light"] input.log-date{
   border-color:rgba(20,15,10,0.16) !important;
 }
 html[data-theme="light"] input.log-date::-webkit-calendar-picker-indicator{filter:none !important;opacity:.75;}
+/* Free-tier locked "today" chip — same treatment as the date pill it replaces. */
+html[data-theme="light"] .log-date-lock{
+  background:#ffffff !important;
+  color:#3a352f !important;
+  border-color:rgba(20,15,10,0.16) !important;
+}
+html[data-theme="light"] .log-date-lock:hover{color:#cc0000 !important;border-color:#cc0000 !important;}
 html[data-theme="light"] .meso-state{color:#3a352f !important;}
 
 /* First-run welcome card — kept #111 on the light page, and its emoji/heading

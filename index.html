@@ -336,7 +336,9 @@
   @media(max-width:500px){
     body{padding:.5rem;overflow-x:hidden}
     .page{max-width:100%}
-    .header{padding:14px 16px}
+    /* NOTE: no .header padding override here on purpose — Nutrition/Training/
+       Settings all keep 16px 20px at mobile, and shrinking it here is what made
+       the Progress bar a different size from every other page. */
     .app-title{font-size:15px}
     .header-logo{height:38px;width:38px}
     .metric-grid{gap:3px}

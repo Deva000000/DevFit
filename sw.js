@@ -10,7 +10,7 @@
    - Apps Script / /api/*: network-only (never cached).
 */
 
-const VERSION = 'devfit-v4.69.0';
+const VERSION = 'devfit-v4.70.0';
 const APP_SHELL = 'devfit-shell-' + VERSION;
 const RUNTIME = 'devfit-runtime-' + VERSION;
 
@@ -41,6 +41,8 @@ const SHELL_FILES = [
   './foods-local.js',
   './foods-bulk.js',
   './scoring.js',
+  './report-engine.js',
+  './devfit-pdf.js',
   './theme.css',
   './theme.js'
 ];

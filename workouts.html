@@ -298,6 +298,7 @@ html.nosplash #devfit-splash{display:none!important}
 <script>try{if(localStorage.getItem('devfit_theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
 <link rel="stylesheet" href="theme.css">
 <script src="devfit-errorlog.js"></script>
+<script src="devfit-pdf.js"></script><!-- named PDF downloads -->
 <script defer src="theme.js"></script>
 <script src="devfit-auth.js"></script>
 </head>
@@ -932,21 +933,12 @@ function exportPlanPDF(){
     doc.text('Page '+p+' of '+pages,W-M,H-9,{align:'right'});
   }
 
-  const safe=progName.replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'').toLowerCase()||'program';
-  const fname='DevFit-'+safe+'.pdf';
-
-  // Try native share (mobile), fallback to download
-  try{
-    const blob=doc.output('blob');
-    const file=new File([blob],fname,{type:'application/pdf'});
-    if(navigator.canShare && navigator.canShare({files:[file]})){
-      navigator.share({files:[file],title:progName,text:'DevFit workout program'})
-        .catch(()=>doc.save(fname));
-      return;
-    }
-  }catch(e){}
-  doc.save(fname);
-  toast('PDF downloaded');
+  // Real name, not a blob UUID — share sheet first because a program PDF is
+  // usually sent on to someone. See devfit-pdf.js.
+  const fname='DevFit_'+(devfitSafeName(progName)||'Workout')+'_Program.pdf';
+  devfitSavePdf(doc, fname, {share:true, title:progName,
+                             shareExtra:{text:'DevFit workout program'}});
+  toast('PDF saved as '+fname);
 }
 
 // ---------- LOG VIEW ----------
@@ -1894,6 +1886,10 @@ function pct(now,then){ return ((now-then)/then)*100; }
 // A percentage over ~3× stops meaning anything to a reader — usually it's a set
 // count that changed, not strength. Say so in words instead of a silly number.
 function pctLabel(p){
+  // A non-finite ratio must never reach the screen as "NaN%" or "Infinity%".
+  // Infinity is the honest case (last time was effectively zero); NaN falls in
+  // here too rather than printing itself onto a progress pill.
+  if(!Number.isFinite(p)) return 'a lot';
   const r=Math.round(Math.abs(p));
   return r>300 ? 'a lot' : r+'%';
 }

@@ -265,6 +265,7 @@ html.nosplash #devfit-splash{display:none!important}
 <script>try{if(localStorage.getItem('devfit_theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
 <link rel="stylesheet" href="theme.css">
 <script src="devfit-errorlog.js"></script>
+<script src="devfit-pdf.js"></script><!-- named PDF downloads -->
 <script defer src="theme.js"></script>
 <script src="devfit-auth.js"></script>
 </head>
@@ -599,11 +600,15 @@ function applyNutritionTierGates(){
 }
 
 const KEY='devfitNutritionV2';
-let data=load();
 
 // Unreadable data must never be handed back as an empty diary — the next edit
 // would save that emptiness straight over the only copy. Quarantine the bytes and
 // stop writing instead. (Same fault, and same fix, as the training page.)
+//
+// This MUST be declared before load() runs. It was below `let data=load()` at
+// first, so the assignment inside load() hit the temporal dead zone, threw, got
+// swallowed by the enclosing try/catch, and the flag silently stayed false —
+// quarantine happened but saving was never actually paused.
 let loadFailed=false;
 function load(){
   try{
@@ -639,6 +644,8 @@ function load(){
   }catch(e){}
   return {targets:{cal:'',p:'',c:'',f:''},days:{}};
 }
+// Runs only after loadFailed exists — see the note above.
+let data=load();
 let _saveWarned=false;
 function save(){
   if(loadFailed) return;   // storage holds data we could not read — do not clobber it
@@ -1330,7 +1337,8 @@ function generateNutritionPDF(){
     doc.text('Page '+p+' of '+pages,W-M,H-9,{align:'right'});
   }
 
-  doc.save('DevFit_Nutrition_'+currentDate.replace(/-/g,'')+'.pdf');
+  // Named download, not doc.save() — see devfit-pdf.js.
+  devfitSavePdf(doc, 'DevFit_Nutrition_Report_'+currentDate+'.pdf');
 }
 
 function lastNDates(n){

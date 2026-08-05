@@ -16,7 +16,14 @@
 */
 'use strict';
 
+// Null-safe by contract. Callers index a week out of appData.bw / steps / sleep,
+// and that index can legitimately point past the end: the Free tier collapses the
+// arrays to a single week, report ranges are built from programDuration rather
+// than from the arrays, and a stale currentWeek survives a tier change. Reading
+// .filter off undefined threw and took the whole render down with it — a blank
+// page, not a wrong number. "No data for that week" is null, never a crash.
 function avg(arr){
+  if(!Array.isArray(arr)) return null;
   const n = arr.filter(v=>v!=='').map(Number).filter(n=>!isNaN(n)&&n>0);
   return n.length ? n.reduce((a,b)=>a+b,0)/n.length : null;
 }
@@ -93,12 +100,14 @@ function bwScore(bwAvg, prevBwAvg, goalType, weekIndex){
 // The DevFit true-progress score — 7 weighted signals, adaptive normalisation,
 // recomp credit, and target-reached overrides. Returns {overall, scores, totalWeight}.
 function calcTrueScore(w){
-  const ci=appData.weeklyCheckin[w]||freshCheckin();
-  const bwAvg=avg(appData.bw[w]);
+  // Every container is optional too — a half-built appData (fresh install, a
+  // restore mid-flight) must degrade to "nothing logged", not explode.
+  const ci=(appData.weeklyCheckin||[])[w]||freshCheckin();
+  const bwAvg=avg((appData.bw||[])[w]);
   let prevBwAvg=null;
-  for(let pw=w-1;pw>=0;pw--){ const pa=avg(appData.bw[pw]); if(pa!==null){prevBwAvg=pa;break;} }
-  const stepsAvg=avg(appData.steps[w]);
-  const sleepAvg=avg(appData.sleep[w]);
+  for(let pw=w-1;pw>=0;pw--){ const pa=avg((appData.bw||[])[pw]); if(pa!==null){prevBwAvg=pa;break;} }
+  const stepsAvg=avg((appData.steps||[])[w]);
+  const sleepAvg=avg((appData.sleep||[])[w]);
   const gt=appData.goalType||'loss';
   const tw=appData.goal?parseFloat(appData.goal):null;
 

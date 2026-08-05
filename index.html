@@ -1270,7 +1270,8 @@ function loadData(){
         setTimeout(()=>{ try{ alert('DevFit could not read your saved progress data on this device.\n\nSaving is paused so nothing gets overwritten. Go to Settings → Export backup file and send it over to recover it.'); }catch(_){} },600);
         return;
       }
-      totalWeeks=(appData.bw&&appData.bw.length)||4;
+      ensureShape();
+      totalWeeks=appData.bw.length||1;
     }
     // Pro → restore full history + open on the current week; Free → single rolling
     // week (non-destructive: Pro history is preserved for re-upgrade).
@@ -1420,15 +1421,61 @@ function dotSteps(v){ return v>=10000?'ok':v>=5000?'warn':'bad'; }
 function dotSleep(v){ return (v>=7&&v<=9)?'ok':v>=6?'warn':'bad'; }
 function dotBW(v){ return v>0?'ok':''; }
 
+// currentWeek must always point at a week that actually exists. A tier change
+// (Pro → Free collapses appData to a single week), a restore, or a stale saved
+// index can all leave it past the end — and then every week-indexed read throws
+// and the whole Progress page renders blank. Clamp once, centrally.
+// ONE INVARIANT, enforced in ONE place: appData always carries the four weekly
+// arrays, always at least one week long, every week row a 7-slot array, every
+// check-in a real object. Twenty-odd call sites index these directly — guarding
+// them one at a time is how you miss the twenty-first and ship a blank page.
+// Cheap, idempotent, and safe to call before every render.
+function ensureShape(){
+  if(!appData || typeof appData!=='object') appData={};
+  ['bw','steps','sleep'].forEach(k=>{
+    if(!Array.isArray(appData[k]) || !appData[k].length) appData[k]=[Array(7).fill('')];
+    for(let i=0;i<appData[k].length;i++){
+      if(!Array.isArray(appData[k][i])) appData[k][i]=Array(7).fill('');
+      while(appData[k][i].length<7) appData[k][i].push('');
+    }
+  });
+  if(!Array.isArray(appData.weeklyCheckin)) appData.weeklyCheckin=[];
+  const n=appData.bw.length;
+  ['steps','sleep'].forEach(k=>{ while(appData[k].length<n) appData[k].push(Array(7).fill('')); });
+  while(appData.weeklyCheckin.length<n) appData.weeklyCheckin.push(freshCheckin());
+  for(let i=0;i<appData.weeklyCheckin.length;i++){
+    const c=appData.weeklyCheckin[i];
+    if(!c || typeof c!=='object') appData.weeklyCheckin[i]=freshCheckin();
+  }
+}
+// Writing a day's value. Creates the week row if it is missing rather than
+// throwing out of an inline onblur, where the error is invisible and the user
+// just sees their number fail to stick.
+function setDay(key,w,i,v){
+  if(!Array.isArray(appData[key])) appData[key]=[];
+  while(appData[key].length<=w) appData[key].push(Array(7).fill(''));
+  if(!Array.isArray(appData[key][w])) appData[key][w]=Array(7).fill('');
+  appData[key][w][i]=v;
+  save(); render();
+}
+function clampWeek(){
+  const n=(appData && appData.bw && appData.bw.length) || 1;
+  if(!Number.isFinite(currentWeek) || currentWeek<0) currentWeek=0;
+  if(currentWeek>n-1) currentWeek=n-1;
+  return currentWeek;
+}
 function buildGrid(id,key,dotFn){
-  const el=document.getElementById(id); el.innerHTML='';
+  const el=document.getElementById(id); if(!el) return;
+  el.innerHTML='';
+  clampWeek();
+  const row=(appData[key]&&appData[key][currentWeek])||Array(7).fill('');
   DAYS.forEach((d,i)=>{
-    const val=appData[key][currentWeek][i];
+    const val=row[i]===undefined?'':row[i];
     const dot=val!==''?dotFn(parseFloat(val)):'';
     const dt=weekDayDate(currentWeek,i);
     el.innerHTML+=`<div class="day-card"><div class="day-lbl">${d}</div><div class="day-date">${dt.getDate()} ${mon(dt)}</div>
       <input type="number" value="${val}" placeholder="—" step="0.1" inputmode="decimal"
-        onblur="appData['${key}'][${currentWeek}][${i}]=this.value;save();render()">
+        onblur="setDay('${key}',${currentWeek},${i},this.value)">
       <div class="day-dot ${dot}"></div></div>`;
   });
 }
@@ -1481,8 +1528,9 @@ function trainingLoadScore(){
   return 0.75;                                          // well under / detraining
 }
 function calcRecoveryScore(w){
-  const ci=appData.weeklyCheckin[w]||freshCheckin();
-  const sleepAvg=avg(appData.sleep[w]);
+  // Same out-of-range week protection as calcTrueScore — see avg() in scoring.js.
+  const ci=(appData.weeklyCheckin||[])[w]||freshCheckin();
+  const sleepAvg=avg((appData.sleep||[])[w]);
   const sl=sleepScore(sleepAvg);
   const ss=stressScore(ci.stress);
   const ld=trainingLoadScore();
@@ -1836,6 +1884,8 @@ function showProgSection(sec){
 }
 
 function render(){
+  ensureShape();
+  clampWeek();
   renderGoalBtns();
   const wpb2=document.getElementById('week-pdf-btn');
   if(wpb2) wpb2.textContent='Week '+(currentWeek+1)+' Report (PDF)';
@@ -1844,9 +1894,10 @@ function render(){
   buildGrid('sleep-grid','sleep',dotSleep);
   renderCheckin();
 
-  const bwAvg=avg(appData.bw[currentWeek]);
-  const stepsAvg=avg(appData.steps[currentWeek]);
-  const sleepAvg=avg(appData.sleep[currentWeek]);
+  // Container-safe: avg() tolerates a missing week row, but not a missing array.
+  const bwAvg=avg((appData.bw||[])[currentWeek]);
+  const stepsAvg=avg((appData.steps||[])[currentWeek]);
+  const sleepAvg=avg((appData.sleep||[])[currentWeek]);
   const gt=appData.goalType||'loss';
 
   let stepsBadge='—',stepsClass='badge-gray';

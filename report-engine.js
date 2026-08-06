@@ -1,26 +1,24 @@
-/* DevFit — report engine (analysis + narrative)
+/* DevFit — report engine
    ------------------------------------------------------------------
-   One place that (a) reads every logged source for a span of weeks and
-   (b) turns those numbers into the words a coach would actually say.
+   Reads every logged source for a span of weeks and reduces it to numbers,
+   trends, and ONE stat line per topic. Both PDF exports call in here — writing
+   this twice is the app-vs-report drift scoring.js was created to kill.
 
-   Why this file exists:
-   • The old Program Report was a table of week numbers. No dates, no food,
-     no training, no sentences — nothing a paying client could read and act on.
-   • Both PDF exports needed the SAME analysis. Writing it twice is exactly the
-     app-vs-report drift that scoring.js was created to kill, so the maths and
-     the prose live here and both reports call in.
+   Design rule, learned the hard way: the report is a dashboard, not an essay.
+   An earlier version wrote a coached paragraph under every chart (what
+   happened / why it matters / verdict) and it was too much to read. What a
+   client wants is the trend and a clean record of what they logged. Charts and
+   tables carry the report; text is one line per section. Keep it that way.
 
    Contract: every function is null-safe. A half-logged week, a missing
-   programStart, an empty food diary — all resolve to "not enough logged
-   to judge", never to a crash and never to an invented number.
+   programStart, an empty food diary — all resolve to "nothing logged",
+   never to a crash and never to an invented number.
 
-   Evidence anchors used in the written sections:
-   • Rate of loss 0.5–1.0 %BW/wk spares lean mass — Helms 2014 (JISSN); Garthe 2011.
-   • Lean gain 0.25–0.5 %BW/wk — Aragon & Schoenfeld 2013.
-   • Protein 1.6–2.2 g/kg/day for hypertrophy & lean retention — Morton 2018 (BJSM).
-   • Steps benefit plateaus ~8,000–10,000/day — Paluch 2022 (Lancet Public Health).
-   • Sleep 7–9 h; restriction shifts loss toward lean mass — Hirshkowitz 2015; Nedeltcheva 2010.
-   • 10–20 hard sets per muscle per week drives hypertrophy — Schoenfeld 2017.
+   Thresholds below come from: rate of loss 0.5–1.0 %BW/wk (Helms 2014;
+   Garthe 2011), lean gain 0.25–0.5 %BW/wk (Aragon & Schoenfeld 2013), protein
+   1.6–2.2 g/kg (Morton 2018), steps plateau ~8,000/day (Paluch 2022), sleep
+   7–9 h (Hirshkowitz 2015). They set the bands; the report no longer prints
+   the reasoning.
 
    PDF SAFETY: text produced here is printed with jsPDF standard fonts
    (WinAnsi / cp1252). Stay inside that set — en/em dash, middle dot, times,
@@ -543,393 +541,122 @@ var DevFitReport = (function(){
     return A;
   }
 
-  /* ================= NARRATIVE =================
-     Everything below writes sentences. Rules it follows:
-     • Never invent a number. If it is not logged, the text says so and says
-       what logging it would buy.
-     • Always give the mechanism, not just the verdict — that is the difference
-       between a dashboard and a coach.
-     • Always end a section with one instruction that has a number in it. */
+  /* ================= SUMMARY LINES =================
+     Deliberately NOT prose.
+
+     The first version of this wrote a coaching essay under every chart — what
+     happened, why it matters, the verdict, the mechanism, the citation. It was
+     accurate and it was far too much to read, which means it did not get read.
+     What someone actually wants off a progress report is the direction of
+     travel and a clean record of what they logged.
+
+     So: one stat line per topic, sized to sit under its chart, and everything
+     else is the chart and the table. If a line needs a second sentence it is
+     the wrong line. */
 
   function pl(n,w,ws){ return n+' '+(n===1?w:(ws||w+'s')); }
-  function join(parts){ return parts.filter(Boolean).join(' '); }
+  function dot(parts){ return parts.filter(Boolean).join('   ·   '); }
+  function sgn(n){ return (n>0?'+':'')+n; }
 
-  /* ---- executive summary ---- */
-  function headline(A){
-    const p=[];
-    const m=A.meta;
-    p.push('This report covers '+(m.single?('week '+(m.startW+1)):(pl(m.weeks,'week')+', week '+(m.startW+1)+' through week '+(m.endW+1)))+
-           (m.span?(', '+m.span):'')+'.');
-    p.push('Over those '+m.calendarDays+' days you logged something on '+A.engagement.activeDays+
-           ' of them ('+A.engagement.pct+'%), with a best unbroken streak of '+pl(A.engagement.bestStreak,'day')+'.');
+  function statLines(A){
+    const W=A.weight, T=A.training, N=A.nutrition, S=A.sleep, P=A.steps;
+    const L={};
 
-    const bits=[];
-    if(A.weight.daysLogged) bits.push('bodyweight on '+pl(A.weight.daysLogged,'day'));
-    if(A.nutrition.daysLogged) bits.push('food on '+pl(A.nutrition.daysLogged,'day'));
-    if(A.training.sessions) bits.push(pl(A.training.sessions,'training session')+' completed');
-    if(A.sleep.daysLogged) bits.push('sleep on '+pl(A.sleep.daysLogged,'night'));
-    if(bits.length) p.push('That breaks down as '+bits.join(', ')+'.');
+    // "82.2 to 82.2 kg" is what a single week produces if you always print the
+    // range — there is only one weekly average to compare against itself.
+    const oneWeekOfWeight = (W.change==null && W.last!=null);
+    L.weight = W.daysLogged ? dot([
+      oneWeekOfWeight ? (f1(W.last)+' kg average')
+                      : ((W.first!=null&&W.last!=null) ? (f1(W.first)+' to '+f1(W.last)+' kg') : null),
+      W.change!=null ? (sgn(f1(W.change))+' kg') : null,
+      W.ratePctWk!=null ? (sgn(f1(W.ratePctWk))+' % a week') : null,
+      pl(W.daysLogged,'weigh-in'),
+      W.plateau ? 'flat for 3 weeks' : null
+    ]) : 'No weigh-ins logged in this period.';
 
-    if(A.weight.change!=null){
-      const dir=A.weight.change<0?'down':(A.weight.change>0?'up':'level');
-      p.push('Bodyweight went from '+f1(A.weight.first)+' kg to '+f1(A.weight.last)+' kg — '+
-             dir+' '+f1(Math.abs(A.weight.change))+' kg'+
-             (A.weight.ratePctWk!=null?(', a trend of '+f1(Math.abs(A.weight.ratePctWk))+' % of bodyweight per week'):'')+'.');
-    } else if(A.weight.daysLogged<2){
-      p.push('There is not enough bodyweight data in this block to call a direction — weigh in at least three mornings a week and the next report can.');
-    }
+    L.training = T.sessions ? dot([
+      pl(T.sessions,'session'),
+      T.sessionsPerWeek+' a week',
+      kcal(T.tonnage)+' kg lifted',
+      T.tonnageChangePct!=null ? ('weekly volume '+sgn(Math.round(T.tonnageChangePct))+' %') : null,
+      T.cardioMin ? (T.cardioMin+' min cardio') : null
+    ]) : 'No sessions logged in this period.';
 
-    if(A.score.avg!=null){
-      p.push('The weighted progress score averaged '+A.score.avg+' % ('+A.score.grade+')'+
-             (A.score.best?(', peaking at '+A.score.best.score+' % in week '+A.score.best.n):'')+'.');
-      if(A.score.drift!=null&&Math.abs(A.score.drift)>=5){
-        p.push(A.score.drift>0
-          ? 'The second half of the block scored '+A.score.drift+' points higher than the first — you finished stronger than you started, which is the shape you want.'
-          : 'The second half scored '+Math.abs(A.score.drift)+' points lower than the first — the block faded, and the sections below show where.');
-      }
-    }
+    L.lifts = T.gainers && T.gainers.length
+      ? ('Getting stronger: '+T.gainers.slice(0,4).map(l=>l.name+' '+sgn(Math.round(l.deltaPct))+' %').join('   ·   '))
+      : null;
 
-    if(A.strongest.length) p.push('Your strongest signal was '+A.strongest[0].label.toLowerCase()+' at '+A.strongest[0].avg+' %.');
-    if(A.weakest.length){
-      const w=A.weakest[0];
-      p.push('The biggest single opportunity is '+w.label.toLowerCase()+': it averaged '+w.avg+
-             ' % and carries '+w.weight+' % of the score, so there are about '+w.lever+
-             ' points sitting unclaimed there — more than any other signal in this block.');
-    }
-    return p.join(' ');
+    L.nutrition = N.daysLogged ? dot([
+      kcal(N.avgCal)+' kcal a day',
+      N.target.cal ? ('target '+kcal(N.target.cal)) : null,
+      N.calDelta!=null ? (sgn(kcal(N.calDelta))+' a day') : null,
+      N.avgP+' g protein',
+      N.proteinPerKg ? (N.proteinPerKg+' g/kg') : null,
+      N.daysLogged+' of '+A.meta.calendarDays+' days logged'
+    ]) : 'No food logged in this period.';
+
+    const rec=[];
+    if(S.daysLogged) rec.push(S.avg+' h sleep', S.inBand+' of '+S.daysLogged+' nights in 7-9 h');
+    if(P.daysLogged) rec.push(kcal(P.avg)+' steps a day', P.at8k+' days over 8,000');
+    L.recovery = rec.length ? dot(rec) : 'No sleep or step data logged in this period.';
+
+    L.score = A.score.avg!=null
+      ? dot([ A.score.avg+' % average', A.score.grade,
+              A.score.best ? ('best W'+A.score.best.n+' at '+A.score.best.score+' %') : null,
+              A.score.drift!=null&&Math.abs(A.score.drift)>=5
+                ? ('second half '+sgn(A.score.drift)+' points') : null ])
+      : 'Not enough logged to score.';
+
+    L.consistency = dot([
+      A.engagement.activeDays+' of '+A.engagement.totalDays+' days active',
+      A.engagement.pct+' %',
+      'longest streak '+pl(A.engagement.bestStreak,'day')
+    ]);
+
+    return L;
   }
 
-  /* ---- bodyweight ---- */
-  function weightSection(A){
-    const W=A.weight, gt=A.meta.goalType;
-    const out={trend:'',theory:'',verdict:'',flag:null};
-
-    if(W.daysLogged===0){
-      out.trend='No bodyweight was logged in this block, so there is nothing to trend.';
-      out.theory='Scale weight is noisy day to day — food in the gut, water, salt and sleep can swing it a kilo either way — which is exactly why it is read as a weekly average, never as a single morning. Three to four weigh-ins a week, same time, after the toilet, before food, is enough to average out the noise.';
-      out.verdict='Action: weigh in on at least three mornings this week so the next report can tell you whether the plan is working.';
-      return out;
-    }
-
-    const t=[];
-    t.push('Weighed in on '+pl(W.daysLogged,'day')+' of '+A.meta.calendarDays+' ('+W.coverage+' % coverage). '+
-           'Weekly averages ran '+A.rows.filter(r=>r.bwAvg!=null).map(r=>'W'+r.n+' '+f1(r.bwAvg)).join(', ')+' kg.');
-    if(W.change!=null){
-      t.push('Net movement '+(W.change>0?'+':'')+f1(W.change)+' kg over the block, a fitted trend of '+
-             (W.ratePerWeek>0?'+':'')+f1(W.ratePerWeek)+' kg per week'+
-             (W.ratePctWk!=null?(' ('+(W.ratePctWk>0?'+':'')+f1(W.ratePctWk)+' % of bodyweight per week)'):'')+'.');
-    }
-    if(W.lowest&&W.highest&&W.lowest.date&&W.highest.date){
-      t.push('Lightest reading '+f1(W.lowest.bw)+' kg on '+fmtDay(W.lowest.date)+', heaviest '+f1(W.highest.bw)+' kg on '+fmtDay(W.highest.date)+'.');
-    }
-    if(W.bfChange!=null){
-      t.push('Body-fat check-ins moved from '+f1(W.bfFirst.v)+' % to '+f1(W.bfLast.v)+' % ('+(W.bfChange>0?'+':'')+f1(W.bfChange)+' points).');
-    }
-    out.trend=t.join(' ');
-
-    if(gt==='loss'){
-      out.theory='The target band for fat loss is 0.5 to 1.0 % of bodyweight per week. At '+
-        (W.last!=null?f1(W.last)+' kg that is roughly '+f1(W.last*0.005)+' to '+f1(W.last*0.01)+' kg a week':'your current weight')+
-        '. Go slower and the diet drags on long enough that adherence dies before the result arrives; go faster and an increasing share of what you lose is muscle, not fat, because the deficit outruns what stored fat can release per day (Helms 2014; Garthe 2011). The scale is the crude instrument here — it cannot separate fat from muscle from water — so it is read alongside strength on the bar and the tape, not on its own.';
-    } else if(gt==='gain'){
-      out.theory='Lean tissue accrues slowly. Beyond the first months of training, 0.25 to 0.5 % of bodyweight per week is about the ceiling for gain that stays mostly muscle (Aragon & Schoenfeld 2013). At '+
-        (W.last!=null?f1(W.last)+' kg that is '+f1(W.last*0.0025)+' to '+f1(W.last*0.005)+' kg a week':'your bodyweight')+
-        '. Faster than that and the surplus is being stored rather than built with, which just buys a longer cut later.';
-    } else {
-      out.theory='On a maintain goal the job is stability, not movement: staying inside about half a percent of bodyweight either way, week to week. Drift outside that band for three weeks running and you are on a slow bulk or a slow cut without having chosen one.';
-    }
-
-    const v=[];
-    if(W.band==='ideal') v.push('Verdict: the rate is sitting in the evidence-based band. Change nothing about calories — hold the line and let it run.');
-    else if(W.band==='fast') v.push('Verdict: the rate is faster than the band. That usually feels like winning and reads as muscle loss later. Add about 150 to 250 kcal a day, mostly carbohydrate around training, and re-check in two weeks.');
-    else if(W.band==='slow') v.push('Verdict: moving in the right direction but under the band. Before touching calories, check the food log is complete — unlogged oils, drinks and bites are the usual cause. If the log is honest, trim 100 to 200 kcal a day or add 2,000 steps.');
-    else if(W.band==='flat') v.push('Verdict: essentially flat. Bodyweight is not responding, which means intake and output are currently balanced regardless of what the plan says on paper.');
-    else if(W.band==='wrong') v.push('Verdict: weight is moving against the stated goal. That is not a failure of effort, it is a mismatch between what the plan assumes and what is actually going in — the nutrition section is where to look.');
-
-    if(W.plateau){
-      v.push('The last three weekly averages sit inside a 0.4 % band, which is a genuine plateau rather than a slow week. Two things drive this: energy expenditure falls as you get lighter and as unconscious daily movement drops, and portion creep quietly returns after a few weeks of dieting. The fix is one variable at a time — restore step count first, tighten logging second, cut calories last.');
-      out.flag='plateau';
-    }
-    if(W.toTarget!=null&&W.target!=null){
-      if((gt==='loss'&&W.toTarget<=0)||(gt==='gain'&&W.toTarget>=0)) v.push('You have reached the '+f1(W.target)+' kg target. The next block should be about holding it, not chasing further.');
-      else v.push(f1(Math.abs(W.toTarget))+' kg to go to the '+f1(W.target)+' kg target'+
-        (W.etaWeeks?(', which at the current trend arrives in about '+pl(W.etaWeeks,'week')+(W.etaDate?(' — around '+W.etaDate):'')):', though the current trend is too flat to project a date')+'.');
-    }
-    if(W.coverage<40) v.push('Note: at '+W.coverage+' % weigh-in coverage this trend is built on thin data. Treat it as a direction, not a measurement.');
-    out.verdict=v.join(' ');
-    return out;
-  }
-
-  /* ---- training ---- */
-  function trainingSection(A){
-    const T=A.training;
-    const out={trend:'',theory:'',verdict:''};
-
-    if(T.sessions===0){
-      out.trend='No training sessions were logged against these dates.';
-      out.theory='Everything else in this report is downstream of training. In a deficit, resistance training is the signal that tells the body to keep muscle while it spends fat; without it, weight still falls but a meaningful share of the loss is lean tissue, and the face-and-shoulders result people actually want does not arrive.';
-      out.verdict='Action: log every session, even a partial one. An unlogged session is an unmeasurable one, and a report cannot coach what it cannot see.';
-      return out;
-    }
-
-    const t=[];
-    t.push('Completed '+pl(T.sessions,'session')+' across '+pl(A.meta.weeks,'week')+' — an average of '+T.sessionsPerWeek+' a week — covering '+
-           pl(T.hardSets,'working set')+' and '+kcal(T.tonnage)+' kg of total volume moved.');
-    if(A.meta.weeks>1){
-      t.push('Sessions by week: '+T.perWeek.map((c,i)=>'W'+A.rows[i].n+' '+c).join(', ')+'.');
-    }
-    if(T.blankWeeks.length) t.push('No sessions at all in '+(T.blankWeeks.length===1?'week ':'weeks ')+T.blankWeeks.join(', ')+'.');
-    if(T.tonnagePerSession) t.push('That averages '+kcal(T.tonnagePerSession)+' kg per session.');
-    if(T.tonnageChangePct!=null&&A.meta.weeks>1){
-      t.push('Comparing the first half of the block with the second, average weekly volume went from '+
-             kcal(T.tonnageFirst)+' kg to '+kcal(T.tonnageLast)+' kg, '+
-             (T.tonnageChangePct>=0?'up ':'down ')+Math.abs(Math.round(T.tonnageChangePct))+' %.');
-    }
-    if(T.cardioSessions) t.push('Cardio: '+pl(T.cardioSessions,'session')+', '+T.cardioMin+' minutes'+(T.cardioKm>0?(' and '+f1(T.cardioKm)+' km'):'')+'.');
-    if(T.gainers.length){
-      t.push('Estimated one-rep max improved on '+pl(T.gainers.length,'lift')+', led by '+
-             T.gainers.slice(0,3).map(l=>l.name+' +'+Math.round(l.deltaPct)+' %'+
-               (l.last&&l.last.topSet?(' (to '+l.last.topSet.reps+'×'+f1(l.last.topSet.weight)+' kg)'):'')).join(', ')+'.');
-    }
-    if(T.stalled.length){
-      t.push('Flat or regressing: '+T.stalled.slice(0,4).map(l=>l.name).join(', ')+'.');
-    }
-    out.trend=t.join(' ');
-
-    out.theory='Progressive overload is the whole mechanism: muscle adapts to a demand it has met before only if the demand keeps rising. The honest measure is not how tired a session felt but whether load, reps or quality sets went up over time, which is why estimated one-rep max is tracked rather than raw weight — eight reps at 60 kg is more work than five at 65 kg, and only the estimate says so. Volume is the dose that drives growth, with roughly 10 to 20 hard sets per muscle per week the productive range for most people (Schoenfeld 2017); below it you maintain, far above it you accumulate fatigue you cannot recover from. In a deficit, holding load is already a win — the goal shifts from adding weight to not losing it.';
-
-    const v=[];
-    if(T.sessionsPerWeek>=3) v.push('Verdict: attendance is where it needs to be at '+T.sessionsPerWeek+' sessions a week. That frequency is enough to hit each muscle group twice, which is the setup that works.');
-    else if(T.sessionsPerWeek>=2) v.push('Verdict: '+T.sessionsPerWeek+' sessions a week maintains but does not build much. Adding a third session is the single highest-return change available to you.');
-    else v.push('Verdict: at '+T.sessionsPerWeek+' sessions a week the stimulus is too thin and too spread out to drive adaptation. Two full-body sessions a week beat one long one.');
-
-    if(T.tonnageChangePct!=null){
-      if(T.tonnageChangePct>=10) v.push('Volume is climbing '+Math.round(T.tonnageChangePct)+' %, which is real overload rather than the same work repeated. Keep the increases small enough that form holds.');
-      else if(T.tonnageChangePct<=-15) v.push('Volume dropped '+Math.abs(Math.round(T.tonnageChangePct))+' % across the block. If that was a planned deload, fine; if not, it is the reason the strength numbers have not moved.');
-      else v.push('Volume is broadly flat, which means the body is being asked to do what it already knows how to do. Add one set to your two main lifts, or two to three reps at the same load, and re-test in two weeks.');
-    }
-    if(T.stalled.length>=2){
-      v.push('Action: '+T.stalled.slice(0,2).map(l=>l.name).join(' and ')+' have not moved. Pick one and drive it — add 2.5 kg or one rep per set per session for the next three sessions, and if it still will not move, the limiter is recovery or technique, not effort.');
-    } else if(T.gainers.length){
-      v.push('Action: keep the progression on '+T.gainers[0].name+' running at the same increment; it is responding.');
-    }
-    out.verdict=v.join(' ');
-    return out;
-  }
-
-  /* ---- nutrition ---- */
-  function nutritionSection(A){
-    const N=A.nutrition;
-    const out={trend:'',theory:'',verdict:''};
-
-    if(N.daysLogged===0){
-      out.trend='No food was logged in this block.';
-      out.theory='Nutrition carries the largest single weight in the score for a reason: training is the signal but food is the substrate, and no amount of work in the gym outruns an intake that is not accounted for. People routinely under-estimate what they eat by 20 to 40 % when guessing, which is not dishonesty — it is that oils, drinks, sauces and handfuls are genuinely invisible until they are written down.';
-      out.verdict='Action: log food for seven consecutive days — including the days that go badly, which are the informative ones. Until then, every nutrition judgement in this report is guesswork.';
-      return out;
-    }
-
-    const t=[];
-    t.push('Logged food on '+pl(N.daysLogged,'day')+' of '+A.meta.calendarDays+' ('+N.coverage+' % coverage), averaging '+
-           kcal(N.avgCal)+' kcal a day'+(N.target.cal?(' against a '+kcal(N.target.cal)+' kcal target'):'')+'.');
-    if(N.calDelta!=null) t.push('That is '+(N.calDelta>0?'+':'')+kcal(N.calDelta)+' kcal a day versus target'+
-      (N.onTargetDays!=null?(', with '+N.onTargetDays+' days inside 10 % of it, '+N.overTargetDays+' over and '+N.underTargetDays+' under'):'')+'.');
-    t.push('Macros averaged '+N.avgP+' g protein'+(N.target.p?(' (target '+N.target.p+' g)'):'')+', '+N.avgC+' g carbs, '+N.avgF+' g fat.');
-    if(N.proteinPerKg!=null) t.push('At '+N.bodyKg+' kg that is '+N.proteinPerKg+' g of protein per kg of bodyweight.');
-    if(N.calSd!=null) t.push('Day-to-day swing was '+kcal(N.calSd)+' kcal (standard deviation).');
-    if(N.weekendDrift!=null&&Math.abs(N.weekendDrift)>=150){
-      t.push('Weekdays averaged '+kcal(N.weekdayCal)+' kcal, weekends '+kcal(N.weekendCal)+' kcal — a '+
-             (N.weekendDrift>0?'rise':'drop')+' of '+kcal(Math.abs(N.weekendDrift))+' kcal on Saturday and Sunday.');
-    }
-    if(N.biggestDay&&N.biggestDay.date) t.push('Biggest day '+kcal(N.biggestDay.food.cal)+' kcal on '+fmtDay(N.biggestDay.date)+
-      '; leanest '+kcal(N.leanestDay.food.cal)+' kcal on '+fmtDay(N.leanestDay.date)+'.');
-    out.trend=t.join(' ');
-
-    out.theory='Two things decide whether nutrition is working. The first is total energy: bodyweight follows the balance between what comes in and what goes out over weeks, and no food is inherently fattening or slimming outside that arithmetic. The second is protein, which is what protects muscle while the balance is negative — 1.6 to 2.2 g per kg of bodyweight per day is where the evidence stops showing further benefit (Morton 2018), and hitting it matters more than the timing or the source. Consistency beats precision: a diet run at 90 % accuracy every day outperforms a perfect one abandoned on day nine, and the standard failure mode is not a bad plan but four disciplined weekdays undone by two unlogged weekend days.';
-
-    const v=[];
-    if(N.proteinPerKg!=null){
-      if(N.proteinPerKg>=1.6) v.push('Verdict: protein is sufficient at '+N.proteinPerKg+' g/kg. Hold it — this is the number protecting muscle while weight moves.');
-      else if(N.proteinPerKg>=1.2) v.push('Verdict: protein at '+N.proteinPerKg+' g/kg is under the range. Add roughly '+Math.round((1.6-N.proteinPerKg)*N.bodyKg)+' g a day — one more protein-led meal or a shake covers it.');
-      else v.push('Verdict: protein at '+N.proteinPerKg+' g/kg is well short and is the most likely reason strength stalls while weight falls. Target '+Math.round(1.6*N.bodyKg)+' to '+Math.round(2.0*N.bodyKg)+' g a day.');
-    } else if(N.avgP!=null){
-      v.push('Verdict: averaging '+N.avgP+' g of protein a day. Log a bodyweight so this can be judged per kilo rather than in the abstract.');
-    }
-    if(N.calDelta!=null){
-      const over=N.calDelta>0;
-      if(Math.abs(N.calDelta)<=100) v.push('Calories are effectively on target — within '+kcal(Math.abs(N.calDelta))+' kcal a day. That is the hard part done.');
-      else if(over) v.push('Running '+kcal(N.calDelta)+' kcal a day over target adds up to roughly '+kcal(N.calDelta*7)+
-        ' kcal a week — about '+f1(N.calDelta*7/7700)+' kg of fat a week you are not losing, which over a 12-week block is '+
-        f1(N.calDelta*7*12/7700)+' kg of result left behind.');
-      else v.push('Running '+kcal(Math.abs(N.calDelta))+' kcal a day under target. Under-eating is not a shortcut — it costs training quality and recovery first, and it is the usual reason a deficit stops being sustainable.');
-    }
-    if(N.coverage<50) v.push('At '+N.coverage+' % logging coverage the averages above describe your logged days, not your week. The unlogged days are almost never the light ones.');
-    if(N.weekendDrift!=null&&N.weekendDrift>=300) v.push('Action: the weekend costs you about '+kcal(N.weekendDrift*2)+' kcal every week. You do not need a stricter weekend — pull 150 kcal off each weekday and the week balances without touching Saturday.');
-    if(N.calSd!=null&&N.avgCal&&N.calSd/N.avgCal>0.25) v.push('Intake swings more than a quarter of the daily average day to day. Steadier days make the trend readable and hunger easier to manage.');
-    out.verdict=v.join(' ');
-    return out;
-  }
-
-  /* ---- sleep + steps ---- */
-  function recoverySection(A){
-    const S=A.sleep, P=A.steps;
-    const out={trend:'',theory:'',verdict:''};
-    const t=[];
-
-    if(S.daysLogged) {
-      t.push('Slept an average of '+S.avg+' hours across '+pl(S.daysLogged,'night')+', with '+S.inBand+' of them ('+S.inBandPct+' %) inside the 7 to 9 hour window'+
-             (S.short?(' and '+pl(S.short,'night')+' under 6 hours'):'')+'.');
-      if(S.sd!=null) t.push('Night-to-night variation was '+S.sd+' hours.');
-      if(S.worst&&S.worst.date&&S.best&&S.best.date) t.push('Shortest night '+f1(S.worst.sleep)+' h on '+fmtDay(S.worst.date)+', longest '+f1(S.best.sleep)+' h on '+fmtDay(S.best.date)+'.');
-    } else t.push('No sleep was logged in this block.');
-
-    if(P.daysLogged){
-      t.push('Averaged '+kcal(P.avg)+' steps a day over '+pl(P.daysLogged,'day')+' — '+kcal(P.total)+' steps in total — clearing 8,000 on '+
-             P.at8k+' of them ('+P.at8kPct+' %)'+(P.under5k?(' and falling under 5,000 on '+pl(P.under5k,'day')):'')+'.');
-      if(P.best&&P.best.date) t.push('Best day '+kcal(P.best.steps)+' on '+fmtDay(P.best.date)+'.');
-    } else t.push('No step data was logged.');
-
-    const st=A.checkin.stress;
-    const stressBits=Object.keys(st).map(k=>st[k]+' '+k);
-    if(stressBits.length) t.push('Self-reported stress across check-ins: '+stressBits.join(', ')+'.');
-    out.trend=t.join(' ');
-
-    out.theory='Sleep and daily movement are the two levers people discount and then wonder why the plan underperforms. Restricting sleep during a deficit does not slow fat loss much — it changes what you lose, shifting a substantially larger share of the loss to lean tissue while raising hunger and lowering next-day training output (Nedeltcheva 2010). Seven to nine hours is the range where those effects disappear (Hirshkowitz 2015). Steps matter for a different reason: they are unconscious daily energy expenditure, the part of the budget that quietly falls as you diet and as you get lighter, and the benefit curve flattens somewhere around 8,000 to 10,000 a day rather than at the arbitrary 10,000 (Paluch 2022). A step target is not cardio — it is the floor that keeps expenditure from sliding while you eat less.';
-
-    const v=[];
-    if(S.avg!=null){
-      if(S.avg>=7&&S.avg<=9) v.push('Verdict: sleep is in range at '+S.avg+' hours. Protect it — it is doing quiet work on every other number here.');
-      else if(S.avg>=6) v.push('Verdict: at '+S.avg+' hours you are running just under the range. Moving bedtime 30 to 45 minutes earlier is a smaller ask than it sounds and buys back training quality and appetite control.');
-      else v.push('Verdict: '+S.avg+' hours is short enough to be actively working against the plan — expect higher hunger, lower gym output and a worse split between fat and muscle lost. This outranks any change to the diet.');
-      if(S.sd!=null&&S.sd>=1.5) v.push('Sleep is also inconsistent (±'+S.sd+' h). A fixed wake time does more for that than a fixed bedtime.');
-    }
-    if(P.avg!=null){
-      if(P.avg>=8000) v.push('Steps are at or above the plateau point at '+kcal(P.avg)+' a day. No change needed — hold this even on rest days.');
-      else if(P.avg>=7250) v.push('Steps at '+kcal(P.avg)+' a day are effectively at the plateau point — the remaining '+kcal(8000-P.avg)+
-        ' is not worth chasing. Consistency matters more here than the last few hundred: it is the low days that pull the average down, not the ceiling.');
-      else if(P.avg>=5000) v.push('Steps at '+kcal(P.avg)+' a day leave room: closing to 8,000 is roughly '+kcal(8000-P.avg)+' more, about '+
-        Math.round((8000-P.avg)/110)+' minutes of walking, and is worth around '+kcal((8000-P.avg)*0.045)+' kcal a day without touching food.');
-      else v.push('Steps at '+kcal(P.avg)+' a day are low enough to be the limiter. Build to 6,000 first, then 8,000 — this is easier to sustain than the equivalent cut in calories.');
-    }
-    if(A.checkin.highStress>=2) v.push('High stress was reported in '+pl(A.checkin.highStress,'week')+'. Stress does not just feel bad — it suppresses recovery and drives eating that has nothing to do with hunger. Where a block looks inconsistent, this is usually the cause and it should be planned around rather than pushed through.');
-    out.verdict=v.join(' ');
-    return out;
-  }
-
-  /* ---- consistency / adherence ---- */
-  function consistencySection(A){
-    const out={trend:'',theory:'',verdict:''};
-    const t=[];
-    t.push('Active on '+A.engagement.activeDays+' of '+A.engagement.totalDays+' days ('+A.engagement.pct+' %), longest unbroken streak '+pl(A.engagement.bestStreak,'day')+'.');
-    t.push('Weekly check-ins completed for '+A.checkin.done+' of '+pl(A.meta.weeks,'week')+'.');
-    const ol=A.checkin.overload, dt=A.checkin.diet;
-    const olMap={improved:'improved',form:'better form',same:'held',regressed:'regressed'};
-    const dtMap={met:'on plan',missed_few:'missed a few',binge:'off plan'};
-    const olBits=Object.keys(ol).map(k=>ol[k]+' '+(olMap[k]||k));
-    const dtBits=Object.keys(dt).map(k=>dt[k]+' '+(dtMap[k]||k));
-    if(olBits.length) t.push('Overload self-report: '+olBits.join(', ')+'.');
-    if(dtBits.length) t.push('Diet self-report: '+dtBits.join(', ')+'.');
-    if(A.score.weeksScored>1&&A.score.best&&A.score.worst){
-      t.push('Best week was week '+A.score.best.n+' at '+A.score.best.score+' %, weakest week '+A.score.worst.n+' at '+A.score.worst.score+' %'+
-             (A.score.best.range?(' ('+A.score.best.range+' versus '+A.score.worst.range+')'):'')+'.');
-    }
-    out.trend=t.join(' ');
-    out.theory='Consistency is not a personality trait, it is a design problem. Adherence collapses when a plan requires daily willpower, and holds when the default behaviour is already close to correct — the same breakfast, the same training days each week, food logged at the moment of eating rather than reconstructed at midnight. The score in this report is deliberately weighted toward the things you control daily rather than the scale, because the scale is an outcome and those are the inputs.';
-    const v=[];
-    if(A.engagement.pct>=80) v.push('Verdict: engagement is high. The data behind this report is trustworthy and the conclusions in it can be acted on directly.');
-    else if(A.engagement.pct>=50) v.push('Verdict: engagement is partial. Roughly '+(100-A.engagement.pct)+' % of days are invisible to this report, and unlogged days are systematically different from logged ones — assume the real averages are slightly worse than the ones printed here.');
-    else v.push('Verdict: most days in this block were not logged. Before changing anything about the plan, spend one week logging everything — the plan is probably not the problem, the visibility is.');
-    if(A.checkin.done<A.meta.weeks) v.push('Action: complete the weekly check-in for every week. It is four taps and it is what lets overload, diet and stress enter the score at all.');
-    out.verdict=v.join(' ');
-    return out;
-  }
-
-  /* ---- prioritised action plan ----
-     The page this prints on says "ranked by how much it will move the result",
-     so it has to actually be ranked. Each candidate carries an impact weight:
-     visibility problems first (you cannot coach data you do not have), then the
-     levers that move the outcome directly, then the fine-tuning. Where a signal
-     lever is available it nudges the base weight, so the ordering reflects THIS
-     block rather than a generic opinion. */
-  function actionPlan(A){
-    const acts=[];
+  /* ---- what to fix, three lines, biggest first ----
+     Ranked by impact, one line each, and every line carries the number it is
+     about. No rationale — the chart above it is the rationale. */
+  function focus(A){
+    const out=[];
     const N=A.nutrition, W=A.weight, T=A.training, S=A.sleep, P=A.steps;
-    const leverOf=key=>{ const s=(A.signals||[]).find(x=>x.key===key); return s?s.lever:0; };
+    const add=(impact,text)=>out.push({impact,text});
 
-    if(N.proteinPerKg!=null&&N.proteinPerKg<1.6&&N.bodyKg){
-      acts.push({impact:85+leverOf('diet'), title:'Raise protein to '+Math.round(1.6*N.bodyKg)+' g a day',
-        why:'You are averaging '+N.avgP+' g ('+N.proteinPerKg+' g/kg). Under 1.6 g/kg, more of what you lose comes off as muscle.',
-        how:'Add roughly '+Math.round((1.6-N.proteinPerKg)*N.bodyKg)+' g — one palm of meat or fish, or a shake, attached to a meal you already eat.'});
-    }
-    if(N.coverage!=null&&N.coverage<70){
-      acts.push({impact:95, title:'Log food on every day for the next 7 days',
-        why:'Only '+N.coverage+' % of days were logged, so every calorie figure in this report describes a filtered week.',
-        how:'Log at the moment of eating, not at night. Log the bad days too — those are the ones that explain the trend.'});
-    }
-    if(T.sessionsPerWeek!=null&&T.sessionsPerWeek<3){
-      acts.push({impact:88+leverOf('ol'), title:'Get to three training sessions a week',
-        why:'You averaged '+T.sessionsPerWeek+'. Below three, most muscle groups are trained once a week or less, which maintains rather than builds.',
-        how:'Fix the days in the calendar now rather than deciding each morning. Three 45-minute sessions beat two long ones.'});
-    }
-    if(T.stalled.length>=1){
-      acts.push({impact:45+leverOf('ol'), title:'Drive '+T.stalled[0].name+' for three sessions',
-        why:'Estimated one-rep max has not moved on it across '+pl(T.stalled[0].sessions,'session')+'.',
-        how:'Add 2.5 kg or one rep per set each session. If it still will not move after three, drop the load 10 % and rebuild.'});
-    }
-    // 7,250 not 8,000: the recovery verdict calls anything above that "effectively
-    // at the plateau point", and an action plan that contradicts the section it
-    // summarises reads as boilerplate — which is what makes clients stop reading.
-    if(P.avg!=null&&P.avg<7250){
-      acts.push({impact:58+leverOf('steps'), title:'Build daily steps to 8,000',
-        why:'You averaged '+kcal(P.avg)+'. Daily movement is the part of expenditure that falls silently while dieting.',
-        how:'Add about '+Math.round((8000-P.avg)/110)+' minutes of walking a day — one deliberate walk, same time each day, is easier to keep than scattered movement.'});
-    }
-    if(S.avg!=null&&S.avg<7){
-      acts.push({impact:72+leverOf('sleep'), title:'Get sleep to 7 hours',
-        why:'You averaged '+S.avg+' h. Short sleep shifts loss toward lean tissue and raises next-day hunger.',
-        how:'Set a fixed wake time first and work bedtime back from it. A consistent 7 beats an erratic 8.'});
-    }
-    if(W.plateau){
-      acts.push({impact:80+leverOf('bw'), title:'Break the plateau in order: movement, then logging, then calories',
-        why:'Three consecutive weekly averages inside a 0.4 % band is a genuine stall, not noise.',
-        how:'Week 1 restore steps to target. Week 2 log everything with a scale. Only if both hold and weight still has not moved, cut 200 kcal a day.'});
-    }
-    if(N.weekendDrift!=null&&N.weekendDrift>=300){
-      acts.push({impact:78+leverOf('diet'), title:'Close the weekend gap',
-        why:'Weekends run '+kcal(N.weekendDrift)+' kcal a day above weekdays, which is roughly '+kcal(N.weekendDrift*2)+' kcal a week.',
-        how:'Do not restrict the weekend. Take 150 kcal off each weekday instead and let Saturday stay social.'});
-    }
-    if(A.checkin.highStress>=2){
-      acts.push({impact:65+leverOf('stress'), title:'Plan around stress instead of pushing through it',
-        why:'High stress was reported in '+pl(A.checkin.highStress,'week')+'. It suppresses recovery, blunts training output and drives eating that is not hunger.',
-        how:'On a known-bad week, cut planned volume by a third rather than skipping training entirely, and hold protein and sleep fixed. A reduced week you complete beats a full week you abandon.'});
-    }
-    if(A.checkin.done<A.meta.weeks){
-      acts.push({impact:40, title:'Complete the weekly check-in every week',
-        why:'Only '+A.checkin.done+' of '+A.meta.weeks+' were filled in, and overload, diet and stress cannot score without it.',
-        how:'Sunday evening, same time, four taps.'});
-    }
-    if(!acts.length){
-      acts.push({impact:1, title:'Change nothing — repeat this block',
-        why:'Every measured signal is inside its target range and the trend is moving with the goal.',
-        how:'Run the same plan again and re-read this report in four weeks. Progress is lost far more often to unnecessary changes than to a plan run too long.'});
-    }
-    // Ranked, then capped at five: a list of ten actions is a list of none.
-    return acts.sort((a,b)=>(b.impact||0)-(a.impact||0)).slice(0,5);
+    if(N.coverage!=null&&N.coverage<70)
+      add(95,'Log food every day — only '+N.coverage+' % of days were logged.');
+    if(N.proteinPerKg!=null&&N.proteinPerKg<1.6&&N.bodyKg)
+      add(85,'Protein up to '+Math.round(1.6*N.bodyKg)+' g a day — currently '+N.avgP+' g.');
+    if(N.calDelta!=null&&N.calDelta>150)
+      add(84,'Calories are '+kcal(N.calDelta)+' a day over target.');
+    if(N.calDelta!=null&&N.calDelta<-150)
+      add(68,'Calories are '+kcal(Math.abs(N.calDelta))+' a day under target.');
+    if(T.sessionsPerWeek!=null&&T.sessionsPerWeek<3)
+      add(88,'Train three times a week — currently '+T.sessionsPerWeek+'.');
+    if(T.sessions&&T.tonnageChangePct!=null&&T.tonnageChangePct<5)
+      add(62,'Volume is flat — add a set or a few reps to your main lifts.');
+    if(W.plateau)
+      add(80,'Weight has not moved for three weeks.');
+    if(S.avg!=null&&S.avg<7)
+      add(72,'Sleep up to 7 hours — currently '+S.avg+' h.');
+    if(P.avg!=null&&P.avg<7250)
+      add(58,'Steps up to 8,000 a day — currently '+kcal(P.avg)+'.');
+    if(A.checkin.highStress>=2)
+      add(65,'High stress in '+pl(A.checkin.highStress,'week')+' — plan those weeks lighter.');
+    if(A.checkin.done<A.meta.weeks)
+      add(40,'Fill in the weekly check-in — '+A.checkin.done+' of '+A.meta.weeks+' done.');
+    if(N.weekendDrift!=null&&N.weekendDrift>=300)
+      add(70,'Weekends run '+kcal(N.weekendDrift)+' kcal a day above weekdays.');
+
+    if(!out.length) add(1,'Everything measured is on track — run this block again.');
+    return out.sort((a,b)=>b.impact-a.impact).slice(0,3).map(x=>x.text);
   }
 
-  function narrate(A){
-    return {
-      headline: headline(A),
-      weight: weightSection(A),
-      training: trainingSection(A),
-      nutrition: nutritionSection(A),
-      recovery: recoverySection(A),
-      consistency: consistencySection(A),
-      actions: actionPlan(A)
-    };
+  function summarize(A){
+    return { lines: statLines(A), focus: focus(A) };
   }
 
-  return { analyze, narrate, monthPresets, reportName,
+  return { analyze, summarize, monthPresets, reportName,
            fmtDay, fmtFull, fmtSpan, DLAB, e1rm, mean, slope, r1, f1 };
 })();

@@ -424,7 +424,7 @@ html.nosplash #devfit-splash{display:none!important}
       <div class="icon">W</div>
       <div class="body">
         <div class="title" id="week-report-title">Week Report (PDF)</div>
-        <div class="desc" id="week-report-desc">Your latest logged week, day by day, with coaching</div>
+        <div class="desc" id="week-report-desc">Your latest logged week, trends and day-by-day log</div>
       </div>
       <div class="chev">›</div>
     </button>
@@ -433,7 +433,7 @@ html.nosplash #devfit-splash{display:none!important}
       <div class="icon">P</div>
       <div class="body">
         <div class="title">Progress Report (PDF)</div>
-        <div class="desc">Pick any week, month or block — full written analysis</div>
+        <div class="desc">Pick any week, month or block — trends and your full log</div>
       </div>
       <div class="chev">›</div>
     </button>
@@ -445,9 +445,8 @@ html.nosplash #devfit-splash{display:none!important}
       <button class="pdf-btn" id="program-report-btn" type="button">Generate</button>
     </div>
     <div style="font-size:11px;color:#888;margin-top:10px;line-height:1.55">
-      Every report covers bodyweight, training, food, sleep, steps and recovery for the dates you pick —
-      each with what happened, why it matters and what to change next. Files are named for the report,
-      e.g. <b>DevFit_Week1_to_Week5_Report.pdf</b>.
+      Trends for weight, training volume, calories, sleep and steps over the dates you pick, then your
+      full day-by-day log. Files are named for the report, e.g. <b>DevFit_Week1_to_Week5_Report.pdf</b>.
     </div>
   </div>
 
@@ -600,6 +599,7 @@ html.nosplash #devfit-splash{display:none!important}
   <canvas id="exp-score" width="560" height="220"></canvas>
   <canvas id="exp-cal" width="560" height="200"></canvas>
   <canvas id="exp-act" width="560" height="200"></canvas>
+  <canvas id="exp-vol" width="560" height="200"></canvas>
 </div>
 
 <div id="toast" class="toast"></div>
@@ -887,7 +887,7 @@ function buildRangeOptions(){
   if(wt) wt.textContent='Week '+(currentWeek+1)+' Report (PDF)';
   if(wd){
     const span=spanLabel(currentWeek,currentWeek).replace(/^\s*·\s*/,'');
-    wd.textContent = span ? (span+' — day by day, with coaching') : 'Day by day, with coaching';
+    wd.textContent = span ? (span+' — trends and your day-by-day log') : 'Trends and your day-by-day log';
   }
 }
 
@@ -987,22 +987,38 @@ function buildExportCharts(A){
     options: baseOpts({ scales:{ x:{ticks:{font:{size:9}}}, y:{beginAtZero:true, max:100, ticks:{font:{size:10}}} } })
   });
 
-  // ── Daily calories against target ──
-  const calLabels=[], calData=[];
-  rows.forEach(r=>r.days.forEach(d=>{
-    if(!d.food) return;
-    calLabels.push(d.date ? DevFitReport.fmtDay(d.date).replace(/^\w+, /,'') : ('W'+r.n+' '+d.label));
-    calData.push(d.food.cal);
-  }));
+  // ── Weekly training volume ──
+  // The headline training trend: is the work going up over the block? Weekly,
+  // not per session — session counts vary and that makes a per-session line
+  // jump around for reasons that have nothing to do with progress.
+  const volData=A.training.perWeekTonnage;
+  kill('_expVolChart');
+  window._expVolChart = new Chart(dot('exp-vol'), {
+    type:'bar',
+    data:{ labels:rows.map(r=>'W'+r.n), datasets:[
+      { data:volData, backgroundColor:'#8c1c1c', borderRadius:5 },
+      { type:'line', data:A.training.perWeek.map(c=>c), borderColor:'#556070', borderWidth:2,
+        pointRadius:3, yAxisID:'y1', spanGaps:true }
+    ]},
+    options: baseOpts({ scales:{
+      x:{ticks:{font:{size:9}}},
+      y:{beginAtZero:true, position:'left', ticks:{font:{size:8}}},
+      y1:{beginAtZero:true, position:'right', grid:{drawOnChartArea:false}, ticks:{font:{size:8}, stepSize:1}}
+    }})
+  });
+
+  // ── Weekly average calories against target ──
+  // Weekly, not daily: 56 daily bars is noise, 8 weekly bars is a trend.
   const tCal=Number(A.nutrition.target.cal)||null;
+  const calData=A.nutrition.perWeek.map(p=>p.cal==null?0:p.cal);
   kill('_expCalChart');
   window._expCalChart = new Chart(dot('exp-cal'), {
     type:'bar',
-    data:{ labels:calLabels, datasets:[
-      { data:calData, backgroundColor:calData.map(v=>tCal?(v>tCal*1.1?'#cc0000':(v<tCal*0.9?'#b8860b':'#2d7a3a')):'#556070'), borderRadius:3 },
+    data:{ labels:rows.map(r=>'W'+r.n), datasets:[
+      { data:calData, backgroundColor:calData.map(v=>!v?'#d5d5db':(tCal?(v>tCal*1.1?'#cc0000':(v<tCal*0.9?'#b8860b':'#2d7a3a')):'#556070')), borderRadius:5 },
       { type:'line', data:tCal?calData.map(()=>tCal):[], borderColor:'#111', borderWidth:1.5, borderDash:[5,3], pointRadius:0, fill:false }
     ]},
-    options: baseOpts({ scales:{ x:{ticks:{font:{size:7}, maxTicksLimit:14, maxRotation:60}}, y:{beginAtZero:true, ticks:{font:{size:9}}} } })
+    options: baseOpts({ scales:{ x:{ticks:{font:{size:9}}}, y:{beginAtZero:true, ticks:{font:{size:9}}} } })
   });
 
   // ── Sleep + steps, weekly averages, twin axis ──
@@ -1218,13 +1234,21 @@ function makeReportDoc(A){
     }
   }
 
-  // The three beats every coach uses: what happened, why it matters, what you
-  // do about it. Colour-coded so a client can skim straight to the verdict.
-  function analysis(n){
-    if(!n) return;
-    if(n.trend)   block('What happened', n.trend, SLATE, [244,245,247]);
-    if(n.theory)  block('Why it matters', n.theory, GOLD, [251,248,240]);
-    if(n.verdict) block('Verdict and next step', n.verdict, RED, [252,244,244]);
+  // The one line that sits under a chart. Wraps if it has to, but it is written
+  // upstream to fit — see the note at the top of report-engine.js about why this
+  // replaced three paragraphs of coaching per section.
+  function statline(text){
+    if(!text) return;
+    need(9);
+    setFill([245,245,248]); pdf.roundedRect(M,S.y,CW,0.1,0,0,'F');
+    font('bold',8.2);
+    const lines=pdf.splitTextToSize(String(text), CW-6);
+    const h=lines.length*4.9+4;
+    setFill([248,248,250]); pdf.roundedRect(M,S.y,CW,h,1.5,1.5,'F');
+    setFill(RED); pdf.rect(M,S.y,2,h,'F');
+    setText([48,48,56]);
+    lines.forEach((l,i)=>pdf.text(l, M+6, S.y+5.4+i*4.9));
+    S.y+=h+5;
   }
 
   function kpis(items, perRow){
@@ -1340,14 +1364,19 @@ function makeReportDoc(A){
   return { pdf, PW, PH, M, CW, TOP, BOT, S,
            RED, INK, BODY, MUTE, LINE, WASH, SLATE, GREEN, GOLD, ORANGE,
            setFill, setText, setDraw, font, scoreColor, scoreGrade,
-           newPage, need, gap, page, slab, para, block, analysis,
+           newPage, need, gap, page, slab, para, block, statline,
            kpis, table, chart, signalBars, footers, runningHead };
 }
 
 // ---------- REPORT GENERATION ----------
 // One renderer for every report. A "week report" is simply a range of one week,
-// so the single-week and multi-week exports can never drift in content, wording
-// or maths again — the only difference is how many rows each table has.
+// so the single-week and multi-week exports can never drift in content or maths.
+//
+// Shape of the document, and why: charts carry the trends, tables carry the log,
+// and text is ONE line per section. The first version of this printed a coached
+// essay under every chart and it was too long to be read. Everything a client
+// asked for — where the trend is going, what they logged, whether volume and
+// calories are moving — is on the first three pages.
 function generateReport(range){
   if(!window.jspdf){ toast('PDF library still loading…', true); return; }
   const { jsPDF } = window.jspdf;
@@ -1357,7 +1386,7 @@ function generateReport(range){
   try{
     A = DevFitReport.analyze(range.startW, range.endW,
         {kind:range.kind, title:range.title, fileBase:range.fileBase});
-    N = DevFitReport.narrate(A);
+    N = DevFitReport.summarize(A);
   }catch(e){ console.error(e); toast('Could not read your data', true); return; }
 
   toast('Building '+A.meta.title+'…');
@@ -1375,9 +1404,9 @@ function paintReport(A, N){
   const pdf = R.pdf, M = R.M, CW = R.CW, PW = R.PW, S = R.S;
   const f1 = DevFitReport.f1;
   const nf = n => (n==null?null:Math.round(n).toLocaleString());
-  const dash = v => (v==null||v==='')?null:v;
+  const L = N.lines;
 
-  /* ================= PAGE 1 — COVER + EXECUTIVE SUMMARY ================= */
+  /* ================= PAGE 1 — SUMMARY ================= */
   R.setFill(R.RED); pdf.rect(0,0,PW,13,'F');
   pdf.setFontSize(19); pdf.setFont('helvetica','bolditalic');
   R.setText(R.INK); pdf.text('DEV', M, 28);
@@ -1387,15 +1416,11 @@ function paintReport(A, N){
 
   R.font('bold',14); R.setText(R.INK);
   pdf.text(A.meta.title, M, 39);
-
   R.font('normal',9.5); R.setText(R.MUTE);
   pdf.text(String(A.meta.name).toUpperCase(), M, 46);
-  const subLine = [
-    A.meta.span || 'Program start date not set',
-    A.meta.calendarDays+' days',
-    A.meta.goalLabel
-  ].join('   ·   ');
-  pdf.text(subLine, M, 51.5);
+  pdf.text([A.meta.span||'Program start date not set',
+            A.meta.calendarDays+' days',
+            A.meta.goalLabel].join('   ·   '), M, 51.5);
   R.font('normal',8); R.setText([165,165,172]);
   pdf.text('Generated '+A.meta.generated, M, 56.5);
 
@@ -1403,7 +1428,6 @@ function paintReport(A, N){
   R.setDraw(R.LINE); pdf.setLineWidth(0.3); pdf.line(M+26,60,PW-M,60);
   S.y = 66; S.section = 'Summary';
 
-  R.slab('The numbers at a glance');
   R.kpis([
     { lbl:'Progress score', val:A.score.avg==null?'—':A.score.avg+'%',
       sub:A.score.grade||'not enough logged', accent:A.score.avg==null?null:R.scoreColor(A.score.avg) },
@@ -1411,210 +1435,93 @@ function paintReport(A, N){
       sub:A.weight.ratePctWk==null?'':(f1(A.weight.ratePctWk)+' %BW/week') },
     { lbl:'Training', val:A.training.sessions+(A.training.sessions===1?' session':' sessions'),
       sub:A.training.sessionsPerWeek==null?'':(A.training.sessionsPerWeek+' per week') },
-    { lbl:'Food logged', val:A.nutrition.daysLogged+' days',
-      sub:A.nutrition.avgCal==null?'no diary':(nf(A.nutrition.avgCal)+' kcal avg') },
+    { lbl:'Volume', val:A.training.tonnage?nf(A.training.tonnage)+' kg':'—',
+      sub:A.training.tonnageChangePct==null?'':((A.training.tonnageChangePct>0?'+':'')+Math.round(A.training.tonnageChangePct)+'% over block') },
+    { lbl:'Avg calories', val:A.nutrition.avgCal==null?'—':nf(A.nutrition.avgCal),
+      sub:A.nutrition.target.cal?('target '+nf(A.nutrition.target.cal)):(A.nutrition.daysLogged+' days logged') },
+    { lbl:'Avg protein', val:A.nutrition.avgP==null?'—':(A.nutrition.avgP+' g'),
+      sub:A.nutrition.proteinPerKg?(A.nutrition.proteinPerKg+' g/kg'):'' },
     { lbl:'Avg sleep', val:A.sleep.avg==null?'—':(A.sleep.avg+' h'),
       sub:A.sleep.inBandPct==null?'not logged':(A.sleep.inBandPct+'% in 7-9 h') },
     { lbl:'Avg steps', val:A.steps.avg==null?'—':nf(A.steps.avg),
-      sub:A.steps.at8kPct==null?'not logged':(A.steps.at8kPct+'% over 8k') },
-    { lbl:'Consistency', val:A.engagement.pct+'%',
-      sub:A.engagement.activeDays+' of '+A.engagement.totalDays+' days' },
-    { lbl:'Best streak', val:A.engagement.bestStreak+' days',
-      sub:A.score.best?('best week: W'+A.score.best.n):'' }
+      sub:A.steps.at8kPct==null?'not logged':(A.steps.at8kPct+'% over 8k') }
   ]);
 
-  R.slab('The headline');
-  R.block(null, N.headline, R.RED, [252,244,244]);
+  R.slab('The period at a glance');
+  [['Weight',L.weight],['Training',L.training],['Nutrition',L.nutrition],
+   ['Sleep & steps',L.recovery],['Consistency',L.consistency]].forEach(([lbl,txt])=>{
+    if(!txt) return;
+    R.font('bold',8.5); R.need(9);
+    R.setText(R.RED); pdf.text(lbl, M, S.y+4);
+    R.font('normal',8.5); R.setText([55,55,62]);
+    const lines=pdf.splitTextToSize(String(txt), CW-34);
+    lines.forEach((l,i)=>pdf.text(l, M+34, S.y+4+i*4.4));
+    S.y += Math.max(6.4, lines.length*4.4+2);
+  });
+  R.gap(4);
+
+  R.slab('Focus next');
+  N.focus.forEach((t,i)=>{
+    R.need(8);
+    R.setFill(R.RED); pdf.circle(M+2.6, S.y+2.5, 2.6, 'F');
+    R.font('bold',7); R.setText([255,255,255]);
+    pdf.text(String(i+1), M+2.6, S.y+3.6, {align:'center'});
+    R.font('normal',9); R.setText([45,45,52]);
+    const lines=pdf.splitTextToSize(t, CW-10);
+    lines.forEach((l,k)=>pdf.text(l, M+8, S.y+3.8+k*4.5));
+    S.y += Math.max(7, lines.length*4.5+2.5);
+  });
 
   if(!A.meta.anchored){
-    R.block('Read this first',
-      'No program start date is set, so weeks cannot be mapped to calendar dates. '+
-      'Training sessions and food logs are matched to weeks by date, which means they cannot be '+
-      'attached to this report either. Set a start date on the Progress page and re-export — '+
-      'everything below will fill in.', R.ORANGE, [253,246,238]);
+    R.gap(2);
+    R.para('No program start date is set, so weeks cannot be matched to calendar dates — '+
+           'training and food logs cannot be attached to this report. Set one on the Progress page.',
+           {size:8, style:'italic', color:R.ORANGE});
   }
 
-  /* ================= BODYWEIGHT ================= */
-  R.page('Bodyweight and Body Composition', A.meta.span);
-  if(A.weight.daysLogged){
-    R.chart('exp-bw', 56, 'Every logged weigh-in across the reporting period.');
-    const wRows = A.rows.map(r=>{
-      const row = [
-        {t:'Week '+r.n, bold:true},
-        r.range,
-        r.bwAvg==null?null:f1(r.bwAvg)+' kg',
-        r.bwDays+'/7',
-        null, null
-      ];
-      return row;
-    });
-    // fill deltas against the previous logged week
-    let prev=null;
-    A.rows.forEach((r,i)=>{
-      if(r.bwAvg==null) return;
-      if(prev!=null){
-        const d=r.bwAvg-prev;
-        wRows[i][4]={t:(d>0?'+':'')+f1(d)+' kg', color:d<0?R.GREEN:(d>0?R.ORANGE:R.MUTE)};
-        wRows[i][5]=(prev?((d/prev*100>0?'+':'')+f1(d/prev*100)+' %'):null);
-      }
-      prev=r.bwAvg;
-    });
-    R.table(
-      [{h:'Week',w:20},{h:'Dates',w:46},{h:'Avg weight',w:28,align:'right'},
-       {h:'Weigh-ins',w:24,align:'right'},{h:'Change',w:32,align:'right'},{h:'% change',w:32,align:'right'}],
-      wRows
-    );
-  }
-  R.analysis(N.weight);
+  /* ================= PAGE 2 — TRENDS ================= */
+  R.page('Trends', A.meta.span);
 
-  /* ================= TRAINING ================= */
-  R.page('Training', A.meta.span);
-  if(A.training.sessions){
-    R.kpis([
-      {lbl:'Sessions', val:String(A.training.sessions), sub:A.training.sessionsPerWeek+' per week'},
-      {lbl:'Working sets', val:nf(A.training.hardSets), sub:'across the block'},
-      {lbl:'Volume moved', val:nf(A.training.tonnage)+' kg', sub:'reps × load'},
-      {lbl:'Cardio', val:A.training.cardioMin?(A.training.cardioMin+' min'):'—',
-       sub:A.training.cardioKm?(A.training.cardioKm+' km'):''}
-    ]);
-    R.slab('Week by week');
-    R.table(
-      [{h:'Week',w:20},{h:'Dates',w:46},{h:'Sessions',w:24,align:'right'},
-       {h:'Volume (kg)',w:34,align:'right'},{h:'Overload check-in',w:58}],
-      A.rows.map((r,i)=>{
-        const olMap={improved:'Improved',form:'Better form',same:'Held the same',regressed:'Regressed'};
-        return [
-          {t:'Week '+r.n, bold:true}, r.range,
-          {t:String(A.training.perWeek[i]), color:A.training.perWeek[i]===0?R.RED:null,
-           bold:A.training.perWeek[i]===0},
-          A.training.perWeekTonnage[i]?nf(A.training.perWeekTonnage[i]):null,
-          olMap[r.ci.overload]||null
-        ];
-      })
-    );
-    if(A.training.topLifts.length){
-      R.slab('Lift progression — estimated one-rep max, first session versus last');
-      R.table(
-        [{h:'Exercise',w:56},{h:'Sessions',w:20,align:'right'},{h:'Sets',w:16,align:'right'},
-         {h:'Volume (kg)',w:28,align:'right'},{h:'First e1RM',w:24,align:'right'},
-         {h:'Last e1RM',w:22,align:'right'},{h:'Change',w:16,align:'right'}],
-        A.training.topLifts.map(l=>[
-          {t:l.name, bold:true},
-          String(l.sessions), String(l.totalSets), nf(l.volume),
-          l.first&&l.first.bestE1rm?f1(l.first.bestE1rm):null,
-          l.last&&l.last.bestE1rm?f1(l.last.bestE1rm):null,
-          l.deltaPct==null?null:{t:(l.deltaPct>0?'+':'')+Math.round(l.deltaPct)+'%',
-            bold:true, color:l.deltaPct>=2?R.GREEN:(l.deltaPct<=-2?R.RED:R.MUTE)}
-        ])
-      );
-      R.para('Estimated one-rep max (Epley) is used instead of raw load so a set of 8 at 60 kg is '+
-             'correctly read as more work than 5 at 65 kg. It is the honest answer to "did this lift get stronger".',
-             {size:7.5, style:'italic', color:R.MUTE});
-    }
-  }
-  R.analysis(N.training);
+  R.slab('Bodyweight');
+  R.chart('exp-bw', 46);
+  R.statline(L.weight);
 
-  /* ================= NUTRITION ================= */
-  R.page('Nutrition', A.meta.span);
-  if(A.nutrition.daysLogged){
-    R.kpis([
-      {lbl:'Avg calories', val:nf(A.nutrition.avgCal),
-       sub:A.nutrition.target.cal?('target '+nf(A.nutrition.target.cal)):'no target set'},
-      {lbl:'Avg protein', val:A.nutrition.avgP+' g',
-       sub:A.nutrition.proteinPerKg?(A.nutrition.proteinPerKg+' g/kg'):''},
-      {lbl:'Days logged', val:A.nutrition.daysLogged+'/'+A.meta.calendarDays,
-       sub:A.nutrition.coverage+'% coverage'},
-      {lbl:'Weekend drift', val:A.nutrition.weekendDrift==null?'—':((A.nutrition.weekendDrift>0?'+':'')+nf(A.nutrition.weekendDrift)),
-       sub:'kcal vs weekdays'}
-    ]);
-    R.chart('exp-cal', 52, 'Daily intake against target. Green is inside 10 % of target, gold under, red over.');
-    R.slab('Week by week');
-    R.table(
-      [{h:'Week',w:20},{h:'Dates',w:44},{h:'Days logged',w:24,align:'right'},
-       {h:'Avg kcal',w:24,align:'right'},{h:'vs target',w:24,align:'right'},
-       {h:'Avg protein',w:24,align:'right'},{h:'Diet check-in',w:22}],
-      A.rows.map((r,i)=>{
-        const pw=A.nutrition.perWeek[i];
-        const tC=A.nutrition.target.cal;
-        const d=(pw.cal!=null&&tC)?(pw.cal-tC):null;
-        const dietMap={met:'On plan',missed_few:'Missed few',binge:'Off plan'};
-        return [
-          {t:'Week '+r.n, bold:true}, r.range,
-          pw.days?String(pw.days)+'/7':null,
-          pw.cal==null?null:nf(pw.cal),
-          d==null?null:{t:(d>0?'+':'')+nf(d), color:Math.abs(d)<=(tC*0.1)?R.GREEN:(d>0?R.RED:R.GOLD)},
-          pw.p==null?null:pw.p+' g',
-          dietMap[r.ci.diet]||null
-        ];
-      })
-    );
-    if(A.nutrition.target.p || A.nutrition.target.c || A.nutrition.target.f){
-      R.slab('Macro split against target');
-      R.table(
-        [{h:'Macro',w:46},{h:'Daily average',w:46,align:'right'},{h:'Target',w:46,align:'right'},{h:'Difference',w:44,align:'right'}],
-        [
-          ['Protein', A.nutrition.avgP+' g', A.nutrition.target.p?A.nutrition.target.p+' g':null,
-            A.nutrition.pDelta==null?null:{t:(A.nutrition.pDelta>0?'+':'')+A.nutrition.pDelta+' g',
-              color:A.nutrition.pDelta>=0?R.GREEN:R.RED}],
-          ['Carbohydrate', A.nutrition.avgC+' g', A.nutrition.target.c?A.nutrition.target.c+' g':null,
-            (A.nutrition.target.c?{t:((A.nutrition.avgC-A.nutrition.target.c)>0?'+':'')+(A.nutrition.avgC-A.nutrition.target.c)+' g'}:null)],
-          ['Fat', A.nutrition.avgF+' g', A.nutrition.target.f?A.nutrition.target.f+' g':null,
-            (A.nutrition.target.f?{t:((A.nutrition.avgF-A.nutrition.target.f)>0?'+':'')+(A.nutrition.avgF-A.nutrition.target.f)+' g'}:null)]
-        ]
-      );
-    }
-  }
-  R.analysis(N.nutrition);
+  R.slab('Training volume per week — bars are kg lifted, line is sessions');
+  R.chart('exp-vol', 44);
+  R.statline(L.training);
 
-  /* ================= SLEEP, STEPS, RECOVERY ================= */
-  R.page('Sleep, Steps and Recovery', A.meta.span);
-  if(A.sleep.daysLogged || A.steps.daysLogged){
-    R.kpis([
-      {lbl:'Avg sleep', val:A.sleep.avg==null?'—':A.sleep.avg+' h',
-       sub:A.sleep.inBand+' nights in 7-9 h'},
-      {lbl:'Short nights', val:A.sleep.short==null?'—':String(A.sleep.short), sub:'under 6 hours'},
-      {lbl:'Avg steps', val:A.steps.avg==null?'—':nf(A.steps.avg),
-       sub:A.steps.at8k+' days over 8,000'},
-      {lbl:'Total steps', val:A.steps.total==null?'—':nf(A.steps.total), sub:'this period'}
-    ]);
-    R.chart('exp-act', 52, 'Bars: average daily steps per week (left axis). Line: average sleep hours (right axis).');
-    R.table(
-      [{h:'Week',w:20},{h:'Dates',w:48},{h:'Avg sleep',w:26,align:'right'},
-       {h:'Nights',w:20,align:'right'},{h:'Avg steps',w:26,align:'right'},
-       {h:'Days',w:18,align:'right'},{h:'Stress',w:24}],
-      A.rows.map(r=>[
-        {t:'Week '+r.n, bold:true}, r.range,
-        r.sleepAvg==null?null:{t:f1(r.sleepAvg)+' h',
-          color:(r.sleepAvg>=7&&r.sleepAvg<=9)?R.GREEN:(r.sleepAvg<6?R.RED:R.GOLD)},
-        r.sleepDays?String(r.sleepDays)+'/7':null,
-        r.stepsAvg==null?null:{t:nf(r.stepsAvg), color:r.stepsAvg>=8000?R.GREEN:(r.stepsAvg<5000?R.RED:R.GOLD)},
-        r.stepsDays?String(r.stepsDays)+'/7':null,
-        r.ci.stress?(r.ci.stress.charAt(0).toUpperCase()+r.ci.stress.slice(1)):null
-      ])
-    );
-  }
-  R.analysis(N.recovery);
+  R.slab('Calories per week — dashed line is your target');
+  R.chart('exp-cal', 44);
+  R.statline(L.nutrition);
 
-  /* ================= SCORE AND CONSISTENCY ================= */
-  R.page('Score and Consistency', A.meta.span);
-  if(A.rows.length>1) R.chart('exp-score', 50, 'Weighted progress score by week.');
-  if(A.signals.length){
-    R.slab('Where the score comes from — weakest signal first');
-    R.signalBars(A.signals);
-    R.para('Each signal is scored 0-100 and weighted. Anything you did not log is left out of the '+
-           'calculation entirely rather than counted as a zero, so the score describes what you '+
-           'actually did — but it also means a thinly logged week can read higher than it lived.',
-           {size:7.5, style:'italic', color:R.MUTE});
-  }
-  R.analysis(N.consistency);
+  /* ================= PAGE 3 — MORE TRENDS + LEDGER ================= */
+  R.page('Sleep, Steps and Score', A.meta.span);
 
-  /* ================= WEEK BY WEEK LEDGER ================= */
-  R.page('Week by Week', 'Every week in this report, with its calendar dates');
+  R.slab('Steps and sleep per week — bars are steps, line is sleep hours');
+  R.chart('exp-act', 44);
+  R.statline(L.recovery);
+
+  if(A.rows.length>1){
+    R.slab('Weekly progress score');
+    R.chart('exp-score', 42);
+    R.statline(L.score);
+  }
+
+  if(L.lifts){
+    R.slab('Strength');
+    R.statline(L.lifts);
+  }
+
+  /* ================= WEEK BY WEEK =================
+     Skipped on a single-week report — a whole page for one row is padding, and
+     the daily log below already carries that week in full. */
+  if(A.rows.length>1){
+  R.page('Week by Week', 'Every week with its calendar dates');
   R.table(
-    [{h:'Week',w:16},{h:'Dates',w:42},{h:'Weight',w:20,align:'right'},
-     {h:'Steps',w:20,align:'right'},{h:'Sleep',w:16,align:'right'},
-     {h:'Sessions',w:18,align:'right'},{h:'Food days',w:20,align:'right'},
-     {h:'Score',w:14,align:'right'},{h:'Grade',w:16}],
+    [{h:'Week',w:16},{h:'Dates',w:40},{h:'Weight',w:19,align:'right'},
+     {h:'Steps',w:19,align:'right'},{h:'Sleep',w:15,align:'right'},
+     {h:'Sessions',w:17,align:'right'},{h:'Volume kg',w:21,align:'right'},
+     {h:'Avg kcal',w:19,align:'right'},{h:'Score',w:16,align:'right'}],
     A.rows.map((r,i)=>{
       const row=[
         {t:'W'+r.n, bold:true}, r.range,
@@ -1622,18 +1529,19 @@ function paintReport(A, N){
         r.stepsAvg==null?null:nf(r.stepsAvg),
         r.sleepAvg==null?null:f1(r.sleepAvg),
         String(A.training.perWeek[i]),
-        A.nutrition.perWeek[i].days?String(A.nutrition.perWeek[i].days):null,
-        r.score==null?null:{t:r.score+'%', bold:true, color:R.scoreColor(r.score)},
-        r.score==null?null:R.scoreGrade(r.score)
+        A.training.perWeekTonnage[i]?nf(A.training.perWeekTonnage[i]):null,
+        A.nutrition.perWeek[i].cal==null?null:nf(A.nutrition.perWeek[i].cal),
+        r.score==null?null:{t:r.score+'%', bold:true, color:R.scoreColor(r.score)}
       ];
       if(r.score!=null) row._accent=R.scoreColor(r.score);
       return row;
     }),
     {rowH:6.8}
   );
+  }
 
   /* ================= DAILY LOG ================= */
-  R.page('Daily Log', 'Every day in the reporting period, exactly as logged');
+  R.page('Daily Log', 'Everything you logged, day by day');
   A.rows.forEach(r=>{
     R.need(34);
     R.setFill([32,32,38]); pdf.roundedRect(M,S.y,CW,7,1.5,1.5,'F');
@@ -1643,7 +1551,7 @@ function paintReport(A, N){
     pdf.text(r.range||'no dates', M+26, S.y+4.9);
     if(r.score!=null){
       R.font('bold',8); R.setText([255,255,255]);
-      pdf.text(r.score+'% · '+R.scoreGrade(r.score), PW-M-3, S.y+4.9, {align:'right'});
+      pdf.text(r.score+'%', PW-M-3, S.y+4.9, {align:'right'});
     }
     S.y+=8.5;
     R.table(
@@ -1661,93 +1569,45 @@ function paintReport(A, N){
       ]),
       {rowH:5.9, size:7.2}
     );
-    if(r.ci && r.ci.notes && r.ci.notes.trim()){
-      R.block('Week '+r.n+' check-in note', r.ci.notes.trim(), R.SLATE, [244,245,247]);
-    }
   });
 
-  /* ================= TRAINING LOG ================= */
+  /* ================= TRAINING LOG =================
+     One row per session, not set by set. The set-by-set version ran to four
+     pages for eight weeks, which is the kind of detail that gets a report put
+     down. The heaviest set of the day carries the useful part in one column. */
   if(A.training.list.length){
-    R.page('Training Log', 'Every session performed, set by set');
-    A.training.list.forEach(s=>{
-      R.need(20);
-      R.setFill([246,240,240]); pdf.roundedRect(M,S.y,CW,7.5,1.5,1.5,'F');
-      R.setFill(R.RED); pdf.rect(M,S.y,1.8,7.5,'F');
-      R.font('bold',8.5); R.setText([150,0,0]);
-      pdf.text(s.name, M+4, S.y+5.2);
-      R.font('normal',7.5); R.setText([115,115,122]);
-      const meta=[ s.date?DevFitReport.fmtDay(s.date):'', s.week?('Week '+s.week):'',
-                   s.sets?(s.sets+' sets'):'', s.tonnage?(nf(s.tonnage)+' kg'):'',
-                   s.min?(s.min+' min'):'' ].filter(Boolean).join('  ·  ');
-      pdf.text(meta, PW-M-3, S.y+5.2, {align:'right'});
-      S.y+=9;
-      s.exercises.forEach(ex=>{
-        const setsTxt=ex.sets.join('   ');
-        R.font('normal',7.6);
-        const lines=pdf.splitTextToSize(setsTxt, CW-62);
-        R.need(Math.max(5.5, lines.length*4.2+1.5));
-        R.font('bold',7.8); R.setText([48,48,54]);
-        pdf.text(ex.name, M+4, S.y+3.4);
-        R.font('normal',7.6); R.setText([88,88,96]);
-        pdf.text(lines, M+60, S.y+3.4);
-        S.y+=Math.max(5.5, lines.length*4.2+1.5);
-      });
-      if(s.notes && s.notes.trim()){
-        R.para('Note: '+s.notes.trim(), {size:7.4, style:'italic', color:R.MUTE, indent:4, gap:1});
-      }
-      R.gap(3);
-    });
+    R.page('Training Log', 'Every session you logged');
+    R.table(
+      [{h:'Date',w:32},{h:'Session',w:34},{h:'Sets',w:14,align:'right'},
+       {h:'Volume kg',w:24,align:'right'},{h:'Cardio',w:22,align:'right'},
+       {h:'Heaviest set',w:56}],
+      A.training.list.map(s=>{
+        // Heaviest set of the session, by estimated one-rep max.
+        let top=null;
+        s.exercises.forEach(ex=>{
+          if(ex.bestE1rm!=null && (top==null || ex.bestE1rm>top.bestE1rm)) top=ex;
+        });
+        const topTxt = top ? (top.name+'  '+(top.sets.find(x=>/×/.test(x))||'')) : null;
+        return [
+          {t:s.date?DevFitReport.fmtDay(s.date):null, bold:true},
+          s.name,
+          s.sets||null,
+          s.tonnage?nf(s.tonnage):null,
+          s.min?(s.min+' min'):null,
+          topTxt
+        ];
+      }),
+      {rowH:6.2, size:7.3}
+    );
   }
 
-  /* ================= ACTION PLAN ================= */
-  R.page('What To Do Next', 'Ranked by how much it will move the result');
-  N.actions.forEach((a,i)=>{
-    R.need(26);
-    R.setFill(R.RED); pdf.circle(M+4, S.y+4, 4, 'F');
-    R.font('bold',9); R.setText([255,255,255]);
-    pdf.text(String(i+1), M+4, S.y+5.4, {align:'center'});
-    R.font('bold',10.5); R.setText(R.INK);
-    const tl=pdf.splitTextToSize(a.title, CW-14);
-    pdf.text(tl, M+12, S.y+5.2);
-    S.y+=tl.length*5+3;
-    R.para(a.why, {size:8.6, indent:12, gap:1.5});
-    R.para('How: '+a.how, {size:8.6, indent:12, color:[40,40,46], gap:6});
-  });
-
+  /* ================= NOTES ================= */
   if(A.checkin.notes.length){
-    R.slab('Trainer notes from your check-ins');
+    R.page('Your Notes', 'From the weekly check-ins');
     A.checkin.notes.forEach(n=>{
       R.block('Week '+n.n+(n.range?(' · '+n.range):''), n.text, R.SLATE, [244,245,247]);
     });
   }
-
-  /* ================= METHOD ================= */
-  R.page('How To Read This Report', 'The method behind every number above');
-  R.block('The progress score',
-    'Seven signals are scored 0-100 and weighted by how much each one actually drives results: '+
-    'diet 23 %, overload 22 %, bodyweight 17 %, body fat 10 %, sleep 10 %, steps 10 %, stress 8 %. '+
-    'Anything not logged is excluded from the calculation rather than scored as zero, and the '+
-    'remaining weights are re-normalised — so the score reflects what you did, not what you '+
-    'forgot to record. 85 and above is Excellent, 65-84 Good, 40-64 Fair, below 40 Needs Work.',
-    R.SLATE, [244,245,247]);
-  R.block('The rate bands',
-    'Fat loss is judged against 0.5-1.0 % of bodyweight per week and lean gain against '+
-    '0.25-0.5 %, because those are the rates at which the tissue you lose is mostly fat and '+
-    'the tissue you gain is mostly muscle. Trends are fitted across all logged weeks by least '+
-    'squares rather than taken first-to-last, so one heavy morning cannot flip the verdict.',
-    R.SLATE, [244,245,247]);
-  R.block('Where the data comes from',
-    'Weight, steps, sleep and weekly check-ins come from the Progress page. Training comes from '+
-    'logged sessions, matched to this period by date and identified by exercise name. Food comes '+
-    'from the nutrition diary, also matched by date. Nothing here is estimated or filled in — '+
-    'every figure is something you recorded, which is also why coverage percentages are printed '+
-    'next to the averages.',
-    R.SLATE, [244,245,247]);
-  R.para('Evidence base: Helms 2014 (JISSN) and Garthe 2011 on rate of loss; Aragon & Schoenfeld 2013 '+
-         'on rate of gain; Morton 2018 (BJSM) on protein intake; Schoenfeld 2017 on training volume; '+
-         'Paluch 2022 (Lancet Public Health) on step counts; Hirshkowitz 2015 and Nedeltcheva 2010 on sleep. '+
-         'This report is a training and nutrition summary, not medical advice.',
-         {size:7.4, style:'italic', color:R.MUTE});
 
   R.footers();
 

@@ -2,15 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<!-- Canonical-host guard: bounce legacy hosts (old Netlify 404 / stale GitHub Pages
-     installs) to the live Vercel app so no client is ever stranded on an old build. -->
 <script>
 (function(){try{
-  var canon='devfitportal.vercel.app', h=location.hostname;
+  var canon='devfitportal.vercel.app',h=location.hostname;
   if(/\.netlify\.app$/i.test(h)||/\.github\.io$/i.test(h)){
-    var f=(location.pathname.split('/').pop()||'index.html');
-    if(!/\.html?$/i.test(f)) f='index.html';
-    location.replace('https://'+canon+'/'+f+location.search+location.hash);
+    location.replace('https://'+canon+'/login.html'+location.search+location.hash);
   }
 }catch(e){}})();
 </script>
@@ -19,401 +15,73 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:ital,wght@1,700;1,800&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
-  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  body{
-    font-family:'DM Sans',sans-serif;
-    min-height:100vh;color:#e8e8ea;
-    background:
-      linear-gradient(180deg,#080809 0%,#101012 60%,#0a0a0b 100%);
-    background-attachment:fixed;
-    display:flex;align-items:center;justify-content:center;
-    padding:1rem;overflow-x:hidden;
-  }
-  .card{
-    backdrop-filter:saturate(140%) blur(8px);-webkit-backdrop-filter:saturate(140%) blur(8px);
-    background:#111111;border:1px solid #2a2a2a;border-top:3px solid #cc0000;
-    border-radius:16px;padding:40px 28px;width:100%;max-width:400px;
-    text-align:center;box-shadow:0 12px 40px rgba(0,0,0,0.4);
-  }
-  .logo-wrap{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:20px}
-  .logo-wrap img{width:60px;height:60px;border-radius:10px;object-fit:cover;background:#fff}
-  .brand-text{text-align:left}
-  .brand-name{font-family:'Inter',system-ui,sans-serif;font-style:italic;font-weight:700;font-size:24px;line-height:1.05;letter-spacing:.005em}
-  .brand-name .dev{color:#ffffff}
-  .brand-name .fit{color:#cc0000}
-  .brand-tag{font-size:11px;color:#cc0000;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-top:4px}
-  .divider{width:40px;height:2px;background:#cc0000;margin:0 auto 24px;border-radius:2px}
-  .welcome{font-size:20px;font-weight:800;color:#fff;margin-bottom:8px}
-  .subtitle{font-size:13px;color:#888;margin-bottom:28px;line-height:1.6}
-
-  /* Email login */
-  .email-section{margin-bottom:14px}
-  .email-input{
-    width:100%;padding:13px 16px;background:#1a1a1a;border:1px solid #2a2a2a;
-    border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;color:#fff;
-    outline:none;transition:border .2s;margin-bottom:10px;
-  }
-  .email-input:focus{border-color:#cc0000}
-  .email-input::placeholder{color:#555}
-  /* Email is the SECONDARY option (outline) — Google is primary */
-  .email-btn{
-    width:100%;padding:12px 20px;background:transparent;border:1px solid #333;border-radius:10px;
-    font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;color:#bbb;
-    cursor:pointer;transition:all .2s;
-  }
-  .email-btn:hover{border-color:#cc0000;color:#fff}
-  .email-btn:active{transform:translateY(0)}
-  .email-btn:disabled{opacity:.5;cursor:not-allowed}
-
-  .sent-msg{
-    display:none;padding:12px 16px;border-radius:10px;font-size:13px;font-weight:500;
-    margin-top:10px;line-height:1.5;background:#001a00;border:1px solid #3fb56e;color:#4ade80;
-  }
-
-  /* OR divider */
-  .or-divider{
-    display:flex;align-items:center;gap:10px;
-    font-size:11px;color:#444;font-weight:600;letter-spacing:.06em;
-    margin:18px 0;
-  }
-  .or-divider::before,.or-divider::after{content:'';flex:1;height:1px;background:#2a2a2a}
-
-  /* Google is the PRIMARY sign-in — white button stands out on the dark card */
-  .google-btn{
-    display:flex;align-items:center;justify-content:center;gap:12px;
-    width:100%;padding:14px 20px;background:#fff;border:1px solid #fff;
-    border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;
-    font-weight:700;color:#1a1a1a;cursor:pointer;transition:all .2s;
-    box-shadow:0 4px 16px rgba(255,255,255,0.12);
-  }
-  .google-btn:hover{background:#f2f2f2;border-color:#f2f2f2;color:#000;transform:translateY(-1px)}
-  .google-btn:active{transform:scale(0.98)}
-  .google-btn svg{width:20px;height:20px;flex-shrink:0}
-
-  .status-box{display:none;padding:12px 16px;border-radius:10px;font-size:13px;font-weight:500;margin-top:14px;line-height:1.5}
-  .status-pending{background:#1a1200;border:1px solid #c6902f;color:#c6902f}
-  .status-denied{background:#1a0000;border:1px solid #cc0000;color:#ff6666}
-  .status-checking{background:#001a1a;border:1px solid #4a6572;color:#60a5fa}
-
-  .contact-box{margin-top:22px;padding:14px;background:#1a1a1a;border-radius:10px;border:1px solid #2a2a2a}
-  .contact-box p{font-size:12px;color:#666;margin-bottom:8px}
-  .contact-link{display:inline-block;background:#cc0000;color:#fff;font-size:12px;font-weight:700;padding:8px 18px;border-radius:20px;text-decoration:none;transition:background .15s}
-  .contact-link:hover{background:#aa0000}
-
-  .footer{margin-top:22px;font-size:11px;color:#444}
-  .spinner{display:none;width:22px;height:22px;border:2px solid #333;border-top-color:#cc0000;border-radius:50%;animation:spin .7s linear infinite;margin:10px auto}
-  @keyframes spin{to{transform:rotate(360deg)}}
-
-  .install-btn{margin-top:12px;background:transparent;border:1px solid #cc0000;color:#cc0000;padding:8px 16px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;display:none}
-  .install-btn:hover{background:#cc0000;color:#fff}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;min-height:100vh;color:#e8e8ea;background:linear-gradient(180deg,#080809 0%,#101012 60%,#0a0a0b 100%);background-attachment:fixed;display:flex;align-items:center;justify-content:center;padding:1rem;overflow-x:hidden}
+.card{backdrop-filter:saturate(140%) blur(8px);-webkit-backdrop-filter:saturate(140%) blur(8px);background:#111;border:1px solid #2a2a2a;border-top:3px solid #cc0000;border-radius:16px;padding:40px 28px;width:100%;max-width:400px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.4)}
+.logo-wrap{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:20px}.logo-wrap img{width:60px;height:60px;border-radius:10px;object-fit:cover;background:#fff}.brand-text{text-align:left}.brand-name{font-family:'Inter',system-ui,sans-serif;font-style:italic;font-weight:700;font-size:24px;line-height:1.05;letter-spacing:.005em}.brand-name .dev{color:#fff}.brand-name .fit{color:#cc0000}.brand-tag{font-size:11px;color:#cc0000;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-top:4px}
+.divider{width:40px;height:2px;background:#cc0000;margin:0 auto 24px;border-radius:2px}.welcome{font-size:20px;font-weight:800;color:#fff;margin-bottom:8px}.subtitle{font-size:13px;color:#888;margin-bottom:26px;line-height:1.6}
+.google-host{min-height:44px;width:100%;display:flex;justify-content:center;align-items:center}.google-loading{width:100%;height:44px;border:1px solid #333;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#777;font-size:13px}
+.or-divider{display:flex;align-items:center;gap:10px;font-size:11px;color:#555;font-weight:600;letter-spacing:.06em;margin:18px 0}.or-divider::before,.or-divider::after{content:'';flex:1;height:1px;background:#2a2a2a}
+.email-toggle{background:transparent;border:0;color:#999;font:600 13px 'DM Sans',sans-serif;cursor:pointer;padding:6px}.email-toggle:hover{color:#fff}.email-section{display:none;margin-top:14px}.email-section.open{display:block}
+.email-input{width:100%;padding:13px 16px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;font:15px 'DM Sans',sans-serif;color:#fff;outline:none;transition:border .2s;margin-bottom:10px}.email-input:focus{border-color:#cc0000}.email-input::placeholder{color:#555}
+.email-btn{width:100%;padding:12px 20px;background:transparent;border:1px solid #333;border-radius:10px;font:600 14px 'DM Sans',sans-serif;color:#bbb;cursor:pointer;transition:all .2s}.email-btn:hover{border-color:#cc0000;color:#fff}.email-btn:disabled{opacity:.5;cursor:not-allowed}
+.code-help{font-size:11px;color:#777;line-height:1.5;margin:0 0 10px}.change-email{background:none;border:0;color:#999;text-decoration:underline;cursor:pointer;font:600 11px 'DM Sans',sans-serif;margin-top:10px}
+.status-box{display:none;padding:12px 16px;border-radius:10px;font-size:13px;font-weight:500;margin-top:14px;line-height:1.5}.status-pending{background:#1a1200;border:1px solid #c6902f;color:#c6902f}.status-denied{background:#1a0000;border:1px solid #cc0000;color:#ff6666}.status-checking{background:#001a1a;border:1px solid #4a6572;color:#60a5fa}.status-sent{background:#001a00;border:1px solid #3fb56e;color:#4ade80}
+.spinner{display:none;width:22px;height:22px;border:2px solid #333;border-top-color:#cc0000;border-radius:50%;animation:spin .7s linear infinite;margin:14px auto 4px}@keyframes spin{to{transform:rotate(360deg)}}.footer{margin-top:24px;font-size:11px;color:#444}
 </style>
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#cc0000">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="DevFit">
-<link rel="apple-touch-icon" href="icon-touch.png">
-<link rel="apple-touch-icon" sizes="180x180" href="icon-touch.png">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="manifest" href="manifest.json"><meta name="theme-color" content="#cc0000"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="DevFit"><link rel="apple-touch-icon" href="icon-touch.png"><link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <style>
-html.nosplash #devfit-splash{display:none!important}
-#devfit-splash{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 38%,#220707,#0a0a0c 72%);transition:opacity .55s ease}
-#devfit-splash.hide{opacity:0;pointer-events:none}
-#devfit-splash .si{display:flex;flex-direction:column;align-items:center;animation:dfPop .6s cubic-bezier(.2,.8,.2,1)}
-#devfit-splash img{width:112px;height:112px;border-radius:26px;background:#fff;box-shadow:0 14px 44px rgba(204,0,0,.45)}
-#devfit-splash .w{margin-top:20px;font-family:'Inter',system-ui,sans-serif;font-style:italic;font-weight:800;font-size:32px;color:#fff;letter-spacing:.01em}
-#devfit-splash .w b{color:#cc0000}
-#devfit-splash .t{margin-top:9px;font-family:'DM Sans',system-ui,sans-serif;font-size:10px;font-weight:700;letter-spacing:.3em;color:rgba(255,255,255,.5)}
-#devfit-splash .bar{margin-top:22px;width:120px;height:3px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden}
-#devfit-splash .bar i{display:block;height:100%;width:45%;background:#cc0000;border-radius:3px;animation:dfBar 1.1s ease-in-out infinite}
-@keyframes dfPop{from{transform:scale(.92);opacity:0}to{transform:none;opacity:1}}
-@keyframes dfBar{0%{transform:translateX(-130%)}100%{transform:translateX(330%)}}
-@media(prefers-reduced-motion:reduce){#devfit-splash .si,#devfit-splash .bar i{animation:none}}
+html.nosplash #devfit-splash{display:none!important}#devfit-splash{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 38%,#220707,#0a0a0c 72%);transition:opacity .55s ease}#devfit-splash.hide{opacity:0;pointer-events:none}#devfit-splash .si{display:flex;flex-direction:column;align-items:center;animation:dfPop .6s cubic-bezier(.2,.8,.2,1)}#devfit-splash img{width:112px;height:112px;border-radius:26px;background:#fff;box-shadow:0 14px 44px rgba(204,0,0,.45)}#devfit-splash .w{margin-top:20px;font-family:'Inter',system-ui,sans-serif;font-style:italic;font-weight:800;font-size:32px;color:#fff}#devfit-splash .w b{color:#cc0000}#devfit-splash .t{margin-top:9px;font:700 10px 'DM Sans',sans-serif;letter-spacing:.3em;color:rgba(255,255,255,.5)}#devfit-splash .bar{margin-top:22px;width:120px;height:3px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden}#devfit-splash .bar i{display:block;height:100%;width:45%;background:#cc0000;border-radius:3px;animation:dfBar 1.1s ease-in-out infinite}@keyframes dfPop{from{transform:scale(.92);opacity:0}to{transform:none;opacity:1}}@keyframes dfBar{0%{transform:translateX(-130%)}100%{transform:translateX(330%)}}@media(prefers-reduced-motion:reduce){#devfit-splash .si,#devfit-splash .bar i{animation:none}}
 </style>
-<script>try{if(sessionStorage.getItem('devfit_splash_shown'))document.documentElement.className+=' nosplash';}catch(e){}</script>
-<!-- Shared theme: early-apply (no flash) + override stylesheet + controller -->
-<script>try{if(localStorage.getItem('devfit_theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
-<link rel="stylesheet" href="theme.css">
-<script src="devfit-errorlog.js"></script>
-<script defer src="theme.js"></script>
-<script src="devfit-auth.js"></script>
+<script>try{if(sessionStorage.getItem('devfit_splash_shown'))document.documentElement.className+=' nosplash';if(localStorage.getItem('devfit_theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
+<link rel="stylesheet" href="theme.css"><script src="devfit-errorlog.js"></script><script defer src="theme.js"></script><script src="devfit-auth.js"></script>
 </head>
 <body>
 <div id="devfit-splash"><div class="si"><img src="icon-192.png" alt="DevFit"><div class="w">DEV<b>FIT</b></div><div class="t">DOMINANCE THROUGH DISCIPLINE</div><div class="bar"><i></i></div></div></div>
-<script>(function(){var s=document.getElementById('devfit-splash');if(!s)return;if(document.documentElement.classList.contains('nosplash')){s.parentNode&&s.parentNode.removeChild(s);return;}try{sessionStorage.setItem('devfit_splash_shown','1');}catch(e){}setTimeout(function(){s.classList.add('hide');setTimeout(function(){s.parentNode&&s.parentNode.removeChild(s);},560);},2000);})();</script>
-
-<div class="card">
-  <div class="logo-wrap">
-    <img src="icon-192.png" alt="DevFit" onerror="this.style.display='none'">
-    <div class="brand-text">
-      <div class="brand-name"><span class="dev">DEV</span><span class="fit">FIT</span></div>
-      <div class="brand-tag">Dominance Through Discipline</div>
-    </div>
-  </div>
-
-  <div class="divider"></div>
-
-  <div class="welcome">Sign in or join free</div>
-  <p class="subtitle">DevFit is free — no password, no sign-up form. Tap <strong style="color:#eee">Continue with Google</strong> and you're in.</p>
-
-  <!-- PRIMARY: Google (one tap, stays in the app) -->
-  <button class="google-btn" id="google-signin-btn" type="button">
-    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-    </svg>
-    Continue with Google
-  </button>
-
-  <!-- OR divider -->
-  <div class="or-divider">or use email instead</div>
-
-  <!-- SECONDARY: Email magic link -->
-  <div class="email-section">
-    <input type="email" id="email-input" class="email-input" placeholder="your@email.com" autocomplete="email" inputmode="email">
-    <button class="email-btn" id="email-btn" type="button">Email me a sign-in link</button>
-    <div class="sent-msg" id="sent-msg">
-      ✉️ Check your inbox!<br>
-      <span style="font-size:11px;color:#86efac">Click the link in the email to sign in. Check spam if it doesn't arrive within a minute.</span>
-    </div>
-  </div>
-
+<script>(function(){var s=document.getElementById('devfit-splash');if(!s)return;if(document.documentElement.classList.contains('nosplash')){s.remove();return;}try{sessionStorage.setItem('devfit_splash_shown','1');}catch(e){}setTimeout(function(){s.classList.add('hide');setTimeout(function(){s.remove();},560);},2000);})();</script>
+<main class="card">
+  <div class="logo-wrap"><img src="icon-192.png" alt="DevFit"><div class="brand-text"><div class="brand-name"><span class="dev">DEV</span><span class="fit">FIT</span></div><div class="brand-tag">Dominance Through Discipline</div></div></div>
+  <div class="divider"></div><div class="welcome">Welcome back</div><p class="subtitle">Sign in to continue to DevFit.</p>
+  <div id="google-button" class="google-host"><div class="google-loading">Loading Google sign-in…</div></div>
+  <div class="or-divider">or</div>
+  <button class="email-toggle" id="email-toggle" type="button">Use an email code</button>
+  <section class="email-section" id="email-section">
+    <div id="email-step"><input type="email" id="email-input" class="email-input" placeholder="your@email.com" autocomplete="email" inputmode="email"><button class="email-btn" id="email-send" type="button">Send code</button></div>
+    <div id="code-step" hidden><p class="code-help">Enter the 6-digit code sent to <strong id="code-email"></strong>.</p><input type="text" id="code-input" class="email-input" placeholder="6-digit code" autocomplete="one-time-code" inputmode="numeric" maxlength="6"><button class="email-btn" id="code-verify" type="button">Verify code</button><button class="change-email" id="change-email" type="button">Use a different email</button></div>
+  </section>
   <div class="spinner" id="spinner"></div>
-
-  <div class="status-box status-checking" id="status-checking">Checking your access — please wait.</div>
-  <div class="status-box status-pending"  id="status-pending">This account has been suspended.<br>Please contact your trainer.</div>
-  <div class="status-box status-denied"   id="status-denied">Couldn't sign you in — check your connection and try again.</div>
-
-  <div class="contact-box">
-    <p>Want Pro (full plans, unlimited history)? Ask your trainer to upgrade you.</p>
-    <a href="https://wa.me/60183679177" class="contact-link">WhatsApp Trainer</a>
-    <p style="margin-top:12px;margin-bottom:0"><a href="landing.html" style="color:#888;text-decoration:none;font-size:12px;font-weight:600">New to DevFit? See what it does →</a></p>
-  </div>
-
-  <button id="install-btn" class="install-btn" type="button">Install DevFit App</button>
-  <div class="footer">DevFit · Secure login · v4.56.0</div>
-  <button id="force-refresh-btn" type="button" style="margin-top:14px;background:transparent;border:1px solid #555;color:#aaa;padding:8px 16px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">↻ Force refresh app</button>
-  <div style="font-size:10px;color:#555;margin-top:6px">Having trouble? Tap above to clear cache.</div>
-</div>
-
+  <div class="status-box status-checking" id="status-checking">Signing you in…</div><div class="status-box status-sent" id="status-sent">Code sent. Check your inbox and spam folder.</div><div class="status-box status-pending" id="status-pending">This account has been suspended.<br>Please contact your trainer.</div><div class="status-box status-denied" id="status-denied">Couldn’t sign you in. Please try again.</div>
+  <div class="footer">DevFit · Secure sign-in</div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 'use strict';
-
-const CLIENT_ID  = '94871311791-ql8k9lo0q9e1uq3ri98ghnfr1m187chh.apps.googleusercontent.com';
-const SB_URL     = 'https://zngberygrzpkhiqrrzwj.supabase.co';
-const SB_KEY     = 'sb_publishable_oJSFEcVvsvbhPA_8mhUrGQ_JCrBddtn';
-
-let _sbClient = null;
-function sb(){ if(_sbClient) return _sbClient; if(!window.supabase) return null; _sbClient=window.supabase.createClient(SB_URL,SB_KEY); return _sbClient; }
-
-function show(id){ document.getElementById(id).style.display='block'; }
-function hide(id){ document.getElementById(id).style.display='none'; }
-function hideAll(){ ['status-checking','status-pending','status-denied'].forEach(hide); }
-function showSpinner(){ document.getElementById('spinner').style.display='block'; }
-function hideSpinner(){ document.getElementById('spinner').style.display='none'; }
-
-// ─── Shared approval check (used by both email + Google paths) ───────────────
-// Layer 1: try the signed-token backend first (/api/session). It verifies the
-// provider token server-side and returns a signed session that can't be forged.
-//
-// TRANSITION SAFETY: while DevFitAuth.strict is false, a denial from the new
-// backend is NOT trusted on its own — the Supabase subscriber table may still
-// be mid-migration (empty or partial) while the Google Sheet remains the real
-// source of truth. So during transition we always fall through to the legacy
-// Sheet check on any non-approval, and only show denied/pending if the SHEET
-// also denies. Once every client is migrated into devfit_subscribers and you
-// flip STRICT=true in devfit-auth.js, the new backend's answer becomes final.
-async function checkApproval(email, name, provider, providerToken){
-  showSpinner(); hideAll(); show('status-checking');
-
-  // Signed-token backend is authoritative. It verifies the provider token
-  // server-side, looks up the subscriber, and returns a signed session that
-  // can't be forged. (The old Google-Sheet fallback was removed.)
-  try{
-    const r = await DevFitAuth.startSession(provider || 'supabase', providerToken, name);
-    hideSpinner(); hideAll();
-    if(r && r.approved){
-      document.cookie='devfit_email='+encodeURIComponent(email)+';max-age=31536000;path=/;SameSite=Lax';
-      window.location.href = 'index.html';
-      return;
-    }
-    show(r && r.status==='pending' ? 'status-pending' : 'status-denied');
-  }catch(e){
-    hideSpinner(); hideAll(); show('status-denied');
-  }
-}
-
-// ─── Email magic link (Supabase Auth) ────────────────────────────────────────
-async function sendMagicLink(){
-  const emailEl = document.getElementById('email-input');
-  const btn     = document.getElementById('email-btn');
-  const email   = (emailEl.value||'').trim().toLowerCase();
-
-  if(!email || !email.includes('@')){
-    emailEl.style.borderColor='#cc0000';
-    emailEl.focus();
-    return;
-  }
-  emailEl.style.borderColor='';
-
-  const db = sb();
-  if(!db){ show('status-denied'); return; }
-
-  btn.disabled = true;
-  btn.textContent = 'Sending…';
-  hideAll();
-
-  try{
-    const redirectTo = window.location.origin + (window.location.pathname.includes('/')
-      ? window.location.pathname.replace(/[^/]*$/, '') : '/') + 'login.html';
-
-    const { error } = await db.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: redirectTo, shouldCreateUser: true }
-    });
-
-    if(error) throw error;
-
-    btn.textContent = '✓ Link sent';
-    document.getElementById('sent-msg').style.display='block';
-
-  }catch(e){
-    btn.disabled=false;
-    btn.textContent='Send Login Link';
-    hideAll();
-    show('status-denied');
-    console.warn('[DevFit Login] Magic link error:', e.message||e);
-  }
-}
-
-// ─── Handle Supabase magic link redirect (runs on page load) ─────────────────
-async function handleMagicLinkReturn(){
-  const db = sb();
-  if(!db) return;
-  // Supabase puts the session in the URL hash after magic link click
-  const hash = window.location.hash;
-  if(!hash.includes('access_token') && !hash.includes('type=magiclink') && !hash.includes('type=recovery')) return;
-
-  showSpinner(); hideAll(); show('status-checking');
-
-  // Give Supabase a moment to parse the hash
-  await new Promise(r=>setTimeout(r,500));
-
-  try{
-    const { data:{ session }, error } = await db.auth.getSession();
-    if(error || !session){
-      hideSpinner(); hideAll(); show('status-denied'); return;
-    }
-    const email = session.user.email;
-    const name  = session.user.user_metadata?.full_name || email.split('@')[0];
-    // Clear the hash so it doesn't stay in the URL bar
-    history.replaceState(null,'',window.location.pathname);
-    checkApproval(email, name, 'supabase', session.access_token);
-  }catch(e){
-    hideSpinner(); hideAll(); show('status-denied');
-  }
-}
-
-// ─── Google OAuth ────────────────────────────────────────────────────────────
-function signInWithGoogle(){
-  if(!window.google || !google.accounts){
-    alert('Google sign-in is loading — try again in a moment.');
-    return;
-  }
-  const client = google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID,
-    scope: 'email profile',
-    callback: async (response) => {
-      if(response.error){ hideAll(); return; }
-      document.getElementById('google-signin-btn').style.display='none';
-      showSpinner(); hideAll(); show('status-checking');
-      try{
-        const userInfo = await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{
-          headers:{ Authorization:'Bearer '+response.access_token }
-        }).then(r=>r.json());
-        checkApproval(userInfo.email, userInfo.name, 'google', response.access_token);
-      }catch(e){
-        hideSpinner(); hideAll(); show('status-denied');
-        document.getElementById('google-signin-btn').style.display='flex';
-      }
-    }
-  });
-  client.requestAccessToken();
-}
-
-// ─── Boot ─────────────────────────────────────────────────────────────────────
-function getCookie(name){
-  const m=document.cookie.match('(?:^|; )'+name+'=([^;]*)');
-  return m?decodeURIComponent(m[1]):'';
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  // Already logged in?
-  try{
-    const user = JSON.parse(localStorage.getItem('devfit_user')||'{}');
-    if(user.approved){ window.location.href='index.html'; return; }
-  }catch(e){}
-
-  // Pre-fill email from cookie (persists across PWA reinstalls on most devices)
-  const savedEmail = getCookie('devfit_email');
-  if(savedEmail){
-    const el = document.getElementById('email-input');
-    el.value = savedEmail;
-    // Show a subtle hint
-    const sub = document.querySelector('.subtitle');
-    if(sub) sub.textContent = 'Welcome back! Tap "Email me a sign-in link" to sign in instantly.';
-  }
-
-  // Coming back from magic link?
-  handleMagicLinkReturn();
-
-  // Wire buttons
-  document.getElementById('email-btn').addEventListener('click', sendMagicLink);
-  document.getElementById('email-input').addEventListener('keydown', e=>{ if(e.key==='Enter') sendMagicLink(); });
-  document.getElementById('google-signin-btn').addEventListener('click', e=>{ e.preventDefault(); signInWithGoogle(); });
-  document.getElementById('force-refresh-btn').addEventListener('click', forceRefresh);
-  const iBtn = document.getElementById('install-btn');
-  if(iBtn) iBtn.addEventListener('click', installApp);
+const CLIENT_ID='94871311791-ql8k9lo0q9e1uq3ri98ghnfr1m187chh.apps.googleusercontent.com';
+const SB_URL='https://zngberygrzpkhiqrrzwj.supabase.co';
+const SB_KEY='sb_publishable_oJSFEcVvsvbhPA_8mhUrGQ_JCrBddtn';
+let sbClient=null,pendingEmail='',googleReady=false;
+function sb(){if(sbClient)return sbClient;if(!window.supabase)return null;sbClient=window.supabase.createClient(SB_URL,SB_KEY);return sbClient}
+function el(id){return document.getElementById(id)}function show(id){el(id).style.display='block'}function hide(id){el(id).style.display='none'}
+function clearStatus(){['status-checking','status-sent','status-pending','status-denied'].forEach(hide)}
+function busy(on){el('spinner').style.display=on?'block':'none';el('email-send').disabled=on;el('code-verify').disabled=on}
+function fail(message){busy(false);clearStatus();el('status-denied').textContent=message||'Couldn’t sign you in. Please try again.';show('status-denied')}
+async function finishLogin(provider,token){busy(true);clearStatus();show('status-checking');try{const r=await DevFitAuth.startSession(provider,token,'');busy(false);clearStatus();if(r&&r.approved){document.cookie='devfit_email='+encodeURIComponent(r.email)+';max-age=31536000;path=/;SameSite=Lax;Secure';location.replace('index.html');return}show(r&&r.status==='pending'?'status-pending':'status-denied')}catch(e){fail('Couldn’t sign you in. Check your connection and try again.')}}
+function initGoogle(){if(googleReady||!window.google||!google.accounts||!google.accounts.id)return false;googleReady=true;google.accounts.id.initialize({client_id:CLIENT_ID,callback:function(response){if(response&&response.credential)finishLogin('google_id',response.credential);else fail()},auto_select:false,cancel_on_tap_outside:true});el('google-button').innerHTML='';google.accounts.id.renderButton(el('google-button'),{type:'standard',theme:'outline',size:'large',text:'continue_with',shape:'rectangular',logo_alignment:'left',width:Math.min(344,el('google-button').clientWidth||344)});return true}
+async function sendCode(){const input=el('email-input'),email=(input.value||'').trim().toLowerCase();if(!/^\S+@\S+\.\S+$/.test(email)){input.style.borderColor='#cc0000';input.focus();return}input.style.borderColor='';const client=sb();if(!client){fail();return}busy(true);clearStatus();try{const result=await client.auth.signInWithOtp({email:email,options:{shouldCreateUser:true}});if(result.error)throw result.error;pendingEmail=email;el('code-email').textContent=email;el('email-step').hidden=true;el('code-step').hidden=false;busy(false);show('status-sent');setTimeout(function(){el('code-input').focus()},0)}catch(e){fail(e&&e.message?e.message:'Couldn’t send the code. Please try again.')}}
+async function verifyCode(){const code=(el('code-input').value||'').replace(/\D/g,'');if(code.length!==6){el('code-input').style.borderColor='#cc0000';el('code-input').focus();return}const client=sb();if(!client||!pendingEmail){fail();return}busy(true);clearStatus();try{const result=await client.auth.verifyOtp({email:pendingEmail,token:code,type:'email'});if(result.error||!result.data||!result.data.session)throw(result.error||new Error('Invalid or expired code'));await finishLogin('supabase',result.data.session.access_token)}catch(e){fail(e&&e.message?e.message:'That code is invalid or expired. Please request a new one.')}}
+async function handleLegacyLink(){const client=sb();if(!client||(!location.hash.includes('access_token')&&!location.hash.includes('type=magiclink')))return;busy(true);clearStatus();show('status-checking');await new Promise(function(r){setTimeout(r,400)});try{const result=await client.auth.getSession();if(!result.data.session)throw new Error();history.replaceState(null,'',location.pathname);await finishLogin('supabase',result.data.session.access_token)}catch(e){fail()}}
+function resetEmail(){pendingEmail='';el('code-step').hidden=true;el('email-step').hidden=false;el('code-input').value='';clearStatus();setTimeout(function(){el('email-input').focus()},0)}
+document.addEventListener('DOMContentLoaded',function(){
+  // Never auto-redirect from a cached browser flag. If the dashboard rejected an
+  // expired token, the login form must remain usable instead of forming a loop.
+  const saved=(document.cookie.match('(?:^|; )devfit_email=([^;]*)')||[])[1];if(saved)el('email-input').value=decodeURIComponent(saved);
+  el('email-toggle').addEventListener('click',function(){el('email-section').classList.toggle('open');if(el('email-section').classList.contains('open'))el('email-input').focus()});
+  el('email-send').addEventListener('click',sendCode);el('code-verify').addEventListener('click',verifyCode);el('change-email').addEventListener('click',resetEmail);
+  el('email-input').addEventListener('keydown',function(e){if(e.key==='Enter')sendCode()});el('code-input').addEventListener('keydown',function(e){if(e.key==='Enter')verifyCode()});
+  handleLegacyLink();if(!initGoogle()){let tries=0;const timer=setInterval(function(){if(initGoogle()||++tries>30)clearInterval(timer)},200)}
 });
-
-// ─── Force refresh ─────────────────────────────────────────────────────────
-async function forceRefresh(){
-  const btn = document.getElementById('force-refresh-btn');
-  if(btn){ btn.textContent='Refreshing…'; btn.disabled=true; }
-  try{
-    if('serviceWorker' in navigator){
-      const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map(r=>r.unregister()));
-    }
-    if('caches' in window){
-      const keys = await caches.keys();
-      await Promise.all(keys.map(k=>caches.delete(k)));
-    }
-  }catch(e){}
-  window.location.href='login.html?_='+Date.now();
-}
-
-// ─── PWA install ────────────────────────────────────────────────────────────
-let deferredPrompt;
-window.addEventListener('beforeinstallprompt',(e)=>{
-  e.preventDefault(); deferredPrompt=e;
-  const btn=document.getElementById('install-btn');
-  if(btn) btn.style.display='inline-block';
-});
-function installApp(){
-  if(!deferredPrompt) return;
-  deferredPrompt.prompt();
-  deferredPrompt.userChoice.then(()=>{ deferredPrompt=null; document.getElementById('install-btn').style.display='none'; });
-}
-
-// Service worker registration + robust auto-update handled by pwa-update.js below.
+window.addEventListener('pageshow',function(){busy(false)});
 </script>
 <script src="pwa-update.js"></script>
-
-<!-- Supabase JS (for magic link auth) -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </body>
 </html>

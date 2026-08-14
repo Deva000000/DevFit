@@ -1770,8 +1770,7 @@ function lastCloudBackupTs(){
 // Escape user-controlled text before it goes into innerHTML (defense-in-depth).
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
-// Your data lives on this phone. Say so plainly, and say what the user has to do
-// about it — an export file is the only copy that survives losing the device.
+// Show local recovery information without exposing infrastructure jargon.
 function refreshBackupStatus(){
   const el = document.getElementById('backup-status');
   if(!el) return;
@@ -1779,15 +1778,13 @@ function refreshBackupStatus(){
   try{ sessions = ((JSON.parse(localStorage.getItem('devfitTrainingV1')||'{}').sessions)||[]).length; }catch(e){}
   try{ snaps = (JSON.parse(localStorage.getItem('devfitTrainingV1__safety')||'[]')||[]).length; }catch(e){}
   el.innerHTML =
-    '<strong>Your data is saved on this phone only.</strong><br>'+
+    '<strong>Your records stay linked to your DevFit account.</strong><br>'+
     sessions+' logged session'+(sessions===1?'':'s')+
     (snaps? ' · '+snaps+' recovery point'+(snaps===1?'':'s')+' kept' : '')+
-    '<br>Export a backup file regularly — it is the only copy that survives losing or wiping this phone.';
+    '<br>You can still export a personal backup file whenever you want.';
 }
 
-// Recovery points are written automatically, on this device, just before anything
-// removes sessions (mesocycle reset, clearing history, deleting a day). No network
-// involved — this is the whole safety net now that nothing syncs.
+// Recovery points are also written locally just before anything removes sessions.
 function recoverSessions(){
   let snaps = [];
   try{ snaps = JSON.parse(localStorage.getItem('devfitTrainingV1__safety')||'[]')||[]; }catch(e){}
@@ -1823,9 +1820,7 @@ function recoverSessions(){
   }catch(e){ toast('Could not read that recovery point', true); }
 }
 
-// Cloud backup / restore removed in v4.69.0 — see devfit-db.js for why. Export and
-// Import below are the backup story now, plus the automatic on-device recovery
-// points in recoverSessions().
+// Export/import and on-device recovery points remain user-controlled safeguards.
 
 function exportBackupFile(){
   try{

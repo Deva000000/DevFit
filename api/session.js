@@ -1,17 +1,17 @@
 // DevFit — POST /api/session
 // Called right after login. Verifies the caller actually owns the email (via the
-// Supabase magic-link token or a Google OAuth token), looks up their subscriber
+// Supabase email-code token or a Google ID token), looks up their subscriber
 // record, and — only if approved — returns a SERVER-SIGNED session token.
 //
 // The signed token is what the app stores instead of a plain "approved:true"
 // flag: it cannot be forged in the browser without DEVFIT_JWT_SECRET.
 //
-// Body: { provider: 'supabase' | 'google', token: <providerAccessToken> }
+// Body: { provider: 'supabase' | 'google_id', token: <providerToken> }
 // 200:  { approved:true, token, email, name, tier, expiry, startDate, plan }
 //       { approved:false, status:'pending'|'denied' }
 
 import {
-  haveServerConfig, emailFromSupabaseToken, emailFromGoogleToken,
+  haveServerConfig, emailFromSupabaseToken, emailFromGoogleToken, identityFromGoogleIdToken,
   getSubscriber, computeTier, signToken, rateLimit, clientIp, readJsonBody, recordLogin, sbUpsert
 } from './_lib.js';
 
@@ -33,8 +33,18 @@ export default async function handler(req, res) {
   if (!rl.ok) { res.status(429).json({ error: 'rate_limited', retryAfter: rl.retryAfter }); return; }
 
   let email = null;
-  if (provider === 'google') email = await emailFromGoogleToken(token);
-  else email = await emailFromSupabaseToken(token);
+  let verifiedName = '';
+  if (provider === 'google_id') {
+    const identity = await identityFromGoogleIdToken(token);
+    email = identity && identity.email;
+    verifiedName = identity && identity.name;
+  } else if (provider === 'google') {
+    // Temporary compatibility for a rolling deploy: old cached login pages still
+    // send an OAuth access token. New clients always use google_id.
+    email = await emailFromGoogleToken(token);
+  } else if (provider === 'supabase') {
+    email = await emailFromSupabaseToken(token);
+  }
   if (!email) { res.status(401).json({ error: 'invalid_identity' }); return; }
 
   // Record the login for every verified identity — including people who aren't
@@ -50,7 +60,7 @@ export default async function handler(req, res) {
   if (!sub) {
     const created = await sbUpsert(
       'devfit_subscribers',
-      { email, name: email.split('@')[0], tier: 'free', approved: true, updated_at: new Date().toISOString() },
+      { email, name: verifiedName || email.split('@')[0], tier: 'free', approved: true, updated_at: new Date().toISOString() },
       'email'
     );
     sub = (Array.isArray(created) ? created[0] : created) || { email, tier: 'free', approved: true };
@@ -64,7 +74,7 @@ export default async function handler(req, res) {
     approved: true,
     token: signed,
     email,
-    name: sub.name || email.split('@')[0],
+    name: sub.name || verifiedName || email.split('@')[0],
     tier,
     expiry: sub.expiry || '',
     startDate: sub.start_date || '',

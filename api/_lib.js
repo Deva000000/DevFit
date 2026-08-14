@@ -18,6 +18,7 @@ export const SB_URL = process.env.SUPABASE_URL || 'https://zngberygrzpkhiqrrzwj.
 const SB_SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
 const SB_ANON = process.env.SUPABASE_ANON_KEY || 'sb_publishable_oJSFEcVvsvbhPA_8mhUrGQ_JCrBddtn';
 const JWT_SECRET = process.env.DEVFIT_JWT_SECRET || '';
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '94871311791-ql8k9lo0q9e1uq3ri98ghnfr1m187chh.apps.googleusercontent.com';
 
 export function haveServerConfig() {
   return Boolean(SB_SERVICE && JWT_SECRET);
@@ -82,6 +83,30 @@ export async function sbInsert(table, row) {
   } catch (e) { return null; }
 }
 
+export async function sbInsertReturning(table, row) {
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: { ...sbHeaders(), Prefer: 'return=representation' },
+      body: JSON.stringify(row)
+    });
+    if (!r.ok) return null;
+    return r.json();
+  } catch (e) { return null; }
+}
+
+export async function sbPatch(table, query, changes) {
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/${table}?${query}`, {
+      method: 'PATCH',
+      headers: { ...sbHeaders(), Prefer: 'return=representation' },
+      body: JSON.stringify(changes)
+    });
+    if (!r.ok) return null;
+    return r.json();
+  } catch (e) { return null; }
+}
+
 export async function sbUpsert(table, row, onConflict) {
   const r = await fetch(`${SB_URL}/rest/v1/${table}?on_conflict=${onConflict}`, {
     method: 'POST',
@@ -115,6 +140,65 @@ export async function emailFromGoogleToken(accessToken) {
     const u = await r.json();
     if (!u || !u.email || u.email_verified === false) return null;
     return String(u.email).toLowerCase();
+  } catch (e) { return null; }
+}
+
+// Google Identity Services ID credential -> verified identity. Unlike the old
+// access-token/userinfo flow, this verifies the signed JWT itself: signature,
+// issuer, audience and lifetime. Google's public signing keys rotate, so cache
+// them only for the duration advertised by Google's Cache-Control header.
+let googleJwks = null;
+let googleJwksUntil = 0;
+
+async function getGoogleJwk(kid) {
+  const hadFreshCache = Boolean(googleJwks && Date.now() < googleJwksUntil);
+  if (!googleJwks || Date.now() >= googleJwksUntil) {
+    const r = await fetch('https://www.googleapis.com/oauth2/v3/certs', { cache: 'no-store' });
+    if (!r.ok) return null;
+    const body = await r.json();
+    googleJwks = Array.isArray(body.keys) ? body.keys : [];
+    const cc = r.headers && r.headers.get ? (r.headers.get('cache-control') || '') : '';
+    const maxAge = Number((cc.match(/max-age=(\d+)/i) || [])[1] || 3600);
+    googleJwksUntil = Date.now() + Math.max(60, Math.min(maxAge, 86400)) * 1000;
+  }
+  const found = googleJwks.find((key) => key && key.kid === kid) || null;
+  // A new signing key can appear before our cached max-age elapses. Refresh once
+  // on an unknown kid so key rotation never locks legitimate users out.
+  if (!found && hadFreshCache) {
+    googleJwks = null;
+    googleJwksUntil = 0;
+    return getGoogleJwk(kid);
+  }
+  return found;
+}
+
+export async function identityFromGoogleIdToken(idToken) {
+  try {
+    const parts = String(idToken || '').split('.');
+    if (parts.length !== 3) return null;
+    const header = JSON.parse(fromB64url(parts[0]));
+    const claims = JSON.parse(fromB64url(parts[1]));
+    if (header.alg !== 'RS256' || !header.kid) return null;
+    const jwk = await getGoogleJwk(header.kid);
+    if (!jwk) return null;
+    const key = crypto.createPublicKey({ key: jwk, format: 'jwk' });
+    const signature = Buffer.from(parts[2].replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+    const valid = crypto.verify('RSA-SHA256', Buffer.from(parts[0] + '.' + parts[1]), key, signature);
+    if (!valid) return null;
+
+    const now = Math.floor(Date.now() / 1000);
+    const issuerOk = claims.iss === 'https://accounts.google.com' || claims.iss === 'accounts.google.com';
+    const audienceOk = Array.isArray(claims.aud)
+      ? claims.aud.includes(GOOGLE_CLIENT_ID)
+      : claims.aud === GOOGLE_CLIENT_ID;
+    if (!issuerOk || !audienceOk || Number(claims.exp || 0) < now - 30) return null;
+    if (Number(claims.iat || 0) > now + 120) return null;
+    if (!claims.sub || !claims.email || claims.email_verified !== true) return null;
+    return {
+      email: String(claims.email).trim().toLowerCase(),
+      name: String(claims.name || claims.given_name || '').trim(),
+      subject: String(claims.sub)
+    };
   } catch (e) { return null; }
 }
 

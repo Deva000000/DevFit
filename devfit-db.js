@@ -31,25 +31,10 @@
 (function (global) {
   'use strict';
 
-  // ══ CLOUD DATA SYNC IS OFF ═══════════════════════════════════════════════
-  // Deliberate product decision (v4.69.0), not a bug: training/nutrition/progress
-  // data now lives ONLY in localStorage on the user's own device. One shared
-  // Supabase row was a single point of failure across every client at once, and a
-  // single bad write to it was unrecoverable because the row has no history.
-  //
-  // What replaces it, on-device and with no network involved:
-  //   • a safety snapshot taken before any write that would REMOVE sessions, so a
-  //     destructive change is always recoverable (Settings → Recover)
-  //   • Export/Import backup file, which the user controls
-  //
-  // The whole sync implementation below is left intact and inert. Flipping this
-  // one flag back to true restores it — and it is now merge-based, so it can no
-  // longer overwrite a good copy with a stale one.
-  //
-  // NOTE: this switch covers app DATA only. Login and Pro verification still talk
-  // to the server (devfit-auth.js → /api/verify); without that there is no way to
-  // check a subscription at all.
-  const CLOUD_SYNC_ENABLED = false;
+  // Account persistence is enabled. The server rejects stale whole-document
+  // writes, the client merges before retrying, and accepted states are archived
+  // in append-only history. localStorage remains the fast offline copy.
+  const CLOUD_SYNC_ENABLED = true;
 
   const DATA_API = '/api/data';
 
@@ -60,8 +45,7 @@
     workouts: 'devfitTrainingV1'
   };
 
-  // With sync off this returns '' for every caller, which every entry point below
-  // already treats as "stay local" — the same path used when a user is offline.
+  // Missing/expired sessions stay local; a later authenticated load reconciles.
   function getToken() {
     if (!CLOUD_SYNC_ENABLED) return '';
     try { return localStorage.getItem('devfit_token') || ''; } catch (e) { return ''; }
@@ -95,6 +79,11 @@
       body: JSON.stringify(Object.assign({ token: token, op: op }, extra || {}))
     });
     if (res.status === 501 || res.status === 401) return { skip: true, status: res.status };
+    if (res.status === 409) {
+      const conflict = await res.json().catch(function () { return {}; });
+      conflict.conflict = true;
+      return conflict;
+    }
     if (!res.ok) throw new Error('data api ' + res.status);
     return await res.json();
   }
@@ -278,15 +267,75 @@
   }
 
   // ── progress ────────────────────────────────────────────────────────────
-  // Deliberately NOT cell-merged. The weekly arrays are positional, and on the
-  // Free tier appData is collapsed to a single week re-anchored to this Monday
-  // while the rest lives in _proHistory — so index 0 means different weeks on a
-  // Free and a Pro copy. Merging by index would smear one week's weights onto
-  // another. Winner takes the weeks; we only make sure the archive and the
-  // profile fields can never be dropped by the exchange.
+  function weekDate(start, index) {
+    const d = new Date(String(start || '') + 'T00:00:00Z');
+    if (isNaN(d)) return '';
+    d.setUTCDate(d.getUTCDate() + index * 7);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function mergeCells(incoming, existing) {
+    const a = Array.isArray(incoming) ? incoming : [];
+    const b = Array.isArray(existing) ? existing : [];
+    const out = [];
+    for (let i = 0; i < Math.max(a.length, b.length, 7); i++) {
+      out[i] = isBlank(a[i]) ? (typeof b[i] === 'undefined' ? '' : b[i]) : a[i];
+    }
+    return out;
+  }
+
+  // Normalize each visible/archive week to its Monday before merging. This lets
+  // two devices edit different weeks or different days without confusing index 0
+  // from programs with different start dates.
   function mergeProgress(win, los) {
     const out = fillGaps(win, los);
-    if (!out._proHistory && los._proHistory) out._proHistory = los._proHistory;
+    const weeks = new Map();
+    const collectTimeline = function (source) {
+      if (!source || !source.programStart) return;
+      const count = Math.max(
+        (source.bw || []).length,
+        (source.steps || []).length,
+        (source.sleep || []).length,
+        (source.weeklyCheckin || []).length
+      );
+      for (let i = 0; i < count; i++) {
+        const date = weekDate(source.programStart, i);
+        if (!date) continue;
+        const old = weeks.get(date) || {};
+        weeks.set(date, {
+          bw: mergeCells(source.bw && source.bw[i], old.bw),
+          steps: mergeCells(source.steps && source.steps[i], old.steps),
+          sleep: mergeCells(source.sleep && source.sleep[i], old.sleep),
+          checkin: fillGaps(source.weeklyCheckin && source.weeklyCheckin[i] || {}, old.checkin || {})
+        });
+      }
+    };
+    const collectDoc = function (doc) {
+      if (!doc) return;
+      collectTimeline(doc._proHistory);
+      collectTimeline(doc);
+    };
+    collectDoc(los);
+    collectDoc(win);
+
+    const dates = Array.from(weeks.keys()).sort();
+    if (!dates.length) return out;
+    const first = new Date(dates[0] + 'T00:00:00Z');
+    const last = new Date(dates[dates.length - 1] + 'T00:00:00Z');
+    const span = Math.round((last - first) / (7 * 86400000)) + 1;
+    if (span < 1 || span > 520) return out;
+
+    out.programStart = dates[0];
+    out.bw = []; out.steps = []; out.sleep = []; out.weeklyCheckin = [];
+    for (let i = 0; i < span; i++) {
+      const wk = weeks.get(weekDate(dates[0], i)) || {};
+      out.bw.push(wk.bw || Array(7).fill(''));
+      out.steps.push(wk.steps || Array(7).fill(''));
+      out.sleep.push(wk.sleep || Array(7).fill(''));
+      out.weeklyCheckin.push(wk.checkin || {});
+    }
+    delete out._proHistory;
+    delete out.freeWeekOf;
     return out;
   }
 
@@ -304,38 +353,8 @@
     return w;
   }
 
-  // ── Sync indicator dot (injected into header automatically) ──────────────
-  function injectDot() {
-    if (!CLOUD_SYNC_ENABLED) return;   // nothing syncs, so no status to report
-    if (document.getElementById('devfit-cloud-dot')) return;
-    const header = document.querySelector('.header') || document.querySelector('header');
-    if (!header) return;
-    const dot = document.createElement('span');
-    dot.id = 'devfit-cloud-dot';
-    dot.title = 'Cloud sync';
-    dot.style.cssText = [
-      'display:inline-block', 'width:7px', 'height:7px', 'border-radius:50%',
-      'background:#6b7280', 'position:absolute', 'top:10px', 'right:14px',
-      'transition:background .4s', 'z-index:999', 'cursor:default'
-    ].join(';');
-    header.style.position = 'relative';
-    header.appendChild(dot);
-  }
-
-  function setIndicator(state) {
-    const el = document.getElementById('devfit-cloud-dot');
-    if (!el) return;
-    const colours = { syncing: '#f59e0b', ok: '#22c55e', err: '#6b7280', offline: '#6b7280' };
-    el.style.background = colours[state] || colours.offline;
-    const labels = { syncing: 'Syncing…', ok: 'Synced ✓', err: 'Sync error', offline: 'Offline' };
-    el.title = labels[state] || 'Cloud sync';
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', injectDot);
-  } else {
-    injectDot();
-  }
+  // Account backup is deliberately invisible in the product UI.
+  function setIndicator() {}
 
   // ── Reconcile state ───────────────────────────────────────────────────────
   // pulled[type]   — the initial pull+merge for this type has completed.
@@ -344,6 +363,9 @@
   const pulled = {};
   const pulling = {};
   const notify = {};
+  const cloudVersion = {};
+  const pendingSave = {};
+  const saveWorker = {};
 
   // Effective local timestamp = most recent of last cloud sync and last local edit.
   function localTsFor(dataType) {
@@ -356,11 +378,34 @@
   async function push(dataType, data) {
     setIndicator('syncing');
     try {
-      const r = await apiCall('set', { dataType: dataType, data: data });
-      if (r && r.skip) { setIndicator('offline'); return false; }
-      localStorage.setItem('devfit_cloud_ts_' + dataType, String(Date.now()));
-      setIndicator('ok');
-      return true;
+      let candidate = data;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const r = await apiCall('set', {
+          dataType: dataType,
+          data: candidate,
+          baseUpdatedAt: cloudVersion[dataType] || '',
+          deviceId: localStorage.getItem('devfit_device_id') || 'unknown'
+        });
+        if (r && r.skip) { setIndicator('offline'); return false; }
+        if (r && r.conflict && r.row) {
+          const serverTs = new Date(r.row.updated_at).getTime();
+          const serverWins = serverTs > localTsFor(dataType) + 3000;
+          candidate = serverWins
+            ? mergeDoc(dataType, r.row.data, candidate)
+            : mergeDoc(dataType, candidate, r.row.data);
+          cloudVersion[dataType] = r.row.updated_at || '';
+          if (LOCAL_KEY[dataType]) writeLocal(dataType, candidate);
+          if (typeof notify[dataType] === 'function') {
+            try { notify[dataType](candidate); } catch (e) {}
+          }
+          continue;
+        }
+        cloudVersion[dataType] = (r && r.updated_at) || cloudVersion[dataType] || '';
+        localStorage.setItem('devfit_cloud_ts_' + dataType, String(Date.now()));
+        setIndicator('ok');
+        return true;
+      }
+      throw new Error('save conflict did not converge');
     } catch (e) {
       console.warn('[DevFit Cloud] save failed (' + dataType + '):', e.message || e);
       setIndicator('err');
@@ -385,6 +430,7 @@
         const row = rows.filter(function (x) { return x.data_type === dataType; })[0];
 
         if (row && row.data) {
+          cloudVersion[dataType] = row.updated_at || '';
           const cloudTs = new Date(row.updated_at).getTime();
           // The timestamp no longer decides who SURVIVES — only who wins a
           // straight conflict on the same field. Everything additive is unioned
@@ -398,7 +444,7 @@
           if (typeof notify[dataType] === 'function') {
             try { notify[dataType](merged); } catch (e) {}
           }
-        }
+        } else cloudVersion[dataType] = '';
         setIndicator('ok');
       } catch (e) {
         console.warn('[DevFit Cloud] sync failed (' + dataType + '):', e.message || e);
@@ -430,18 +476,20 @@
     // so an edit is never clobbered even if the user navigates away mid-upload.
     try { localStorage.setItem('devfit_local_ts_' + dataType, String(Date.now())); } catch (_) {}
     if (!getToken()) return;
-    if (!LOCAL_KEY[dataType]) { await push(dataType, data); return; }
-
-    if (!pulled[dataType]) {
-      // Never push before we have seen what the cloud holds. reconcile() reads the
-      // caller's data back out of localStorage (written moments ago by save()),
-      // merges, and uploads the result — so this save is included, not skipped.
-      setIndicator('syncing');
-      const merged = await reconcile(dataType);
-      await push(dataType, merged || data);
-      return;
+    pendingSave[dataType] = data;
+    if (!saveWorker[dataType]) {
+      saveWorker[dataType] = (async function () {
+        if (!pulled[dataType] && LOCAL_KEY[dataType]) await reconcile(dataType);
+        while (pendingSave[dataType]) {
+          let latest = pendingSave[dataType];
+          pendingSave[dataType] = null;
+          if (LOCAL_KEY[dataType]) latest = readLocal(dataType) || latest;
+          await push(dataType, latest);
+        }
+      })();
     }
-    await push(dataType, data);
+    try { await saveWorker[dataType]; }
+    finally { saveWorker[dataType] = null; }
   }
 
   // ── Startup sync (single data type) ───────────────────────────────────────
@@ -517,7 +565,7 @@
       if (v != null) { obj[k] = v; any = true; }
     });
     if (!any) return;
-    try { await apiCall('set', { dataType: 'prefs', data: obj }); } catch (e) {}
+    try { await cloudSave('prefs', obj); } catch (e) {}
   }
 
   async function restorePrefs() {
@@ -527,6 +575,7 @@
       if (!r || r.skip) return;
       const row = ((r && r.rows) || []).filter(function (x) { return x.data_type === 'prefs'; })[0];
       if (!row || !row.data) return;
+      cloudVersion.prefs = row.updated_at || '';
       Object.keys(row.data).forEach(function (k) {
         if (PREF_KEYS.indexOf(k) < 0) return;
         try { if (localStorage.getItem(k) == null) localStorage.setItem(k, row.data[k]); } catch (e) {}

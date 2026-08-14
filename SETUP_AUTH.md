@@ -90,6 +90,22 @@ alter table devfit_rate        enable row level security;
 alter table devfit_logins      enable row level security;
 alter table devfit_errors      enable row level security;
 -- No policies = the public anon key cannot read or write. Service key bypasses RLS.
+
+-- Append-only recovery history for account data. The app still reads the current
+-- devfit_data row, while every accepted version is retained here.
+create table if not exists devfit_data_versions (
+  id            bigint generated always as identity primary key,
+  email         text not null,
+  data_type     text not null,
+  data          jsonb not null,
+  content_hash  text not null,
+  source_device text,
+  created_at    timestamptz not null default now(),
+  unique (email, data_type, content_hash)
+);
+alter table devfit_data_versions enable row level security;
+create index if not exists devfit_data_versions_lookup_idx
+  on devfit_data_versions (email, data_type, created_at desc);
 ```
 
 > **Note:** the `prefs` cloud backup (display name, goals, view prefs — added for
@@ -107,11 +123,31 @@ Project → **Settings → Environment Variables** (Production + Preview):
 | `DEVFIT_ADMIN_PASSWORD` | A strong password you'll type into `admin.html` |
 | `SUPABASE_URL` | *(optional)* defaults to your project URL already |
 | `SUPABASE_ANON_KEY` | *(optional)* defaults to the publishable key already in the app |
+| `GOOGLE_CLIENT_ID` | *(optional)* defaults to the public Google web client ID already used by DevFit |
 
 > The **service_role** key must never appear in client code — it only lives in
 > Vercel env and is used by `api/*` server-side. That's the whole point.
 
 **Redeploy** after setting them (env changes need a fresh deploy).
+
+## Step 2A — Email-code fallback and canonical URL
+
+Google ID-token sign-in is the primary login. Email is a same-page six-digit-code
+fallback and must not contain a redirect link.
+
+In Supabase Dashboard → Authentication → Email Templates → Magic Link, use a
+template containing `{{ .Token }}` and remove `{{ .ConfirmationURL }}`. For
+example: `Your DevFit sign-in code is {{ .Token }}`.
+
+In Authentication → URL Configuration:
+
+- Set Site URL to `https://devfitportal.vercel.app`.
+- Remove the old Netlify URL from Redirect URLs.
+- Keep only the Vercel production URL and any intentional Vercel preview URLs.
+
+In Google Cloud Console, keep `https://devfitportal.vercel.app` in the OAuth web
+client's Authorized JavaScript origins. The server validates every Google ID
+token's signature, issuer, expiry and audience before creating a DevFit session.
 
 ## Step 3 — Migrate your current clients
 

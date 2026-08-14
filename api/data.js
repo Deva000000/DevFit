@@ -11,11 +11,45 @@
 // Body: { token, op:'get' }                 → { rows:[{data_type,data,updated_at}] }
 //       { token, op:'set', dataType, data } → { ok:true, updated_at }
 
+import crypto from 'crypto';
 import {
-  haveServerConfig, verifyToken, sbSelect, sbUpsert, readJsonBody
+  haveServerConfig, verifyToken, sbSelect, sbInsert, sbInsertReturning, sbPatch, readJsonBody
 } from './_lib.js';
 
 const TYPES = ['progress', 'nutrition', 'workouts', 'prefs'];
+
+function stableJson(value) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return '[' + value.map(stableJson).join(',') + ']';
+  return '{' + Object.keys(value).sort().map((key) => JSON.stringify(key) + ':' + stableJson(value[key])).join(',') + '}';
+}
+
+function contentHash(data) {
+  return crypto.createHash('sha256').update(stableJson(data)).digest('hex');
+}
+
+async function archiveVersion(email, dataType, data, deviceId) {
+  // Best effort during rollout: a missing history table must not stop the current
+  // row being saved. Once SETUP_AUTH's additive migration is run, every distinct
+  // accepted state is retained and can be recovered by the trainer.
+  await sbInsert('devfit_data_versions', {
+    email,
+    data_type: dataType,
+    data,
+    content_hash: contentHash(data),
+    source_device: String(deviceId || 'unknown').slice(0, 80)
+  });
+}
+
+async function currentRow(email, dataType) {
+  const rows = await sbSelect(
+    'devfit_data',
+    'email=eq.' + encodeURIComponent(email) +
+      '&data_type=eq.' + encodeURIComponent(dataType) +
+      '&select=data_type,data,updated_at'
+  );
+  return Array.isArray(rows) && rows[0] ? rows[0] : null;
+}
 
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
@@ -47,14 +81,46 @@ export default async function handler(req, res) {
       const dataType = String(body.dataType || '');
       if (TYPES.indexOf(dataType) < 0) { res.status(400).json({ error: 'bad_type' }); return; }
       if (typeof body.data === 'undefined') { res.status(400).json({ error: 'no_data' }); return; }
-      const saved = await sbUpsert(
-        'devfit_data',
-        { email, data_type: dataType, data: body.data, updated_at: new Date().toISOString() },
-        'email,data_type'
-      );
-      if (!saved) { res.status(500).json({ error: 'save_failed' }); return; }
-      const row = Array.isArray(saved) ? saved[0] : saved;
-      res.status(200).json({ ok: true, updated_at: (row && row.updated_at) || new Date().toISOString() });
+      const existing = await currentRow(email, dataType);
+      const baseUpdatedAt = String(body.baseUpdatedAt || '');
+      const now = new Date().toISOString();
+
+      if (existing) {
+        // Optimistic concurrency: a device may only replace the exact version it
+        // previously read. A stale device receives the current document, merges
+        // it locally, then retries. It can never silently overwrite newer data.
+        if (!baseUpdatedAt || baseUpdatedAt !== String(existing.updated_at || '')) {
+          res.status(409).json({ error: 'conflict', row: existing });
+          return;
+        }
+        await archiveVersion(email, dataType, existing.data, 'server-before:' + String(body.deviceId || 'unknown'));
+        const changed = await sbPatch(
+          'devfit_data',
+          'email=eq.' + encodeURIComponent(email) +
+            '&data_type=eq.' + encodeURIComponent(dataType) +
+            '&updated_at=eq.' + encodeURIComponent(baseUpdatedAt),
+          { data: body.data, updated_at: now }
+        );
+        if (!changed) { res.status(500).json({ error: 'save_failed' }); return; }
+        if (!changed.length) {
+          res.status(409).json({ error: 'conflict', row: await currentRow(email, dataType) });
+          return;
+        }
+        await archiveVersion(email, dataType, body.data, body.deviceId);
+        res.status(200).json({ ok: true, updated_at: changed[0].updated_at || now });
+        return;
+      }
+
+      const inserted = await sbInsertReturning('devfit_data', {
+        email, data_type: dataType, data: body.data, updated_at: now
+      });
+      if (!inserted || !inserted.length) {
+        const raced = await currentRow(email, dataType);
+        if (raced) { res.status(409).json({ error: 'conflict', row: raced }); return; }
+        res.status(500).json({ error: 'save_failed' }); return;
+      }
+      await archiveVersion(email, dataType, body.data, body.deviceId);
+      res.status(200).json({ ok: true, updated_at: inserted[0].updated_at || now });
       return;
     }
 

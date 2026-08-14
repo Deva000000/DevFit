@@ -36,6 +36,19 @@
     };
   }
 
+  window.DevFitErrors = {
+    report: function (type, message, extra) {
+      var c = ctx(), x = extra || {};
+      post({
+        type: String(type || 'error').slice(0, 20),
+        message: String(message || 'Unknown error').slice(0, 500),
+        stack: String(x.stack || '').slice(0, 1500),
+        src: String(x.src || '').slice(0, 200),
+        page: c.page, ua: c.ua
+      });
+    }
+  };
+
   window.addEventListener('error', function (e) {
     if (!e || !e.message) return; // ignore bare resource-load errors
     var c = ctx();

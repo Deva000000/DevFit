@@ -1,7 +1,7 @@
 # DevFit Layer 1 — Secure activation (signed tokens + Supabase + admin panel)
 
 This replaces the "trust localStorage + hand-edit a Google Sheet" flow with a
-**server-signed session token** and a **trainer admin panel**. A faked
+**server-signed session token** and a **DevFit admin panel**. A faked
 localStorage session no longer survives a page reload, and you activate clients
 instantly from `admin.html` instead of the Sheet.
 
@@ -18,11 +18,11 @@ on your existing Vercel project.
 | `api/session.js` | Login → verifies identity, returns a **signed** session token |
 | `api/verify.js` | Every page load → validates the token, returns live tier |
 | `api/admin.js` | Password-gated activation backend (rate-limited) |
-| `admin.html` | Your trainer panel — activate/extend/revoke clients |
+| `admin.html` | DevFit panel — activate/extend/revoke clients and view production alerts |
 | `devfit-auth.js` | Shared client gate used by all app pages |
 
 Wired into: `login.html`, `index.html`, `nutrition.html`, `workouts.html`,
-`settings.html`. Service worker bumped to **v4.45.0**.
+`settings.html`. Current service worker release is **v4.74.0**.
 
 ---
 
@@ -71,8 +71,7 @@ create table if not exists devfit_logins (
   primary key (email, device_id)
 );
 
--- OPTIONAL: durable client crash log (api/log.js). Without this table, client
--- errors still show up in Vercel's function logs — this just keeps a history.
+-- Durable production error and health-event history.
 create table if not exists devfit_errors (
   id      bigint generated always as identity primary key,
   type    text,
@@ -81,6 +80,7 @@ create table if not exists devfit_errors (
   src     text,
   page    text,
   ua      text,
+  status  integer,
   at      timestamptz default now()
 );
 
@@ -142,8 +142,8 @@ In Authentication → URL Configuration:
 - Remove the old Netlify URL from Redirect URLs.
 - Keep only `https://devfitportal.vercel.app/**`.
 
-Legacy Supabase link-return handling stays hidden temporarily so an already-issued
-link can finish safely on the Vercel host. No new email-link login is offered.
+The login page contains no email-link flow or browser Supabase client. Existing
+signed DevFit sessions remain valid until manual logout or account revocation.
 
 In Google Cloud Console, keep `https://devfitportal.vercel.app` in the OAuth web
 client's Authorized JavaScript origins. The server validates every Google ID

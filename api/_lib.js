@@ -125,6 +125,24 @@ export async function sbUpsert(table, row, onConflict) {
   return r.json();
 }
 
+// Durable production event reporting. Always write to Vercel logs and, when the
+// server database is available, retain the event in devfit_errors. This helper
+// never throws back into a user request.
+export async function recordServerEvent(type, message, details = {}) {
+  const rec = {
+    type: String(type || 'server').slice(0, 20),
+    message: String(message || '').slice(0, 500),
+    stack: String(details.stack || '').slice(0, 1500),
+    src: String(details.src || '').slice(0, 200),
+    page: String(details.page || '').slice(0, 120),
+    ua: String(details.ua || '').slice(0, 200),
+    status: Number.isFinite(details.status) ? details.status : null,
+    at: new Date().toISOString()
+  };
+  try { console.error('[DevFit monitor]', JSON.stringify(rec)); } catch (_) {}
+  try { if (haveServerConfig()) await sbInsert('devfit_errors', rec); } catch (_) {}
+}
+
 // ── Identity verification (proves the caller owns the email) ─────────────────
 // Supabase magic-link session token → email.
 export async function emailFromSupabaseToken(accessToken) {

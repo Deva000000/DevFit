@@ -1,4 +1,4 @@
-/* DevFit Service Worker — v4.0.0
+/* DevFit Service Worker — v4.74.0
    Strategy (atomic updates — no stale code can ever mix with fresh HTML):
    - HTML pages + app logic (.js/.css): NETWORK-FIRST with cache fallback, so every
      online load gets a consistent, up-to-date set. This is what prevents the
@@ -10,7 +10,7 @@
    - Apps Script / /api/*: network-only (never cached).
 */
 
-const VERSION = 'devfit-v4.73.0';
+const VERSION = 'devfit-v4.74.0';
 const APP_SHELL = 'devfit-shell-' + VERSION;
 const RUNTIME = 'devfit-runtime-' + VERSION;
 
@@ -23,6 +23,8 @@ const SHELL_FILES = [
   './settings.html',
   './landing.html',
   './pricing.html',
+  './privacy.html',
+  './terms.html',
   // ── Manifest + icons ────────────────────────────────────────────────
   './manifest.json',
   './icon-touch.png',
@@ -63,7 +65,8 @@ self.addEventListener('install', (event) => {
             .catch((e) => console.warn('[SW] precache skip', f, String(e)))
         )
       ))
-      .then(() => self.skipWaiting())
+      // On an update, remain waiting until the client deliberately chooses the
+      // update banner. First installs activate normally because no worker exists.
   );
 });
 

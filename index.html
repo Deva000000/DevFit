@@ -818,7 +818,7 @@ html.nosplash #devfit-splash{display:none!important}
     <div class="action-row">
       <button class="btn danger" onclick="clearWeek()">Clear this week</button>
     </div>
-    <div style="font-size:11px;color:#aaa;margin-top:10px;line-height:1.5">Reports, Logout, Sync &amp; Reset are in the <a href="settings.html" style="color:#cc0000;text-decoration:none;font-weight:700">Settings tab</a>. Generate a full week report (habits + workouts + nutrition) there.</div>
+    <div style="font-size:11px;color:#aaa;margin-top:10px;line-height:1.5">Reports, Backup, Logout &amp; Reset are in the <a href="settings.html" style="color:#cc0000;text-decoration:none;font-weight:700">Settings tab</a>. Generate a full week report (habits + workouts + nutrition) there.</div>
   </div>
 
 </div>
@@ -931,7 +931,7 @@ html.nosplash #devfit-splash{display:none!important}
   <button class="btn-install" onclick="pwaInstall()">Install App</button>
   <button class="btn-x" onclick="pwaDismiss()" aria-label="Hide for now">×</button>
 </div>
-<div id="pwa-update-bar" onclick="pwaApplyUpdate()">New version available — tap to update</div>
+<div id="pwa-update-bar" onclick="DevFitApplyUpdate()">Update ready — tap to restart</div>
 <div id="ios-hint">
   <button class="x" onclick="document.getElementById('ios-hint').classList.remove('show')">×</button>
   <strong>Install DevFit</strong><br>
@@ -2236,7 +2236,7 @@ function showCountdown(){
       ringDays.textContent='END';
       ringDays.style.fontSize='9';
       title.textContent='Program completed';
-      sub.textContent='Contact your trainer to start a new program';
+      sub.textContent='Contact DevFit to start a new program';
       return;
     }
     ringProg.setAttribute('stroke-dashoffset', offset);
@@ -2484,14 +2484,14 @@ function runProgressSync(){
     if(healed){ try{ if(DevFitDB.cloudSave) DevFitDB.cloudSave('progress',appData); }catch(e){} }
   });
 }
-// The cloud layer (supabase-js + devfit-db.js) is loaded at the END of the body,
-// AFTER this script. Wait for it before first-run onboarding + the initial sync,
+// The account recovery layer (devfit-db.js) is loaded at the END of the body.
+// Wait for it before first-run onboarding + the initial reconciliation,
 // so a returning user's saved program is pulled from the cloud instead of the
 // onboarding wizard firing again on every fresh device or browser. Falls through
-// after ~5s if the CDN never loads (offline), where startFirstRun's own guard
+// after ~5s if the script cannot load (offline), where startFirstRun's own guard
 // keeps the app usable.
 (function whenCloudReady(cb){
-  function ready(){ return window.DevFitDB && window.DevFitDB.forceSyncAll && window.supabase; }
+  function ready(){ return window.DevFitDB && window.DevFitDB.forceSyncAll; }
   if(ready()){ cb(); return; }
   var waited=0, iv=setInterval(function(){
     waited+=100;
@@ -2877,7 +2877,6 @@ body{padding-bottom:104px!important}
   <a href="settings.html"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>Settings</span></a>
 </nav>
 <script>(function(){var raw=location.pathname.split('/').pop();var p=raw.replace(/\.html$/,'')||'index';document.querySelectorAll('.devfit-bottomnav a').forEach(function(a){if(a.getAttribute('href').replace(/\.html$/,'')===p)a.classList.add('active');});})();</script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="devfit-db.js"></script>
 </body>
 </html>

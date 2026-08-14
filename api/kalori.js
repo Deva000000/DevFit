@@ -5,7 +5,7 @@
 //   2. Cache results at the edge so repeated searches are instant
 //   3. Allow graceful fallback if the API is down
 
-import { sameSiteOnly } from './_lib.js';
+import { sameSiteOnly, recordServerEvent } from './_lib.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -18,13 +18,17 @@ export default async function handler(req, res) {
 
   try {
     const r = await fetch(url, { headers: { 'Accept': 'application/json' }, signal: AbortSignal.timeout(5000) });
-    if (!r.ok) { res.status(200).json({ data: [], error: 'kalori ' + r.status }); return; }
+    if (!r.ok) {
+      await recordServerEvent('food_timeout', 'Kalori upstream returned ' + r.status, { page: '/api/kalori', status: r.status });
+      res.status(200).json({ data: [], error: 'kalori ' + r.status }); return;
+    }
     const j = await r.json();
     res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
     // Normalise: API may return { data: [...] } or { foods: [...] } or bare array
     const items = Array.isArray(j) ? j : (j.data || j.foods || j.results || []);
     res.status(200).json({ data: items });
   } catch (e) {
+    await recordServerEvent('food_timeout', String(e && e.message || e), { page: '/api/kalori', status: 502 });
     res.status(200).json({ data: [], error: String(e && e.message || e) });
   }
 }

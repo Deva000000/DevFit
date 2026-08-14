@@ -15,7 +15,7 @@
 //
 // Edge-cached so popular queries are instant and OFF isn't hammered.
 
-import { sameSiteOnly } from './_lib.js';
+import { sameSiteOnly, recordServerEvent } from './_lib.js';
 
 const UA = 'DevFit/1.0 (devfitportal.vercel.app)';
 
@@ -95,6 +95,7 @@ export default async function handler(req, res) {
     res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
     res.status(200).json({ products });
   } catch (e) {
+    await recordServerEvent('food_timeout', String(e && e.message || e), { page: '/api/off', status: 502 });
     res.status(200).json({ products: [], error: String(e && e.message || e) });
   }
 }

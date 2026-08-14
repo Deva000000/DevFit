@@ -22,7 +22,7 @@ body{font-family:'DM Sans',sans-serif;min-height:100vh;color:#e8e8ea;background:
 .divider{width:40px;height:2px;background:#cc0000;margin:0 auto 24px;border-radius:2px}.welcome{font-size:20px;font-weight:800;color:#fff;margin-bottom:8px}.subtitle{font-size:13px;color:#888;margin-bottom:26px;line-height:1.6}
 .google-host{min-height:44px;width:100%;display:flex;justify-content:center;align-items:center}.google-loading{width:100%;height:44px;border:1px solid #333;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#777;font-size:13px}
 .status-box{display:none;padding:12px 16px;border-radius:10px;font-size:13px;font-weight:500;margin-top:14px;line-height:1.5}.status-pending{background:#1a1200;border:1px solid #c6902f;color:#c6902f}.status-denied{background:#1a0000;border:1px solid #cc0000;color:#ff6666}.status-checking{background:#001a1a;border:1px solid #4a6572;color:#60a5fa}
-.spinner{display:none;width:22px;height:22px;border:2px solid #333;border-top-color:#cc0000;border-radius:50%;animation:spin .7s linear infinite;margin:14px auto 4px}@keyframes spin{to{transform:rotate(360deg)}}.footer{margin-top:24px;font-size:11px;color:#444}
+.spinner{display:none;width:22px;height:22px;border:2px solid #333;border-top-color:#cc0000;border-radius:50%;animation:spin .7s linear infinite;margin:14px auto 4px}@keyframes spin{to{transform:rotate(360deg)}}.footer{margin-top:24px;font-size:11px;line-height:1.8;color:#555}.footer a{color:#777;text-decoration:none}.footer a:hover{color:#aaa}
 </style>
 <link rel="manifest" href="manifest.json"><meta name="theme-color" content="#cc0000"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="DevFit"><link rel="apple-touch-icon" href="icon-touch.png"><link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <style>
@@ -39,28 +39,23 @@ html.nosplash #devfit-splash{display:none!important}#devfit-splash{position:fixe
   <div class="divider"></div><div class="welcome">Welcome back</div><p class="subtitle">Sign in to continue to DevFit.</p>
   <div id="google-button" class="google-host"><div class="google-loading">Loading Google sign-in…</div></div>
   <div class="spinner" id="spinner"></div>
-  <div class="status-box status-checking" id="status-checking">Signing you in…</div><div class="status-box status-pending" id="status-pending">This account has been suspended.<br>Please contact your trainer.</div><div class="status-box status-denied" id="status-denied">Couldn’t sign you in. Please try again.</div>
-  <div class="footer">DevFit · Secure sign-in</div>
+  <div class="status-box status-checking" id="status-checking">Signing you in…</div><div class="status-box status-pending" id="status-pending">This account is not active.<br>Please contact DevFit.</div><div class="status-box status-denied" id="status-denied">Couldn’t sign you in. Please try again.</div>
+  <div class="footer">DevFit · Secure sign-in<br><a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · <a href="https://wa.me/60183679177">Contact DevFit</a></div>
 </main>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 'use strict';
 const CLIENT_ID='94871311791-ql8k9lo0q9e1uq3ri98ghnfr1m187chh.apps.googleusercontent.com';
-const SB_URL='https://zngberygrzpkhiqrrzwj.supabase.co';
-const SB_KEY='sb_publishable_oJSFEcVvsvbhPA_8mhUrGQ_JCrBddtn';
-let sbClient=null,googleReady=false;
-function sb(){if(sbClient)return sbClient;if(!window.supabase)return null;sbClient=window.supabase.createClient(SB_URL,SB_KEY);return sbClient}
+let googleReady=false;
 function el(id){return document.getElementById(id)}function show(id){el(id).style.display='block'}function hide(id){el(id).style.display='none'}
 function clearStatus(){['status-checking','status-pending','status-denied'].forEach(hide)}
 function busy(on){el('spinner').style.display=on?'block':'none'}
 function fail(message){busy(false);clearStatus();el('status-denied').textContent=message||'Couldn’t sign you in. Please try again.';show('status-denied')}
 async function finishLogin(provider,token){busy(true);clearStatus();show('status-checking');try{const r=await DevFitAuth.startSession(provider,token,'');busy(false);clearStatus();if(r&&r.approved){document.cookie='devfit_email='+encodeURIComponent(r.email)+';max-age=31536000;path=/;SameSite=Lax;Secure';location.replace('index.html');return}show(r&&r.status==='pending'?'status-pending':'status-denied')}catch(e){fail('Couldn’t sign you in. Check your connection and try again.')}}
 function initGoogle(){if(googleReady||!window.google||!google.accounts||!google.accounts.id)return false;googleReady=true;google.accounts.id.initialize({client_id:CLIENT_ID,callback:function(response){if(response&&response.credential)finishLogin('google_id',response.credential);else fail()},auto_select:false,cancel_on_tap_outside:true});el('google-button').innerHTML='';google.accounts.id.renderButton(el('google-button'),{type:'standard',theme:'outline',size:'large',text:'continue_with',shape:'rectangular',logo_alignment:'left',width:Math.min(344,el('google-button').clientWidth||344)});return true}
-async function handleLegacyLink(){const client=sb();if(!client||(!location.hash.includes('access_token')&&!location.hash.includes('type=magiclink')))return;busy(true);clearStatus();show('status-checking');await new Promise(function(r){setTimeout(r,400)});try{const result=await client.auth.getSession();if(!result.data.session)throw new Error();history.replaceState(null,'',location.pathname);await finishLogin('supabase',result.data.session.access_token)}catch(e){fail()}}
 document.addEventListener('DOMContentLoaded',function(){
   // Never auto-redirect from a cached browser flag. If the dashboard rejected an
   // expired token, the login form must remain usable instead of forming a loop.
-  handleLegacyLink();if(!initGoogle()){let tries=0;const timer=setInterval(function(){if(initGoogle()||++tries>30)clearInterval(timer)},200)}
+  if(!initGoogle()){let tries=0;const timer=setInterval(function(){if(initGoogle()||++tries>30)clearInterval(timer)},200)}
 });
 window.addEventListener('pageshow',function(){busy(false)});
 </script>

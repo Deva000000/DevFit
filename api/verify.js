@@ -12,7 +12,8 @@
 //       { approved:false, reason }
 
 import {
-  haveServerConfig, verifyToken, getSubscriber, computeTier, signToken, readJsonBody, recordLogin
+  haveServerConfig, verifyToken, getSubscriber, computeTier, signToken, readJsonBody, recordLogin,
+  recordServerEvent
 } from './_lib.js';
 
 export default async function handler(req, res) {
@@ -25,24 +26,20 @@ export default async function handler(req, res) {
 
   const body = await readJsonBody(req);
 
-  // VISIBILITY TRACKING — record every active device for anyone with a session,
-  // BEFORE the token check. This captures users who logged in before the signed-
-  // token system (cached session, no token) and pending/free users too, so the
-  // trainer's "Logins & Devices" tab shows everyone who's actually using the app,
-  // not just freshly-authenticated ones. Tracking never grants access, so the
-  // client-known email is acceptable. isLogin=false → refresh last-seen only.
-  if (body.email && String(body.email).includes('@')) {
-    await recordLogin(String(body.email).toLowerCase(), body.deviceId, req.headers['user-agent'], false);
-  }
-
   const payload = verifyToken(body.token);
   if (!payload || !payload.email) {
     res.status(200).json({ approved: false, reason: 'invalid_token' });
     return;
   }
 
+  // Track only the identity proven by the signed token. Never trust the email in
+  // the request body, otherwise an attacker can pollute the device table with
+  // arbitrary addresses even though they cannot gain account access.
+  await recordLogin(payload.email, body.deviceId, req.headers['user-agent'], false);
+
   const sub = await getSubscriber(payload.email);
   if (typeof sub === 'undefined') {
+    await recordServerEvent('verify_failure', 'Account store unavailable during verification', { page: '/api/verify', status: 503 });
     res.status(503).json({ error: 'account_store_unavailable' });
     return;
   }

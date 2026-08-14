@@ -159,9 +159,56 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
   assert.match(settings, /<div class="title">Install DevFit App<\/div>/);
   assert.match(settings, /if\(!deferredInstallPrompt\)\{\s*showIosHint\(\)/);
   assert.equal(manifest.display, 'standalone');
-  assert.match(worker, /devfit-v4\.73\.0/);
+  assert.match(worker, /devfit-v4\.74\.0/);
+  assert.doesNotMatch(worker, /\.then\(\(\) => self\.skipWaiting\(\)\)/);
 
   for (const html of [index, settings]) {
+    for (const match of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)) {
+      if (match[1].trim()) new Function(match[1]);
+    }
+  }
+});
+
+test('backup restore is account-bound, merge-only and monitored', () => {
+  const settings = fs.readFileSync(new URL('../settings.html', import.meta.url), 'utf8');
+  const errors = fs.readFileSync(new URL('../devfit-errorlog.js', import.meta.url), 'utf8');
+  assert.match(settings, /Save \/ Share Backup File/);
+  assert.match(settings, /navigator\.canShare\(\{files:\[file\]\}\)/);
+  assert.match(settings, /from!==owner/);
+  assert.match(settings, /DevFitDB\._merge\(type,current,incoming\)/);
+  assert.match(settings, /devfit_pre_import_backup::/);
+  assert.doesNotMatch(settings, /Import anyway\? It replaces/);
+  assert.match(errors, /window\.DevFitErrors/);
+});
+
+test('public pages contain legal links and no retired sync or trainer claims', () => {
+  const names = ['landing.html','pricing.html','login.html','index.html','settings.html'];
+  const publicHtml = names.map((n) => fs.readFileSync(new URL('../'+n, import.meta.url), 'utf8')).join('\n');
+  assert.match(publicHtml, /privacy\.html/);
+  assert.match(publicHtml, /terms\.html/);
+  assert.doesNotMatch(publicHtml, /contact (your )?trainer|trainer \/ client sync|automatic cloud backup|multi-device sync|syncs automatically/i);
+  const privacy = fs.readFileSync(new URL('../privacy.html', import.meta.url), 'utf8');
+  const terms = fs.readFileSync(new URL('../terms.html', import.meta.url), 'utf8');
+  assert.match(privacy, /Retention and deletion/);
+  assert.match(terms, /Payments and refunds/);
+});
+
+test('login has no obsolete browser Supabase or magic-link handler', () => {
+  const html = fs.readFileSync(new URL('../login.html', import.meta.url), 'utf8');
+  assert.doesNotMatch(html, /supabase\.min\.js|handleLegacyLink|SB_KEY|SB_URL/);
+});
+
+test('verification records only the signed token email', () => {
+  const source = fs.readFileSync(new URL('../api/verify.js', import.meta.url), 'utf8');
+  const verifiedAt = source.indexOf('const payload = verifyToken(body.token)');
+  const recordedAt = source.indexOf('recordLogin(payload.email');
+  assert.ok(verifiedAt >= 0 && recordedAt > verifiedAt);
+  assert.doesNotMatch(source, /recordLogin\(body\.email/);
+});
+
+test('all edited HTML inline scripts parse', () => {
+  for (const name of ['admin.html','landing.html','pricing.html','login.html','index.html','nutrition.html','workouts.html','settings.html','privacy.html','terms.html']) {
+    const html = fs.readFileSync(new URL('../'+name, import.meta.url), 'utf8');
     for (const match of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)) {
       if (match[1].trim()) new Function(match[1]);
     }

@@ -66,6 +66,12 @@ export default async function handler(req, res) {
       return;
     }
 
+    if (action === 'errors') {
+      const rows = await sbSelect('devfit_errors', 'select=*&order=at.desc&limit=100');
+      res.status(200).json({ errors: rows || [] });
+      return;
+    }
+
     // ── Payment settings (DuitNow QR / WhatsApp / note) — trainer-editable ──
     if (action === 'getConfig') {
       const rows = await sbSelect('devfit_config', 'id=eq.1&select=*');

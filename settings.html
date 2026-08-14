@@ -316,7 +316,7 @@ html.nosplash #devfit-splash{display:none!important}
 
       <div class="guide-item"><div class="gi-ic" style="background:rgba(168,85,247,0.16);color:#c4b5fd">⤬</div><div class="gi-tx"><b>Share cards</b>Turn a session into a clean branded image you can post. Tap <b>Share today's win</b> at the bottom of Log Session for a workout or cardio card, or share a weekly progress card from Progress. Light, dark and transparent themes. Set your @handle and card font under <b>Personal → Share Card</b> below.</div></div>
 
-      <div class="guide-item"><div class="gi-ic" style="background:rgba(34,197,94,0.16);color:#86efac">☁</div><div class="gi-tx"><b>Your data &amp; sync</b>Everything saves on this phone instantly, then copies to your account on the DevFit server — a row tied to your email that only you can read or write. Sign in on a new phone and it all comes back. You can also force a backup, restore, or export a file you keep yourself under <b>Data &amp; Account</b> below.</div></div>
+      <div class="guide-item"><div class="gi-ic" style="background:rgba(34,197,94,0.16);color:#86efac">↓</div><div class="gi-tx"><b>Your data &amp; backup</b>Your entries save on this device as you log them. Under <b>Data &amp; Account</b>, use <b>Save / Share Backup File</b> regularly and keep the file in Files, Google Drive, iCloud Drive, or another safe place you control.</div></div>
 
       <div class="guide-item"><div class="gi-ic" style="background:rgba(148,163,184,0.16);color:#cbd5e1">⚙</div><div class="gi-tx"><b>Make it feel like an app</b>Under <b>App</b> below you can <b>install DevFit to your home screen</b> (it then runs full-screen and works offline), switch between <b>light and dark</b> themes, and turn on an <b>evening reminder</b> to log your day.</div></div>
 
@@ -344,7 +344,7 @@ html.nosplash #devfit-splash{display:none!important}
     </div>
     <div class="cloud-note">
       <svg viewBox="0 0 24 24"><path d="M20 17.6A4 4 0 0 0 18 10a6 6 0 0 0-11.6-1.6A4.5 4.5 0 0 0 6 17.6"/><path d="M9 13l2 2 4-4"/></svg>
-      <div>Your data is saved to your account (<b id="cloud-email">your email</b>) and syncs automatically. Log out and back in on any device — everything is restored.</div>
+      <div>Signed in as <b id="cloud-email">your email</b>. Keep your own recovery copy using <b>Save / Share Backup File</b> under Data &amp; Account.</div>
     </div>
   </div>
 
@@ -479,7 +479,7 @@ html.nosplash #devfit-splash{display:none!important}
       <div class="icon">↻</div>
       <div class="body">
         <div class="title">Check for Updates</div>
-        <div class="desc">Pull the latest version — no need to wait for trainer</div>
+        <div class="desc">Install the latest DevFit release when you are ready</div>
       </div>
       <div class="chev">›</div>
     </button>
@@ -495,11 +495,7 @@ html.nosplash #devfit-splash{display:none!important}
          in plain words, before showing any buttons. -->
     <div class="cloud-note" style="margin-bottom:12px">
       <svg viewBox="0 0 24 24"><path d="M20 17.6A4 4 0 0 0 18 10a6 6 0 0 0-11.6-1.6A4.5 4.5 0 0 0 6 17.6"/><path d="M9 13l2 2 4-4"/></svg>
-      <div><b>Where your data lives.</b> Everything saves on this phone first, then copies to
-      DevFit's secure database on our server — into a row that belongs to your email alone.
-      Only your signed-in account can read or write it; no other user can reach your data, and
-      we never store it on someone else's device. This happens automatically every time you log
-      something. The buttons below are just manual control over the same thing.</div>
+      <div><b>Keep a backup you control.</b> DevFit saves on this device. Tap <b>Save / Share Backup File</b>, then keep the file in Files, Google Drive, iCloud Drive, or another safe location. Use <b>Restore from Backup File</b> if you change device, browser, or reinstall the app.</div>
     </div>
 
     <div id="backup-status" style="font-size:12px;line-height:1.5;padding:2px 2px 10px;color:var(--muted,#9aa0a6)">Checking your backup…</div>
@@ -514,21 +510,21 @@ html.nosplash #devfit-splash{display:none!important}
     <button class="setting-btn" id="export-file-btn" type="button">
       <div class="icon">↧</div>
       <div class="body">
-        <div class="title">Export Backup File</div>
-        <div class="desc">Save a .json file to your own phone — yours to keep, works offline and even if your plan lapses</div>
+        <div class="title">Save / Share Backup File</div>
+        <div class="desc">Keep a recovery file in Files, Google Drive, iCloud Drive, or another app</div>
       </div>
       <div class="chev">›</div>
     </button>
     <button class="setting-btn" id="import-file-btn" type="button">
       <div class="icon">↥</div>
       <div class="body">
-        <div class="title">Import Backup File</div>
-        <div class="desc">Load a .json file you exported earlier back into the app</div>
+        <div class="title">Restore from Backup File</div>
+        <div class="desc">Safely merge an earlier backup for this Gmail into the records on this device</div>
       </div>
       <div class="chev">›</div>
     </button>
     <input type="file" id="import-file-input" accept="application/json,.json" style="display:none">
-    <div class="card-sub" style="margin-top:10px">Your logged data is never deleted when a plan ends — Free simply shows less of it.</div>
+    <div class="card-sub" style="margin-top:10px">A plan ending does not clear your device records. Keep regular backup files, especially before changing or resetting a phone.</div>
   </div>
 
   <div class="card" id="card-data">
@@ -553,7 +549,7 @@ html.nosplash #devfit-splash{display:none!important}
 
   <div class="footer">
     DevFit · Dominance Through Discipline<br>
-    <a href="https://wa.me/60183679177">Contact trainer</a> · v4.67.0
+    <a href="https://wa.me/60183679177">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.74.0
   </div>
 
 
@@ -1736,24 +1732,17 @@ async function checkForUpdates(){
       const reg = await navigator.serviceWorker.getRegistration();
       if(reg){
         await reg.update();
-        // If a new worker is installing or waiting, activate it
         if(reg.waiting){
-          reg.waiting.postMessage({type:'SKIP_WAITING'});
+          toast('Update ready — tap the update banner when you are ready');
+          if(window.DevFitShowUpdate) window.DevFitShowUpdate(reg);
+          return;
         }
       }
     }
-    // Force a clean reload bypassing cache
-    setTimeout(()=>{
-      // Clear app caches and hard reload
-      if('caches' in window){
-        caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))))
-          .finally(()=>{ window.location.reload(true); });
-      } else {
-        window.location.reload(true);
-      }
-    }, 600);
+    toast('DevFit is up to date ✓');
   } catch(e){
     toast('Update check failed', true);
+    if(window.DevFitErrors) window.DevFitErrors.report('update_failure', e && e.message || 'Update check failed');
   }
 }
 
@@ -1762,14 +1751,6 @@ const BACKUP_KEYS = ['progressLog2','devfitNutritionV2','devfitTrainingV1'];
 
 function backupOwnerEmail(){
   try{ return (JSON.parse(localStorage.getItem('devfit_user')||'{}').email||'').toLowerCase(); }catch(e){ return ''; }
-}
-function lastCloudBackupTs(){
-  let t = 0;
-  ['progress','nutrition','workouts'].forEach(k=>{
-    const v = parseInt(localStorage.getItem('devfit_cloud_ts_'+k)||'0',10);
-    if(v>t) t=v;
-  });
-  return t;
 }
 // Escape user-controlled text before it goes into innerHTML (defense-in-depth).
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){
@@ -1781,11 +1762,11 @@ function refreshBackupStatus(){
   let sessions = 0, snaps = 0;
   try{ sessions = ((JSON.parse(localStorage.getItem('devfitTrainingV1')||'{}').sessions)||[]).length; }catch(e){}
   try{ snaps = (JSON.parse(localStorage.getItem('devfitTrainingV1__safety')||'[]')||[]).length; }catch(e){}
-  el.innerHTML =
-    '<strong>Your records stay linked to your DevFit account.</strong><br>'+
-    sessions+' logged session'+(sessions===1?'':'s')+
-    (snaps? ' · '+snaps+' recovery point'+(snaps===1?'':'s')+' kept' : '')+
-    '<br>You can still export a personal backup file whenever you want.';
+  let last = 0;
+  try{ last = parseInt(localStorage.getItem('devfit_last_manual_backup::'+backupOwnerEmail())||'0',10); }catch(e){}
+  el.innerHTML = '<strong>'+sessions+' logged session'+(sessions===1?'':'s')+' on this device.</strong>'+(
+    snaps? ' · '+snaps+' recovery point'+(snaps===1?'':'s') : '')+'<br>'+(
+    last ? 'Last backup saved '+esc(new Date(last).toLocaleString())+'.' : 'No manual backup has been saved from this device yet.');
 }
 
 // Recovery points are also written locally just before anything removes sessions.
@@ -1826,20 +1807,31 @@ function recoverSessions(){
 
 // Export/import and on-device recovery points remain user-controlled safeguards.
 
-function exportBackupFile(){
+async function exportBackupFile(){
   try{
     const payload = { app:'DevFit', kind:'backup', version:3, exportedAt:new Date().toISOString(), email:backupOwnerEmail(), data:{} };
     BACKUP_KEYS.forEach(k=>{ const v=localStorage.getItem(k); if(v!=null) payload.data[k]=v; });
-    const blob = new Blob([JSON.stringify(payload,null,2)], {type:'application/json'});
-    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     const stamp = new Date().toISOString().slice(0,10);
-    a.href = url;
-    a.download = 'DevFit_Backup_'+(backupOwnerEmail()||'account').replace(/[^a-z0-9]+/gi,'_')+'_'+stamp+'.json';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(()=>URL.revokeObjectURL(url), 1500);
-    toast('Backup file downloaded ✓');
-  }catch(e){ toast('Export failed', true); }
+    const filename = 'DevFit_Backup_'+(backupOwnerEmail()||'account').replace(/[^a-z0-9]+/gi,'_')+'_'+stamp+'.json';
+    const file = new File([JSON.stringify(payload,null,2)], filename, {type:'application/json'});
+    let shared = false;
+    if(navigator.share && navigator.canShare && navigator.canShare({files:[file]})){
+      try{ await navigator.share({title:'DevFit backup',text:'Keep this recovery file somewhere safe.',files:[file]}); shared=true; }
+      catch(e){ if(e && e.name==='AbortError') return; }
+    }
+    if(!shared){
+      const url = URL.createObjectURL(file); a.href=url; a.download=filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(()=>URL.revokeObjectURL(url),1500);
+    }
+    localStorage.setItem('devfit_last_manual_backup::'+backupOwnerEmail(),String(Date.now()));
+    refreshBackupStatus();
+    toast(shared?'Backup shared ✓':'Backup file saved ✓');
+  }catch(e){
+    toast('Backup failed', true);
+    if(window.DevFitErrors) window.DevFitErrors.report('backup_failure', e && e.message || 'Backup export failed');
+  }
 }
 
 function importBackupFile(){
@@ -1850,27 +1842,57 @@ function handleImportFile(ev){
   const file = ev.target.files && ev.target.files[0];
   ev.target.value = '';
   if(!file) return;
+  if(file.size>15*1024*1024){ toast('Backup file is too large', true); return; }
   const reader = new FileReader();
   reader.onload = function(){
+    let before = null, wrote = false;
     try{
       const parsed = JSON.parse(reader.result);
       const data = parsed && parsed.data;
-      if(!data || typeof data!=='object'){ toast('Not a valid DevFit backup', true); return; }
+      if(parsed.app!=='DevFit' || parsed.kind!=='backup' || !data || typeof data!=='object'){ toast('Not a valid DevFit backup', true); return; }
       const owner = backupOwnerEmail();
       const from  = (parsed.email||'').toLowerCase();
-      let msg = 'Import this backup? It replaces the data on this device.';
-      if(from && owner && from!==owner) msg = 'This backup is from '+from+', but you are signed in as '+owner+'. Import anyway? It replaces the data on this device.';
-      if(!confirm(msg)) return;
-      let n = 0;
+      if(!owner || !from || from!==owner){
+        toast('This backup belongs to a different Gmail account', true);
+        if(window.DevFitErrors) window.DevFitErrors.report('restore_rejected','Backup email did not match signed-in account');
+        return;
+      }
+      if(!confirm('Restore this backup for '+owner+'?\n\nDevFit will merge it with this device. Existing records are kept.')) return;
+      before = {app:'DevFit',kind:'pre-import',createdAt:new Date().toISOString(),email:owner,data:{}};
+      BACKUP_KEYS.forEach(k=>{ const raw=localStorage.getItem(k); if(raw!=null) before.data[k]=raw; });
+      localStorage.setItem('devfit_pre_import_backup::'+owner, JSON.stringify(before));
+      const typeFor = {progressLog2:'progress',devfitNutritionV2:'nutrition',devfitTrainingV1:'workouts'};
+      const prepared = [];
       BACKUP_KEYS.forEach(k=>{
-        if(data[k]!=null){ try{ localStorage.setItem(k, data[k]); n++; }catch(_){} }
+        if(typeof data[k]!=='string') return;
+        const incoming=JSON.parse(data[k]);
+        const raw=localStorage.getItem(k); let current=null;
+        try{ current=raw?JSON.parse(raw):null; }catch(e){}
+        const type=typeFor[k];
+        const merged=(window.DevFitDB&&DevFitDB._merge)?DevFitDB._merge(type,current,incoming):(current||incoming);
+        prepared.push({key:k,type:type,data:merged});
       });
-      // Mark local as freshly edited so the imported copy wins the next cloud sync
-      // (and gets pushed up), rather than being overwritten by an older cloud row.
-      ['progress','nutrition','workouts'].forEach(t=>{ try{ localStorage.setItem('devfit_local_ts_'+t, String(Date.now())); }catch(_){}});
-      toast('Imported '+n+' section(s) ✓');
+      if(!prepared.length) throw new Error('Backup contains no supported data');
+      prepared.forEach(item=>{
+        localStorage.setItem(item.key,JSON.stringify(item.data));
+        wrote=true;
+        const type=item.type, merged=item.data;
+        localStorage.setItem('devfit_local_ts_'+type,String(Date.now()));
+        if(window.DevFitDB&&DevFitDB.cloudSave) DevFitDB.cloudSave(type,merged);
+      });
+      toast('Restored and merged '+prepared.length+' section(s) ✓');
       setTimeout(()=>window.location.reload(), 800);
-    }catch(e){ toast('Could not read backup file', true); }
+    }catch(e){
+      if(wrote && before && before.data){
+        BACKUP_KEYS.forEach(k=>{ try{ if(before.data[k]==null)localStorage.removeItem(k);else localStorage.setItem(k,before.data[k]); }catch(_){} });
+      }
+      toast('Could not restore backup file', true);
+      if(window.DevFitErrors) window.DevFitErrors.report('restore_failure', e && e.message || 'Restore failed');
+    }
+  };
+  reader.onerror=function(){
+    toast('Could not read backup file',true);
+    if(window.DevFitErrors) window.DevFitErrors.report('restore_failure','FileReader failed');
   };
   reader.readAsText(file);
 }
@@ -1971,11 +1993,9 @@ body{padding-bottom:104px!important}
 </nav>
 <script>(function(){var raw=location.pathname.split('/').pop();var p=raw.replace(/\.html$/,'')||'index';document.querySelectorAll('.devfit-bottomnav a').forEach(function(a){if(a.getAttribute('href').replace(/\.html$/,'')===p)a.classList.add('active');});})();</script>
 <script src="/pwa-update.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="devfit-db.js"></script>
 <script>
-// Nothing is pulled from a server any more — data is read straight off this
-// device. Just paint the status line so it reflects what is actually stored here.
+// Paint the user-controlled backup status from what is stored on this device.
 (function(){ try{ refreshBackupStatus(); }catch(e){} })();
 </script>
 <script>

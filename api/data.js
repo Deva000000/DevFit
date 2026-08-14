@@ -13,7 +13,8 @@
 
 import crypto from 'crypto';
 import {
-  haveServerConfig, verifyToken, getSubscriber, sbSelect, sbInsert, sbInsertReturning, sbPatch, readJsonBody
+  haveServerConfig, verifyToken, getSubscriber, sbSelect, sbInsert, sbInsertReturning, sbPatch, readJsonBody,
+  recordServerEvent
 } from './_lib.js';
 
 const TYPES = ['progress', 'nutrition', 'workouts', 'prefs'];
@@ -108,7 +109,10 @@ export default async function handler(req, res) {
             '&updated_at=eq.' + encodeURIComponent(baseUpdatedAt),
           { data: body.data, updated_at: now }
         );
-        if (!changed) { res.status(500).json({ error: 'save_failed' }); return; }
+        if (!changed) {
+          await recordServerEvent('data_failure', 'Account data update failed', { page: '/api/data', status: 500 });
+          res.status(500).json({ error: 'save_failed' }); return;
+        }
         if (!changed.length) {
           res.status(409).json({ error: 'conflict', row: await currentRow(email, dataType) });
           return;
@@ -124,6 +128,7 @@ export default async function handler(req, res) {
       if (!inserted || !inserted.length) {
         const raced = await currentRow(email, dataType);
         if (raced) { res.status(409).json({ error: 'conflict', row: raced }); return; }
+        await recordServerEvent('data_failure', 'Account data insert failed', { page: '/api/data', status: 500 });
         res.status(500).json({ error: 'save_failed' }); return;
       }
       await archiveVersion(email, dataType, body.data, body.deviceId);
@@ -133,6 +138,7 @@ export default async function handler(req, res) {
 
     res.status(400).json({ error: 'unknown_op' });
   } catch (e) {
+    await recordServerEvent('data_failure', String(e && e.message || e), { page: '/api/data', status: 500, stack: e && e.stack });
     res.status(500).json({ error: 'server_error' });
   }
 }

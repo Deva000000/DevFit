@@ -91,6 +91,7 @@
     <div class="tabs">
       <button id="tab-manage" class="on">Activate & Plans</button>
       <button id="tab-logins">Logins & Devices</button>
+      <button id="tab-errors">Production Alerts</button>
     </div>
 
     <!-- ===== MANAGE VIEW ===== -->
@@ -162,8 +163,17 @@
     <div id="view-logins" class="hide">
       <div class="card">
         <h2>Everyone who logged in <span class="tap" id="refresh-logins">refresh</span></h2>
-        <div class="hint" style="margin-top:0;margin-bottom:10px">Tap a row to see each device (two phones, phone+tablet+laptop show separately). Data is shared across all a person's devices automatically.</div>
+        <div class="hint" style="margin-top:0;margin-bottom:10px">Tap a row to see each device. Login records help diagnose account access issues.</div>
         <div class="list" id="logins"><div class="hint">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- ===== ERRORS VIEW ===== -->
+    <div id="view-errors" class="hide">
+      <div class="card">
+        <h2>Recent production alerts <span class="tap" id="refresh-errors">refresh</span></h2>
+        <div class="hint" style="margin-top:0;margin-bottom:10px">Latest 100 login, verification, data, food-service, backup and client-crash events.</div>
+        <div class="list" id="errors"><div class="hint">Loading…</div></div>
       </div>
     </div>
 
@@ -551,6 +561,7 @@ function timeAgo(iso){
   if(s<86400) return Math.floor(s/3600)+'h ago';
   return Math.floor(s/86400)+'d ago';
 }
+function safeText(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
 function renderLogins(rows){
   var box=$('logins');
   if(!rows.length){ box.innerHTML='<div class="hint">No logins recorded yet.</div>'; return; }
@@ -600,12 +611,30 @@ async function refreshLogins(){
   else $('logins').innerHTML='<div class="hint">Failed: '+(r.data.error||r.status)+'</div>';
 }
 
+function renderErrors(rows){
+  var box=$('errors');
+  if(!rows.length){ box.innerHTML='<div class="hint">No production alerts recorded.</div>'; return; }
+  box.innerHTML=rows.map(function(r){
+    var detail=[r.page,r.status?'HTTP '+r.status:'',timeAgo(r.at)].filter(Boolean).join(' · ');
+    return '<div class="sub-row" style="display:block"><b style="color:#fca5a5">'+safeText(r.type||'error')+'</b> '+
+      '<span style="color:#ddd">'+safeText(r.message||'')+'</span><br><span class="hint">'+safeText(detail)+'</span></div>';
+  }).join('');
+}
+async function refreshErrors(){
+  $('errors').innerHTML='<div class="hint">Loading…</div>';
+  var r=await call('errors');
+  if(r.status===200) renderErrors(r.data.errors||[]);
+  else $('errors').innerHTML='<div class="hint">Failed: '+safeText(r.data.error||r.status)+'</div>';
+}
+
 /* ---------- tabs ---------- */
 function showTab(which){
   var m=which==='manage';
-  $('tab-manage').classList.toggle('on',m); $('tab-logins').classList.toggle('on',!m);
-  $('view-manage').classList.toggle('hide',!m); $('view-logins').classList.toggle('hide',m);
-  if(!m) refreshLogins();
+  var l=which==='logins', e=which==='errors';
+  $('tab-manage').classList.toggle('on',m); $('tab-logins').classList.toggle('on',l); $('tab-errors').classList.toggle('on',e);
+  $('view-manage').classList.toggle('hide',!m); $('view-logins').classList.toggle('hide',!l); $('view-errors').classList.toggle('hide',!e);
+  if(l) refreshLogins();
+  if(e) refreshErrors();
 }
 
 /* ---------- payment settings ---------- */
@@ -678,8 +707,10 @@ $('pw').addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); 
 $('logout-btn').addEventListener('click', function(){ pw=''; $('pw').value=''; $('panel').classList.add('hide'); $('login-card').classList.remove('hide'); });
 $('refresh').addEventListener('click', refreshList);
 $('refresh-logins').addEventListener('click', refreshLogins);
+$('refresh-errors').addEventListener('click', refreshErrors);
 $('tab-manage').addEventListener('click', function(){ showTab('manage'); });
 $('tab-logins').addEventListener('click', function(){ showTab('logins'); });
+$('tab-errors').addEventListener('click', function(){ showTab('errors'); });
 $('start').addEventListener('change', updateDuration);
 $('end').addEventListener('change', updateDuration);
 Array.prototype.forEach.call($('presets').children, function(b){

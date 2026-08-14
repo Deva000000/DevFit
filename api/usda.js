@@ -10,7 +10,7 @@
 // so food search keeps working from day one. OpenFoodFacts (client-side, no key)
 // remains the primary source for branded/Malaysian products + barcodes.
 
-import { sameSiteOnly } from './_lib.js';
+import { sameSiteOnly, recordServerEvent } from './_lib.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -46,6 +46,7 @@ export default async function handler(req, res) {
   try {
     const r = await fetch(url);
     if (!r.ok) {
+      await recordServerEvent('food_timeout', 'USDA upstream returned ' + r.status, { page: '/api/usda', status: r.status });
       // Never 500 the client — just return no USDA results so OFF/local still serve.
       res.status(200).json({ foods: [], error: 'usda ' + r.status });
       return;
@@ -55,6 +56,7 @@ export default async function handler(req, res) {
     res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
     res.status(200).json({ foods: Array.isArray(j.foods) ? j.foods : [] });
   } catch (e) {
+    await recordServerEvent('food_timeout', String(e && e.message || e), { page: '/api/usda', status: 502 });
     res.status(200).json({ foods: [], error: String(e && e.message || e) });
   }
 }

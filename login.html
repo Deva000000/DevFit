@@ -21,12 +21,7 @@ body{font-family:'DM Sans',sans-serif;min-height:100vh;color:#e8e8ea;background:
 .logo-wrap{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:20px}.logo-wrap img{width:60px;height:60px;border-radius:10px;object-fit:cover;background:#fff}.brand-text{text-align:left}.brand-name{font-family:'Inter',system-ui,sans-serif;font-style:italic;font-weight:700;font-size:24px;line-height:1.05;letter-spacing:.005em}.brand-name .dev{color:#fff}.brand-name .fit{color:#cc0000}.brand-tag{font-size:11px;color:#cc0000;font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-top:4px}
 .divider{width:40px;height:2px;background:#cc0000;margin:0 auto 24px;border-radius:2px}.welcome{font-size:20px;font-weight:800;color:#fff;margin-bottom:8px}.subtitle{font-size:13px;color:#888;margin-bottom:26px;line-height:1.6}
 .google-host{min-height:44px;width:100%;display:flex;justify-content:center;align-items:center}.google-loading{width:100%;height:44px;border:1px solid #333;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#777;font-size:13px}
-.or-divider{display:flex;align-items:center;gap:10px;font-size:11px;color:#555;font-weight:600;letter-spacing:.06em;margin:18px 0}.or-divider::before,.or-divider::after{content:'';flex:1;height:1px;background:#2a2a2a}
-.email-toggle{background:transparent;border:0;color:#999;font:600 13px 'DM Sans',sans-serif;cursor:pointer;padding:6px}.email-toggle:hover{color:#fff}.email-section{display:none;margin-top:14px}.email-section.open{display:block}
-.email-input{width:100%;padding:13px 16px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;font:15px 'DM Sans',sans-serif;color:#fff;outline:none;transition:border .2s;margin-bottom:10px}.email-input:focus{border-color:#cc0000}.email-input::placeholder{color:#555}
-.email-btn{width:100%;padding:12px 20px;background:transparent;border:1px solid #333;border-radius:10px;font:600 14px 'DM Sans',sans-serif;color:#bbb;cursor:pointer;transition:all .2s}.email-btn:hover{border-color:#cc0000;color:#fff}.email-btn:disabled{opacity:.5;cursor:not-allowed}
-.code-help{font-size:11px;color:#777;line-height:1.5;margin:0 0 10px}.change-email{background:none;border:0;color:#999;text-decoration:underline;cursor:pointer;font:600 11px 'DM Sans',sans-serif;margin-top:10px}
-.status-box{display:none;padding:12px 16px;border-radius:10px;font-size:13px;font-weight:500;margin-top:14px;line-height:1.5}.status-pending{background:#1a1200;border:1px solid #c6902f;color:#c6902f}.status-denied{background:#1a0000;border:1px solid #cc0000;color:#ff6666}.status-checking{background:#001a1a;border:1px solid #4a6572;color:#60a5fa}.status-sent{background:#001a00;border:1px solid #3fb56e;color:#4ade80}
+.status-box{display:none;padding:12px 16px;border-radius:10px;font-size:13px;font-weight:500;margin-top:14px;line-height:1.5}.status-pending{background:#1a1200;border:1px solid #c6902f;color:#c6902f}.status-denied{background:#1a0000;border:1px solid #cc0000;color:#ff6666}.status-checking{background:#001a1a;border:1px solid #4a6572;color:#60a5fa}
 .spinner{display:none;width:22px;height:22px;border:2px solid #333;border-top-color:#cc0000;border-radius:50%;animation:spin .7s linear infinite;margin:14px auto 4px}@keyframes spin{to{transform:rotate(360deg)}}.footer{margin-top:24px;font-size:11px;color:#444}
 </style>
 <link rel="manifest" href="manifest.json"><meta name="theme-color" content="#cc0000"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="DevFit"><link rel="apple-touch-icon" href="icon-touch.png"><link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
@@ -43,14 +38,8 @@ html.nosplash #devfit-splash{display:none!important}#devfit-splash{position:fixe
   <div class="logo-wrap"><img src="icon-192.png" alt="DevFit"><div class="brand-text"><div class="brand-name"><span class="dev">DEV</span><span class="fit">FIT</span></div><div class="brand-tag">Dominance Through Discipline</div></div></div>
   <div class="divider"></div><div class="welcome">Welcome back</div><p class="subtitle">Sign in to continue to DevFit.</p>
   <div id="google-button" class="google-host"><div class="google-loading">Loading Google sign-in…</div></div>
-  <div class="or-divider">or</div>
-  <button class="email-toggle" id="email-toggle" type="button">Use an email code</button>
-  <section class="email-section" id="email-section">
-    <div id="email-step"><input type="email" id="email-input" class="email-input" placeholder="your@email.com" autocomplete="email" inputmode="email"><button class="email-btn" id="email-send" type="button">Send code</button></div>
-    <div id="code-step" hidden><p class="code-help">Enter the 6-digit code sent to <strong id="code-email"></strong>.</p><input type="text" id="code-input" class="email-input" placeholder="6-digit code" autocomplete="one-time-code" inputmode="numeric" maxlength="6"><button class="email-btn" id="code-verify" type="button">Verify code</button><button class="change-email" id="change-email" type="button">Use a different email</button></div>
-  </section>
   <div class="spinner" id="spinner"></div>
-  <div class="status-box status-checking" id="status-checking">Signing you in…</div><div class="status-box status-sent" id="status-sent">Code sent. Check your inbox and spam folder.</div><div class="status-box status-pending" id="status-pending">This account has been suspended.<br>Please contact your trainer.</div><div class="status-box status-denied" id="status-denied">Couldn’t sign you in. Please try again.</div>
+  <div class="status-box status-checking" id="status-checking">Signing you in…</div><div class="status-box status-pending" id="status-pending">This account has been suspended.<br>Please contact your trainer.</div><div class="status-box status-denied" id="status-denied">Couldn’t sign you in. Please try again.</div>
   <div class="footer">DevFit · Secure sign-in</div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -59,25 +48,18 @@ html.nosplash #devfit-splash{display:none!important}#devfit-splash{position:fixe
 const CLIENT_ID='94871311791-ql8k9lo0q9e1uq3ri98ghnfr1m187chh.apps.googleusercontent.com';
 const SB_URL='https://zngberygrzpkhiqrrzwj.supabase.co';
 const SB_KEY='sb_publishable_oJSFEcVvsvbhPA_8mhUrGQ_JCrBddtn';
-let sbClient=null,pendingEmail='',googleReady=false;
+let sbClient=null,googleReady=false;
 function sb(){if(sbClient)return sbClient;if(!window.supabase)return null;sbClient=window.supabase.createClient(SB_URL,SB_KEY);return sbClient}
 function el(id){return document.getElementById(id)}function show(id){el(id).style.display='block'}function hide(id){el(id).style.display='none'}
-function clearStatus(){['status-checking','status-sent','status-pending','status-denied'].forEach(hide)}
-function busy(on){el('spinner').style.display=on?'block':'none';el('email-send').disabled=on;el('code-verify').disabled=on}
+function clearStatus(){['status-checking','status-pending','status-denied'].forEach(hide)}
+function busy(on){el('spinner').style.display=on?'block':'none'}
 function fail(message){busy(false);clearStatus();el('status-denied').textContent=message||'Couldn’t sign you in. Please try again.';show('status-denied')}
 async function finishLogin(provider,token){busy(true);clearStatus();show('status-checking');try{const r=await DevFitAuth.startSession(provider,token,'');busy(false);clearStatus();if(r&&r.approved){document.cookie='devfit_email='+encodeURIComponent(r.email)+';max-age=31536000;path=/;SameSite=Lax;Secure';location.replace('index.html');return}show(r&&r.status==='pending'?'status-pending':'status-denied')}catch(e){fail('Couldn’t sign you in. Check your connection and try again.')}}
 function initGoogle(){if(googleReady||!window.google||!google.accounts||!google.accounts.id)return false;googleReady=true;google.accounts.id.initialize({client_id:CLIENT_ID,callback:function(response){if(response&&response.credential)finishLogin('google_id',response.credential);else fail()},auto_select:false,cancel_on_tap_outside:true});el('google-button').innerHTML='';google.accounts.id.renderButton(el('google-button'),{type:'standard',theme:'outline',size:'large',text:'continue_with',shape:'rectangular',logo_alignment:'left',width:Math.min(344,el('google-button').clientWidth||344)});return true}
-async function sendCode(){const input=el('email-input'),email=(input.value||'').trim().toLowerCase();if(!/^\S+@\S+\.\S+$/.test(email)){input.style.borderColor='#cc0000';input.focus();return}input.style.borderColor='';const client=sb();if(!client){fail();return}busy(true);clearStatus();try{const result=await client.auth.signInWithOtp({email:email,options:{shouldCreateUser:true}});if(result.error)throw result.error;pendingEmail=email;el('code-email').textContent=email;el('email-step').hidden=true;el('code-step').hidden=false;busy(false);show('status-sent');setTimeout(function(){el('code-input').focus()},0)}catch(e){fail(e&&e.message?e.message:'Couldn’t send the code. Please try again.')}}
-async function verifyCode(){const code=(el('code-input').value||'').replace(/\D/g,'');if(code.length!==6){el('code-input').style.borderColor='#cc0000';el('code-input').focus();return}const client=sb();if(!client||!pendingEmail){fail();return}busy(true);clearStatus();try{const result=await client.auth.verifyOtp({email:pendingEmail,token:code,type:'email'});if(result.error||!result.data||!result.data.session)throw(result.error||new Error('Invalid or expired code'));await finishLogin('supabase',result.data.session.access_token)}catch(e){fail(e&&e.message?e.message:'That code is invalid or expired. Please request a new one.')}}
 async function handleLegacyLink(){const client=sb();if(!client||(!location.hash.includes('access_token')&&!location.hash.includes('type=magiclink')))return;busy(true);clearStatus();show('status-checking');await new Promise(function(r){setTimeout(r,400)});try{const result=await client.auth.getSession();if(!result.data.session)throw new Error();history.replaceState(null,'',location.pathname);await finishLogin('supabase',result.data.session.access_token)}catch(e){fail()}}
-function resetEmail(){pendingEmail='';el('code-step').hidden=true;el('email-step').hidden=false;el('code-input').value='';clearStatus();setTimeout(function(){el('email-input').focus()},0)}
 document.addEventListener('DOMContentLoaded',function(){
   // Never auto-redirect from a cached browser flag. If the dashboard rejected an
   // expired token, the login form must remain usable instead of forming a loop.
-  const saved=(document.cookie.match('(?:^|; )devfit_email=([^;]*)')||[])[1];if(saved)el('email-input').value=decodeURIComponent(saved);
-  el('email-toggle').addEventListener('click',function(){el('email-section').classList.toggle('open');if(el('email-section').classList.contains('open'))el('email-input').focus()});
-  el('email-send').addEventListener('click',sendCode);el('code-verify').addEventListener('click',verifyCode);el('change-email').addEventListener('click',resetEmail);
-  el('email-input').addEventListener('keydown',function(e){if(e.key==='Enter')sendCode()});el('code-input').addEventListener('keydown',function(e){if(e.key==='Enter')verifyCode()});
   handleLegacyLink();if(!initGoogle()){let tries=0;const timer=setInterval(function(){if(initGoogle()||++tries>30)clearInterval(timer)},200)}
 });
 window.addEventListener('pageshow',function(){busy(false)});

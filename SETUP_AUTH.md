@@ -130,20 +130,20 @@ Project → **Settings → Environment Variables** (Production + Preview):
 
 **Redeploy** after setting them (env changes need a fresh deploy).
 
-## Step 2A — Email-code fallback and canonical URL
+## Step 2A — Google-only login and canonical URL
 
-Google ID-token sign-in is the primary login. Email is a same-page six-digit-code
-fallback and must not contain a redirect link.
-
-In Supabase Dashboard → Authentication → Email Templates → Magic Link, use a
-template containing `{{ .Token }}` and remove `{{ .ConfirmationURL }}`. For
-example: `Your DevFit sign-in code is {{ .Token }}`.
+Google ID-token sign-in is the only login shown to users. The server verifies the
+token signature, audience, issuer, lifetime, verified email, and stable Google
+subject before creating the DevFit session.
 
 In Authentication → URL Configuration:
 
 - Set Site URL to `https://devfitportal.vercel.app`.
 - Remove the old Netlify URL from Redirect URLs.
-- Keep only the Vercel production URL and any intentional Vercel preview URLs.
+- Keep only `https://devfitportal.vercel.app/**`.
+
+Legacy Supabase link-return handling stays hidden temporarily so an already-issued
+link can finish safely on the Vercel host. No new email-link login is offered.
 
 In Google Cloud Console, keep `https://devfitportal.vercel.app` in the OAuth web
 client's Authorized JavaScript origins. The server validates every Google ID
@@ -188,7 +188,7 @@ the documented Layer-1 limit.)
 
 > **One-time re-login:** existing users logged in *before* this system only
 > have a session, not a signed token. The moment you flip strict, each of them
-> is asked to log in once (a single magic-link tap) which mints their token.
+> is asked to log in once with Google, which mints their token.
 > Expected and harmless — just don't flip it in the middle of a busy day.
 
 ## Step 6 (later) — retire the Google Sheet

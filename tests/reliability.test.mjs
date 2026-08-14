@@ -81,7 +81,7 @@ test('login uses ID credentials and has no redirect-based email or sales panel',
   const html = fs.readFileSync(new URL('../login.html', import.meta.url), 'utf8');
   assert.match(html, /google\.accounts\.id\.initialize/);
   assert.match(html, /finishLogin\('google_id'/);
-  assert.doesNotMatch(html, /initTokenClient|emailRedirectTo|Email me a sign-in link|contact-box|Want Pro/i);
+  assert.doesNotMatch(html, /initTokenClient|emailRedirectTo|signInWithOtp|verifyOtp|Use an email code|Email me a sign-in link|contact-box|Want Pro/i);
   for (const match of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)) {
     if (match[1].trim()) new Function(match[1]);
   }

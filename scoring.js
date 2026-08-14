@@ -27,21 +27,35 @@ function avg(arr){
   const n = arr.filter(v=>v!=='').map(Number).filter(n=>!isNaN(n)&&n>0);
   return n.length ? n.reduce((a,b)=>a+b,0)/n.length : null;
 }
+function loggedValues(arr){
+  if(!Array.isArray(arr)) return [];
+  return arr.filter(v=>v!==''&&v!==null&&v!==undefined).map(Number).filter(n=>Number.isFinite(n)&&n>0);
+}
+function median(arr){
+  const n=loggedValues(arr).sort((a,b)=>a-b);
+  if(!n.length) return null;
+  const m=Math.floor(n.length/2);
+  return n.length%2?n[m]:(n[m-1]+n[m])/2;
+}
 
-function stepsScore(s){
+function stepsScore(s,target){
   if(s===null) return null;
-  if(s>=8000)  return 100; // benefit plateau reached
-  if(s>=7000)  return 85;
-  if(s>=5000)  return 60;
-  if(s>=3000)  return 35;
+  let goal=Number(target);
+  if(!Number.isFinite(goal)||goal<3000) goal=Number(typeof appData!=='undefined'&&appData&&appData.targetSteps)||7000;
+  goal=Math.max(3000,Math.min(goal,20000));
+  const ratio=s/goal;
+  if(ratio>=1)    return 100;
+  if(ratio>=0.85) return 85;
+  if(ratio>=0.70) return 65;
+  if(ratio>=0.50) return 40;
   return 20;
 }
 function sleepScore(h){
   if(h===null) return null;
   if(h>=7 && h<=9)  return 100;
-  if(h>=9 && h<10)  return 75;
+  if(h>9 && h<=10)  return 85;
   if(h>=6 && h<7)   return 75;
-  if(h>=10)         return 50;
+  if(h>10)          return 65;
   if(h>=5 && h<6)   return 45;
   return 20;
 }
@@ -64,8 +78,9 @@ function dietScore(d){ if(d==='met') return 100; if(d==='missed_few') return 70;
 function stressScore(s){ if(s==='low') return 100; if(s==='moderate') return 55; if(s==='high') return 30; return null; }
 
 // Bodyweight rate-of-change scoring (% change vs previous logged week).
-function bwScore(bwAvg, prevBwAvg, goalType, weekIndex){
+function bwScore(bwAvg, prevBwAvg, goalType, weekIndex, currentCount, previousCount){
   if(weekIndex===0) return null; // Week 1 is baseline — no score yet
+  if((currentCount||0)<3 || (previousCount||0)<3) return null; // daily noise needs a real weekly sample
   if(bwAvg===null || prevBwAvg===null) return null;
   const pct=(bwAvg-prevBwAvg)/prevBwAvg*100;
   const tw=appData.goal?parseFloat(appData.goal):null;
@@ -103,16 +118,25 @@ function calcTrueScore(w){
   // Every container is optional too — a half-built appData (fresh install, a
   // restore mid-flight) must degrade to "nothing logged", not explode.
   const ci=(appData.weeklyCheckin||[])[w]||freshCheckin();
-  const bwAvg=avg((appData.bw||[])[w]);
+  const currentBw=loggedValues((appData.bw||[])[w]);
+  const bwAvg=median(currentBw);
   let prevBwAvg=null;
-  for(let pw=w-1;pw>=0;pw--){ const pa=avg((appData.bw||[])[pw]); if(pa!==null){prevBwAvg=pa;break;} }
+  let previousCount=0;
+  for(let pw=w-1;pw>=0;pw--){ const pv=loggedValues((appData.bw||[])[pw]); if(pv.length>=3){prevBwAvg=median(pv);previousCount=pv.length;break;} }
   const stepsAvg=avg((appData.steps||[])[w]);
   const sleepAvg=avg((appData.sleep||[])[w]);
   const gt=appData.goalType||'loss';
   const tw=appData.goal?parseFloat(appData.goal):null;
 
-  let bwVal=bwScore(bwAvg,prevBwAvg,gt,w);
+  let bwVal=bwScore(bwAvg,prevBwAvg,gt,w,currentBw.length,previousCount);
   let bfVal=bfScore(ci.bfDir);
+  let bwStatus='';
+  if(bwVal===null){
+    if(currentBw.length===0) bwStatus='Not logged';
+    else if(currentBw.length<3) bwStatus='Need 3 weigh-ins';
+    else if(w===0) bwStatus='Baseline week';
+    else if(previousCount<3) bwStatus='Need previous baseline';
+  }
 
   // Recomp credit — scale stalled but body-fat dropping = working
   const bfDropping=(ci.bfDir==='drop_clear'||ci.bfDir==='drop_slight');
@@ -128,24 +152,27 @@ function calcTrueScore(w){
   if(targetReached && bfDropping) bfVal=100;
 
   const scores={
-    bw:     {val:bwVal,                          weight:17, label:'Bodyweight'},
+    bw:     {val:bwVal,                          weight:17, label:'Bodyweight', status:bwStatus},
     bf:     {val:bfVal,                          weight:10, label:'Body fat'},
     ol:     {val:overloadScore(ci.overload),     weight:22, label:'Overload'},
     diet:   {val:dietScore(ci.diet),             weight:23, label:'Diet'},
     sleep:  {val:sleepScore(sleepAvg),           weight:10, label:'Sleep'},
-    steps:  {val:stepsScore(stepsAvg),           weight:10, label:'Steps'},
+    steps:  {val:stepsScore(stepsAvg,appData.targetSteps), weight:10, label:'Steps'},
     stress: {val:stressScore(ci.stress),         weight:8,  label:'Stress'}
   };
 
   // Adaptive normalisation — only weight what's actually logged
-  let totalWeight=0, weightedSum=0;
+  let totalWeight=0, weightedSum=0, signalCount=0;
   Object.values(scores).forEach(s=>{
-    if(s.val!==null){ totalWeight+=s.weight; weightedSum+=s.val*s.weight; }
+    if(s.val!==null){ totalWeight+=s.weight; weightedSum+=s.val*s.weight; signalCount++; }
   });
 
-  let overall = totalWeight>0 ? Math.round(weightedSum/totalWeight) : null;
-  if(targetReached && bfDropping) overall=100;
-  else if(targetReached && overall!==null) overall=Math.max(overall,95);
+  // Sparse lifestyle-only data must never look like a complete weekly result.
+  // Require three independent signals covering at least 40% of the product
+  // weighting before presenting one headline number; components remain visible.
+  const overall = signalCount>=3 && totalWeight>=40 ? Math.round(weightedSum/totalWeight) : null;
+  const coverage=Math.round(totalWeight);
+  const confidence=coverage>=70?'High':coverage>=40?'Moderate':'Low';
 
-  return {overall, scores, totalWeight};
+  return {overall, scores, totalWeight, signalCount, coverage, confidence};
 }

@@ -18,6 +18,7 @@
 <title>DevFit — Progress</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@400;500;600;700;800&family=Inter:ital,wght@1,700;1,800&family=Lora:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600;1,700&family=Anton&family=Righteous&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="progress-model.js"></script><!-- versioned programs + safe legacy migration -->
 <script src="scoring.js"></script><!-- shared scoring engine (app score === report score) -->
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -156,7 +157,8 @@
   .day-card:focus-within{border-color:var(--g)}
   .day-lbl{font-size:10px;font-weight:500;color:#888888;margin-bottom:1px;text-transform:uppercase;letter-spacing:.04em}
   .day-date{font-size:9px;font-weight:600;color:#cc0000;margin-bottom:4px;letter-spacing:.02em}
-  .day-card input{width:100%;font-family:'DM Sans',system-ui,sans-serif;font-size:15px;font-weight:700;text-align:center;border:none;background:transparent;color:#111111;outline:none;padding:2px 0}
+  .day-card input,.day-card select{width:100%;font-family:'DM Sans',system-ui,sans-serif;font-size:15px;font-weight:700;text-align:center;border:none;background:transparent;color:#111111;outline:none;padding:2px 0}
+  .day-card select{-webkit-appearance:none;appearance:none;cursor:pointer;text-align-last:center}
   .day-card input::placeholder{color:var(--bd);font-size:18px;font-weight:400}
   input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none}
   input[type=number]{-moz-appearance:textfield}
@@ -238,6 +240,13 @@
   .btn:hover{background:var(--bg3)}
   .btn.danger{border-color:#fca5a5;color:var(--r)}
   .btn.danger:hover{background:#fee2e2}
+  .program-managed{margin-top:13px;padding-top:13px;border-top:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .program-managed-copy{font-size:11px;color:#888;line-height:1.45}
+  .program-managed-copy b{display:block;color:#333;font-size:12px;margin-bottom:2px}
+  .btn.program-new{flex-shrink:0;border-color:#cc0000;color:#cc0000;background:#fff;font-weight:700}
+  .history-list{display:flex;flex-direction:column;gap:8px}
+  .history-row{display:flex;justify-content:space-between;gap:12px;align-items:center;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px}
+  .history-title{font-size:12px;font-weight:800;color:#111}.history-sub{font-size:10px;color:#777;margin-top:2px}.history-result{font-size:12px;font-weight:800;color:#2f9e57;text-align:right;white-space:nowrap}
 
   /* STARTING STATS */
   .stats-banner{background:#1a1a1a;border:1px solid #cc0000;border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:12px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
@@ -342,7 +351,7 @@
     .header-logo{height:38px;width:38px}
     .metric-grid{gap:3px}
     .day-card{padding:6px 2px;min-width:0;overflow:hidden}
-    .day-card input{font-size:12px;min-width:0;width:100%}
+    .day-card input,.day-card select{font-size:12px;min-width:0;width:100%}
     .day-lbl{font-size:9px;letter-spacing:.02em}
     .sum-val{font-size:15px}
     .summary-strip{grid-template-columns:1fr 1fr}
@@ -359,7 +368,7 @@
   @media(max-width:380px){
     .metric-grid{gap:2px}
     .day-card{padding:5px 1px}
-    .day-card input{font-size:11px}
+    .day-card input,.day-card select{font-size:11px}
     .day-lbl{font-size:8px}
     .stat-val{font-size:13px}
     .stat-lbl{font-size:9px}
@@ -471,7 +480,7 @@ html.nosplash #devfit-splash{display:none!important}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
       <div>
         <div class="section-label" style="margin-bottom:5px;">Program duration</div>
-        <select style="width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:9px 12px;border:1px solid #d1d5db;border-radius:var(--radius);background:#fff;color:#111;outline:none;cursor:pointer;" id="programDuration" onchange="save();render()">
+        <select style="width:100%;font-family:'DM Sans',sans-serif;font-size:13px;padding:9px 12px;border:1px solid #d1d5db;border-radius:var(--radius);background:#fff;color:#111;outline:none;cursor:pointer;" id="programDuration" onchange="changeProgramDuration()">
           <option value="4">4 weeks</option>
           <option value="8" selected>8 weeks</option>
           <option value="12">12 weeks</option>
@@ -480,7 +489,7 @@ html.nosplash #devfit-splash{display:none!important}
       </div>
       <div>
         <div class="section-label" style="margin-bottom:5px;">Program start (Week 1 Mon)</div>
-        <input style="width:100%;box-sizing:border-box;-webkit-appearance:none;appearance:none;font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 12px;border:1px solid #d1d5db;border-radius:var(--radius);background:#fff;color:#111;outline:none;" id="programStart" type="date" onchange="save();renderTabs();render()">
+        <input style="width:100%;box-sizing:border-box;-webkit-appearance:none;appearance:none;font-family:'DM Sans',sans-serif;font-size:13px;padding:8px 12px;border:1px solid #d1d5db;border-radius:var(--radius);background:#f3f4f6;color:#555;outline:none;" id="programStart" type="date" readonly aria-readonly="true">
       </div>
     </div>
     <div style="margin-bottom:10px;">
@@ -495,6 +504,10 @@ html.nosplash #devfit-splash{display:none!important}
         <button class="goal-btn" id="goal-gain" onclick="setGoal('gain')">Gain</button>
         <button class="goal-btn" id="goal-maintain" onclick="setGoal('maintain')">Maintain</button>
       </div>
+    </div>
+    <div class="program-managed">
+      <div class="program-managed-copy"><b id="program-managed-title">Weeks managed automatically</b><span id="program-managed-sub">Your program expands from its start date. Logged history is never removed.</span></div>
+      <button type="button" class="btn program-new" onclick="openNewProgram()">Start new program</button>
     </div>
     </div><!-- /setup-body -->
   </details>
@@ -572,7 +585,7 @@ html.nosplash #devfit-splash{display:none!important}
   </nav>
 
   <!-- WEEK SELECTOR — pick the week to view/log (moved here from the header) -->
-  <div class="week-tabs" id="week-tabs" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;margin:0 0 8px;"></div>
+  <div class="week-tabs" id="week-tabs" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-start;margin:0 0 8px;"></div>
   <div id="week-range" style="text-align:center;font-family:'DM Sans',system-ui,sans-serif;font-size:12px;font-weight:600;color:#9a9a9a;margin:0 0 12px;letter-spacing:.02em;"></div>
 
   <!-- ===== DAILY SECTION ===== -->
@@ -612,8 +625,8 @@ html.nosplash #devfit-splash{display:none!important}
       <div class="score-breakdown" id="score-breakdown"></div>
     </div>
     <div style="margin-top:12px;font-size:11px;color:#e2e8f0;line-height:1.6;" id="score-legend">
-      Score weighted across 7 signals — Overload 22% · Diet 23% · Bodyweight 17% · Body fat 10% · Sleep 10% · Steps 10% · Stress 8%. Untracked signals are skipped and the rest re-normalise automatically. Recomp credit applies if body-fat drops while weight stalls.
-      <div style="margin-top:8px;opacity:.85;">Bodyweight is scored on weekly rate of change: <b>loss 0.5–1%/wk</b> (lean-mass sparing — Helms 2014), <b>lean gain 0.25–0.5%/wk</b> (Aragon &amp; Schoenfeld 2013), <b>maintain ±0.5%/wk</b>. Steps target 8–10k/day (Paluch 2022, Lancet); sleep 7–9h (AASM/NSF).</div>
+      Weekly score combines 7 logged signals — Overload 22% · Diet 23% · Bodyweight 17% · Body fat 10% · Sleep 10% · Steps 10% · Stress 8%. A headline score appears only after at least 3 signals and 40% coverage; missing signals never pretend the week is fully measured.
+      <div style="margin-top:8px;opacity:.85;">Bodyweight uses the median of at least 3 weigh-ins per week and compares it with the previous sufficiently logged week. Suggested rates are guidance, not a diagnosis: <b>loss 0.5–1%/wk</b>, <b>lean gain 0.25–0.5%/wk</b>, <b>maintain ±0.5%/wk</b>. Steps are scored against your chosen goal; sleep guidance uses 7–9h.</div>
     </div>
     <button class="wk-share-btn" id="wk-share-btn" type="button">Share Weekly Card</button>
   </div>
@@ -732,7 +745,7 @@ html.nosplash #devfit-splash{display:none!important}
       </div>
     </div>
     <div style="font-size:12.5px;color:#cbd5e1;margin-bottom:14px;line-height:1.7;text-align:left;max-width:290px;margin-left:auto;margin-right:auto;">
-      <div style="margin-bottom:5px;">✓ <b>True Progress Score</b> — one number from 6 signals: weight, overload, diet, sleep, steps, stress</div>
+      <div style="margin-bottom:5px;">✓ <b>True Progress Score</b> — one number from 7 signals when enough of the week is logged</div>
       <div style="margin-bottom:5px;">✓ <b>Every week you've logged</b> — the whole timeline, not just this week</div>
       <div style="margin-bottom:5px;">✓ <b>Trend charts</b> — bodyweight &amp; score, so you see the direction early</div>
       <div style="margin-bottom:5px;">✓ <b>Training history</b> — every session + per-exercise progression</div>
@@ -786,11 +799,11 @@ html.nosplash #devfit-splash{display:none!important}
       </div>
       <div style="background:#f8fafc;border-radius:8px;padding:7px 8px;">
         <div style="font-size:10px;font-weight:700;color:#111;margin-bottom:2px;">Sleep 10%</div>
-        <div style="font-size:9px;color:#666;">7–9h=100 · 6–7h=75<br>9–10h=75 · 10h+=50 · &lt;5h=20</div>
+        <div style="font-size:9px;color:#666;">7–9h=100 · 6–7h=75<br>9–10h=85 · 10h+=65 · &lt;5h=20</div>
       </div>
       <div style="background:#f8fafc;border-radius:8px;padding:7px 8px;">
         <div style="font-size:10px;font-weight:700;color:#111;margin-bottom:2px;">Steps 10%</div>
-        <div style="font-size:9px;color:#666;">10k+=100 · 7.5k=80<br>5k=55 · 3k=35 · &lt;3k=20</div>
+        <div style="font-size:9px;color:#666;">100% of your goal=100<br>85%=85 · 70%=65 · 50%=40</div>
       </div>
       <div style="background:#f8fafc;border-radius:8px;padding:7px 8px;">
         <div style="font-size:10px;font-weight:700;color:#111;margin-bottom:2px;">Stress 8%</div>
@@ -798,7 +811,7 @@ html.nosplash #devfit-splash{display:none!important}
       </div>
       <div style="background:#fff7ed;border-radius:8px;padding:7px 8px;border:1px dashed #fb923c;">
         <div style="font-size:10px;font-weight:700;color:#9a3412;margin-bottom:2px;">Recomp rule</div>
-        <div style="font-size:9px;color:#9a3412;">If BF drops &amp; weight stalls, bodyweight auto-set to 75</div>
+        <div style="font-size:9px;color:#9a3412;">If BF drops while weight stalls, the weight signal receives recomp credit</div>
       </div>
     </div>
     <div style="display:flex;gap:14px;margin-bottom:8px;font-size:11px;color:#555;">
@@ -811,14 +824,17 @@ html.nosplash #devfit-splash{display:none!important}
     <div id="score-empty" class="chart-empty" style="display:none"><div class="ce-ic">📊</div>Log a full week to see your progress score.</div>
   </div>
 
+  <!-- PROGRAM HISTORY (Pro, read-only and non-destructive) -->
+  <div class="pro-gate card" id="program-history-card">
+    <div class="section-label">Program history</div>
+    <div id="program-history-list" class="history-list"></div>
+  </div>
+
   </div><!-- ===== /ANALYTICS SECTION ===== -->
 
-  <!-- ACTIONS -->
+  <!-- SETTINGS HANDOFF -->
   <div class="card">
-    <div class="action-row">
-      <button class="btn danger" onclick="clearWeek()">Clear this week</button>
-    </div>
-    <div style="font-size:11px;color:#aaa;margin-top:10px;line-height:1.5">Reports, Backup, Logout &amp; Reset are in the <a href="settings.html" style="color:#cc0000;text-decoration:none;font-weight:700">Settings tab</a>. Generate a full week report (habits + workouts + nutrition) there.</div>
+    <div style="font-size:11px;color:#aaa;line-height:1.5">Reports, Backup, Logout &amp; Reset are in the <a href="settings.html" style="color:#cc0000;text-decoration:none;font-weight:700">Settings tab</a>. Generate a full week report (habits + workouts + nutrition) there.</div>
   </div>
 
 </div>
@@ -921,6 +937,48 @@ html.nosplash #devfit-splash{display:none!important}
         <button class="onb-btn ghost" onclick="onbBack()">Back</button>
         <button class="onb-btn primary" onclick="onbFinish()">Start tracking &rarr;</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- START A NEW PROGRAM — previous program remains read-only in history -->
+<div class="onb-overlay" id="new-program-overlay" role="dialog" aria-modal="true" aria-labelledby="new-program-title">
+  <div class="onb-card">
+    <div class="onb-top">
+      <img class="onb-logo" src="icon-192.png" alt="" onerror="this.style.display='none'">
+      <div class="onb-brand"><span class="d">DEV</span><span class="f">FIT</span></div>
+    </div>
+    <div class="onb-eyebrow">Program transition</div>
+    <div class="onb-h" id="new-program-title">Start a new program</div>
+    <div class="onb-p">Your current program and every logged day will stay in Program History. The new timeline begins cleanly at Week 1.</div>
+    <div class="onb-row">
+      <div class="onb-field">
+        <label class="onb-label" for="np-start">Start date</label>
+        <input class="onb-input" id="np-start" type="date">
+      </div>
+      <div class="onb-field">
+        <label class="onb-label" for="np-duration">Length</label>
+        <select class="onb-select" id="np-duration"><option value="4">4 weeks</option><option value="8">8 weeks</option><option value="12">12 weeks</option><option value="16">16 weeks</option></select>
+      </div>
+    </div>
+    <div class="onb-row">
+      <div class="onb-field">
+        <label class="onb-label" for="np-start-weight">Current weight</label>
+        <div class="onb-suffix"><input class="onb-input" id="np-start-weight" type="number" inputmode="decimal" step="0.1"><span>kg</span></div>
+      </div>
+      <div class="onb-field">
+        <label class="onb-label" for="np-goal-weight">Target weight</label>
+        <div class="onb-suffix"><input class="onb-input" id="np-goal-weight" type="number" inputmode="decimal" step="0.1"><span>kg</span></div>
+      </div>
+    </div>
+    <div class="onb-field">
+      <label class="onb-label" for="np-goal-type">Goal</label>
+      <select class="onb-select" id="np-goal-type"><option value="loss">Lose fat</option><option value="gain">Build muscle</option><option value="maintain">Maintain</option></select>
+    </div>
+    <div class="onb-err" id="np-error"></div>
+    <div class="onb-nav">
+      <button class="onb-btn ghost" type="button" onclick="closeNewProgram()">Cancel</button>
+      <button class="onb-btn primary" type="button" onclick="createNewProgram()">Start Week 1</button>
     </div>
   </div>
 </div>
@@ -1059,143 +1117,25 @@ function isoWeekKey(d){
   return dt.getFullYear() + '-W' + String(Math.ceil(((dt - new Date(dt.getFullYear(),0,1))/86400000 + 1)/7)).padStart(2,'0');
 }
 
-// Tier-aware reconciliation of the progress weeks. Call after EVERY appData
-// replacement (load, onboarding restore, cloud sync). Pro → restore full history;
-// Free → single rolling week, but NON-DESTRUCTIVELY (history is preserved).
+// Free and Pro share the same durable program model. Tier changes affect what is
+// visible, never the shape or ownership of saved data. The timeline provisions
+// itself from the planned duration and always includes the real current week.
 function reconcileTierWeeks(){
-  if(isPro()){ restoreProHistory(); currentWeek = currentWeekIndex(); return; }
-  normalizeFreeTierWeeksView();
+  if(typeof DevFitProgress!=='undefined') appData=DevFitProgress.ensureDocument(appData);
+  const start=programStartDate(), today=mondayOf(new Date());
+  const elapsed=(start&&today)?Math.max(0,Math.round((today-start)/(7*86400000))):0;
+  const planned=Math.max(1,parseInt(appData.programDuration,10)||8);
+  if(typeof DevFitProgress!=='undefined') appData=DevFitProgress.ensureTimeline(appData,Math.max(planned,elapsed+1));
+  ensureShape();
+  totalWeeks=Math.max(1,appData.bw.length);
+  currentWeek=currentWeekIndex();
 }
 
 function anyWeekVals(a){ return Array.isArray(a) && a.some(v => v !== '' && v != null); }
 function weekHasData(w){ return anyWeekVals(w && w.bw) || anyWeekVals(w && w.steps) || anyWeekVals(w && w.sleep); }
-function mkBlankWeek(){ return { bw:Array(7).fill(''), steps:Array(7).fill(''), sleep:Array(7).fill(''), checkin:freshCheckin() }; }
-
-// The archive of PAST weeks, kept as a calendar-indexed timeline (parallel arrays +
-// programStart). Rides inside the progress blob, so it syncs to the cloud and is
-// never lost. The single visible week (appData.bw[0]) is the CURRENT week only —
-// no week is ever in both places, so there's no divergence and no data loss.
-function ensureHistory(anchorYmd){
-  if(!appData._proHistory) appData._proHistory = { bw:[], steps:[], sleep:[], weeklyCheckin:[], programStart: anchorYmd || '' };
-  if(!appData._proHistory.programStart && anchorYmd) appData._proHistory.programStart = anchorYmd;
-  return appData._proHistory;
-}
-// Fold one week {bw,steps,sleep,checkin} into a timeline H at its TRUE calendar
-// index (from H.programStart). Pads with blank weeks as needed and only ever fills
-// an EMPTY slot, so existing archived data is never overwritten. The single tested
-// primitive shared by archiving (Free rollover) and restore (upgrade).
-function foldWeekIntoTimeline(H, wk, weekMondayStr){
-  if(!H || !weekHasData(wk) || !weekMondayStr) return;
-  const wkMon = mondayOf(new Date(weekMondayStr));
-  if(!wkMon) return;
-  // Anchor (re-anchor) to this week whenever the timeline is empty, so a stale/early
-  // anchor left by an empty archive can never skew the calendar indices.
-  if(!H.programStart || !H.bw.length){ H.programStart = ymd(wkMon); }
-  const start = mondayOf(new Date(H.programStart));
-  if(!start) return;
-  let idx = Math.round((wkMon - start) / (7*24*3600*1000));
-  if(idx < 0){
-    // Earlier than the current anchor → prepend blanks and move the anchor back,
-    // keeping the whole timeline correctly ordered.
-    const shift = -idx;
-    for(let k=0;k<shift;k++){ const b=mkBlankWeek(); H.bw.unshift(b.bw); H.steps.unshift(b.steps); H.sleep.unshift(b.sleep); H.weeklyCheckin.unshift(b.checkin); }
-    H.programStart = ymd(wkMon); idx = 0;
-  }
-  while(H.bw.length <= idx){ const b=mkBlankWeek(); H.bw.push(b.bw); H.steps.push(b.steps); H.sleep.push(b.sleep); H.weeklyCheckin.push(b.checkin); }
-  if(!weekHasData({ bw:H.bw[idx], steps:H.steps[idx], sleep:H.sleep[idx] })){
-    H.bw[idx]=wk.bw; H.steps[idx]=wk.steps; H.sleep[idx]=wk.sleep; H.weeklyCheckin[idx]=wk.checkin;
-  }
-}
-function visibleWeek(){
-  return { bw:(appData.bw&&appData.bw[0])||Array(7).fill(''), steps:(appData.steps&&appData.steps[0])||Array(7).fill(''),
-           sleep:(appData.sleep&&appData.sleep[0])||Array(7).fill(''), checkin:(appData.weeklyCheckin&&appData.weeklyCheckin[0])||freshCheckin() }; }
-
-// FREE TIER: the app shows exactly ONE week (the current calendar week) and rolls
-// every Monday. DATA SAFETY / SYNC-ALL-YEAR: every completed week is ARCHIVED into
-// the _proHistory timeline (which syncs) instead of being wiped — so a free user's
-// data is retained for the whole year and fully restored if they ever go Pro. Only
-// the VIEW is limited to one week; the data is never destroyed for any tier.
-function normalizeFreeTierWeeksView(){
-  const currentWk = isoWeekKey(new Date());
-  const thisMon = ymd(mondayOf(new Date()));
-
-  // Fresh downgrade from Pro: appData still holds the whole multi-week program.
-  // Split it: the CURRENT calendar week stays visible/editable; every OTHER week
-  // that has data is archived into the timeline. This keeps exactly one copy of each
-  // week (no overlap, no collision), so nothing is ever lost or duplicated. An
-  // all-empty default appData creates no archive at all.
-  if(appData.bw && appData.bw.length > 1){
-    const base = mondayOf(new Date(appData.programStart || thisMon));
-    const curIdx = base ? Math.round((mondayOf(new Date()) - base) / (7*86400000)) : -1;
-    const weeksIn = [];
-    let currentWeekData = null;
-    for(let i=0;i<appData.bw.length;i++){
-      const wk = { bw:appData.bw[i]||Array(7).fill(''), steps:(appData.steps&&appData.steps[i])||Array(7).fill(''),
-                   sleep:(appData.sleep&&appData.sleep[i])||Array(7).fill(''), checkin:(appData.weeklyCheckin&&appData.weeklyCheckin[i])||freshCheckin() };
-      if(i === curIdx){ currentWeekData = wk; continue; }
-      if(weekHasData(wk)) weeksIn.push({ wk:wk, mon: base ? ymd(new Date(base.getTime()+i*7*86400000)) : thisMon });
-    }
-    if(weeksIn.length){
-      const H = ensureHistory(weeksIn[0].mon);
-      weeksIn.forEach(function(x){ foldWeekIntoTimeline(H, x.wk, x.mon); });
-    }
-    const cw = currentWeekData || mkBlankWeek();
-    appData.bw=[cw.bw]; appData.steps=[cw.steps]; appData.sleep=[cw.sleep]; appData.weeklyCheckin=[cw.checkin];
-    appData.programStart = thisMon;
-    appData.freeWeekOf = currentWk;
-    const ps0=document.getElementById('programStart'); if(ps0) ps0.value=appData.programStart;
-    localStorage.setItem('devfit_freeWeekKey', currentWk);
-    totalWeeks = 1; currentWeek = 0;
-    try { localStorage.setItem('progressLog2', JSON.stringify(appData)); } catch(e){}
-    if(typeof DevFitDB!=='undefined' && DevFitDB.cloudSave) DevFitDB.cloudSave('progress',appData);
-    return; // downgrade fully handled — current week is visible, others archived
-  }
-
-  totalWeeks = 1; currentWeek = 0;
-
-  // Roll to the current week: archive the OUTGOING visible week (if it holds data)
-  // at its own Monday, then start a fresh blank current week anchored to this Monday.
-  if(appData.freeWeekOf !== currentWk){
-    const outgoing = visibleWeek();
-    if(weekHasData(outgoing) && appData.programStart && appData.freeWeekOf && appData.freeWeekOf !== '__rolled__'){
-      const H = ensureHistory(appData.programStart);
-      foldWeekIntoTimeline(H, outgoing, appData.programStart);
-    }
-    appData.bw=[Array(7).fill('')]; appData.steps=[Array(7).fill('')]; appData.sleep=[Array(7).fill('')]; appData.weeklyCheckin=[freshCheckin()];
-    appData.freeWeekOf = currentWk;
-    appData.programStart = thisMon;
-    const ps=document.getElementById('programStart'); if(ps) ps.value=appData.programStart;
-    localStorage.setItem('devfit_freeWeekKey', currentWk);
-    try { localStorage.setItem('progressLog2', JSON.stringify(appData)); } catch(e){}
-    if(typeof DevFitDB!=='undefined' && DevFitDB.cloudSave) DevFitDB.cloudSave('progress',appData);
-  }
-}
-
-// Upgrade → Pro: promote the archived timeline into the visible weeks and fold the
-// current week back in at its true calendar slot. Nothing was ever lost, so the
-// user sees their complete history the moment they go Pro.
-function restoreProHistory(){
-  if(!appData || !appData._proHistory) return;
-  const H = appData._proHistory;
-  // Fold the current visible week (the one live slot) into the timeline before promoting.
-  if(appData.bw && appData.bw.length === 1) foldWeekIntoTimeline(H, visibleWeek(), appData.programStart || '');
-  appData.bw = H.bw && H.bw.length ? H.bw : [Array(7).fill('')];
-  appData.steps = H.steps && H.steps.length ? H.steps : [Array(7).fill('')];
-  appData.sleep = H.sleep && H.sleep.length ? H.sleep : [Array(7).fill('')];
-  appData.weeklyCheckin = H.weeklyCheckin && H.weeklyCheckin.length ? H.weeklyCheckin : [freshCheckin()];
-  if(H.programStart) appData.programStart = H.programStart;
-  delete appData._proHistory;
-  delete appData.freeWeekOf;
-  totalWeeks = (appData.bw && appData.bw.length) || 1;
-  try { localStorage.setItem('progressLog2', JSON.stringify(appData)); } catch(e){}
-  if(typeof DevFitDB!=='undefined' && DevFitDB.cloudSave) DevFitDB.cloudSave('progress',appData);
-}
-
-// Back-compat shim: some call sites / older references may still call this name.
-function normalizeFreeTierWeeks(){ if(!isPro()) normalizeFreeTierWeeksView(); }
 
 // ── Free-tier teaser sparkline ────────────────────────────────────────────
-// Weekly-average bodyweight for the last 4 logged weeks (archive + current),
+// Weekly-average bodyweight for the last 4 logged weeks in the active program,
 // used only to draw a blurred, number-free "you have a trend" teaser for free users.
 function weekAvgBw(weekArr){
   if(!Array.isArray(weekArr)) return null;
@@ -1203,9 +1143,8 @@ function weekAvgBw(weekArr){
   return v.length ? v.reduce(function(a,b){return a+b;},0)/v.length : null;
 }
 function last4WeeksBwAvgs(){
-  var s=[]; var H=appData._proHistory;
-  if(H && Array.isArray(H.bw)) H.bw.forEach(function(wk){ s.push(weekAvgBw(wk)); });
-  s.push(weekAvgBw(appData.bw && appData.bw[0]));
+  var s=[];
+  (appData.bw||[]).forEach(function(wk){ s.push(weekAvgBw(wk)); });
   return s.filter(function(v){return v!=null;}).slice(-4);
 }
 // Free-tier hook. The strongest and most honest reason to upgrade is that the
@@ -1213,11 +1152,9 @@ function last4WeeksBwAvgs(){
 // deleting it. Generic benefit copy converts badly; "4 weeks are waiting for you"
 // is specific, true, and theirs.
 function lockedWeekCount(){
-  var H=appData._proHistory, n=0;
-  if(H && Array.isArray(H.bw)){
-    for(var i=0;i<H.bw.length;i++){
-      if(weekHasData({ bw:H.bw[i], steps:H.steps&&H.steps[i], sleep:H.sleep&&H.sleep[i] })) n++;
-    }
+  var n=0;
+  for(var i=0;i<(appData.bw||[]).length;i++){
+    if(i!==currentWeek && weekHasData({ bw:appData.bw[i], steps:appData.steps&&appData.steps[i], sleep:appData.sleep&&appData.sleep[i] })) n++;
   }
   return n;
 }
@@ -1330,11 +1267,9 @@ function lockCard(card, title){
 
 // BLUR Pro-only UI for free tier (cards stay visible — users see what they're missing)
 function applyTierGates(){
-  // Week tabs hidden for free tier (pro-gate sections handled by renderExtraCards)
-  if(!isPro()){
-    const wtabsBox = document.getElementById('week-tabs');
-    if(wtabsBox) wtabsBox.style.display = 'none';
-  }
+  // Free limits navigation, not storage. The same complete program remains intact.
+  const wtabsBox = document.getElementById('week-tabs');
+  if(wtabsBox) wtabsBox.style.display = isPro() ? 'flex' : 'none';
 }
 function save(){
   appData.goal=document.getElementById('goalInput').value;
@@ -1343,6 +1278,7 @@ function save(){
   appData.programDuration=document.getElementById('programDuration').value;
   const _ts=document.getElementById('targetSteps'); if(_ts) appData.targetSteps=_ts.value;
   const _sl=document.getElementById('targetSleep'); if(_sl) appData.targetSleep=_sl.value;
+  if(typeof DevFitProgress!=='undefined') appData=DevFitProgress.captureActive(appData);
   if(loadFailed) return;   // storage holds data we could not read — do not clobber it
   try{
     localStorage.setItem('progressLog2',JSON.stringify(appData));
@@ -1358,11 +1294,57 @@ function save(){
 }
 
 function setGoal(type){ appData.goalType=type; save(); render(); }
+function latestLoggedWeight(){
+  for(let w=(appData.bw||[]).length-1;w>=0;w--) for(let d=6;d>=0;d--){
+    const n=parseFloat(appData.bw[w]&&appData.bw[w][d]); if(isFinite(n)&&n>0) return n;
+  }
+  const sw=parseFloat(appData.startWeight); return isFinite(sw)?sw:'';
+}
+function openNewProgram(){
+  const ov=document.getElementById('new-program-overlay'); if(!ov)return;
+  document.getElementById('np-start').value=ymd(mondayOf(new Date()));
+  document.getElementById('np-duration').value=appData.programDuration||'8';
+  document.getElementById('np-start-weight').value=latestLoggedWeight();
+  document.getElementById('np-goal-weight').value=appData.goal||'';
+  document.getElementById('np-goal-type').value=appData.goalType||'loss';
+  document.getElementById('np-error').textContent='';
+  ov.classList.add('show');
+}
+function closeNewProgram(){ const ov=document.getElementById('new-program-overlay'); if(ov)ov.classList.remove('show'); }
+function createNewProgram(){
+  const sw=parseFloat(document.getElementById('np-start-weight').value), gw=parseFloat(document.getElementById('np-goal-weight').value);
+  const gt=document.getElementById('np-goal-type').value, err=document.getElementById('np-error');
+  if(!isFinite(sw)||sw<25||sw>400){err.textContent='Enter your current weight in kg.';return;}
+  if(gt!=='maintain'&&(!isFinite(gw)||gw<25||gw>400)){err.textContent='Enter a valid target weight in kg.';return;}
+  if(gt==='loss'&&gw>=sw){err.textContent='For fat loss, the target must be below your current weight.';return;}
+  if(gt==='gain'&&gw<=sw){err.textContent='For muscle gain, the target must be above your current weight.';return;}
+  const opts={start:document.getElementById('np-start').value,duration:document.getElementById('np-duration').value,
+    startWeight:String(sw),goal:gt==='maintain'?String(sw):String(gw),goalType:gt,targetSteps:appData.targetSteps||'',targetSleep:appData.targetSleep||''};
+  appData=DevFitProgress.startProgram(appData,opts); totalWeeks=appData.bw.length; currentWeek=0;
+  ['startWeight','goalInput','programDuration','programStart'].forEach(id=>{const el=document.getElementById(id);if(el){const map={startWeight:appData.startWeight,goalInput:appData.goal,programDuration:appData.programDuration,programStart:appData.programStart};el.value=map[id];}});
+  closeNewProgram(); save(); renderGoalBtns(); renderTabs(); render();
+}
 function renderGoalBtns(){
   ['loss','gain','maintain'].forEach(t=>{
     const b=document.getElementById('goal-'+t);
     if(b) b.className='goal-btn'+(appData.goalType===t?' active-'+t:'');
   });
+}
+
+function renderProgramHistory(){
+  const list=document.getElementById('program-history-list'); if(!list)return;
+  const programs=(appData.programs||[]).slice().sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  const title=document.getElementById('program-managed-title'), sub=document.getElementById('program-managed-sub');
+  if(title) title.textContent='Weeks managed automatically · '+totalWeeks+' available';
+  if(sub) sub.textContent=(programs.length>1?(programs.length-1)+' previous program'+(programs.length===2?'':'s')+' preserved. ':'')+'Start a new program when your goal or training phase changes.';
+  if(!programs.length){list.innerHTML='<div style="font-size:12px;color:#777">Your completed programs will appear here.</div>';return;}
+  list.innerHTML=programs.map(p=>{
+    const vals=[];(p.bw||[]).forEach(r=>(r||[]).forEach(v=>{const n=parseFloat(v);if(isFinite(n)&&n>0)vals.push(n);}));
+    const change=vals.length>1?+(vals[vals.length-1]-vals[0]).toFixed(1):null;
+    const result=change===null?'Baseline':(change>0?'+':'')+change+' kg';
+    const status=p.id===appData.activeProgramId?'Current':'Completed';
+    return '<div class="history-row"><div><div class="history-title">'+status+' · '+(p.duration||8)+' weeks</div><div class="history-sub">Started '+String(p.start||'').split('-').reverse().join('/')+' · '+(p.goalType||'loss')+'</div></div><div class="history-result">'+result+'</div></div>';
+  }).join('');
 }
 
 function renderTabs(){
@@ -1376,37 +1358,22 @@ function renderTabs(){
   }
   // Keep the active week visible in the horizontal strip (it may be scrolled off).
   const activeTab=c.querySelector('.wtab.active');
-  if(activeTab) try{ activeTab.scrollIntoView({inline:'center',block:'nearest'}); }catch(e){}
-  const add=document.createElement('button');
-  add.className='wtab-action';
-  add.textContent='+ Add';
-  add.onclick=addWeek;
-  c.appendChild(add);
+  if(activeTab) requestAnimationFrame(()=>{
+    try{
+      if(currentWeek===0) c.scrollLeft=0;
+      else activeTab.scrollIntoView({inline:'center',block:'nearest'});
+    }catch(e){}
+  });
   const wr=document.getElementById('week-range');
   if(wr) wr.textContent='Week '+(currentWeek+1)+'  ·  '+weekRangeLabel(currentWeek)+' '+weekDayDate(currentWeek,6).getFullYear();
   populateRangeDropdowns();
-  if(totalWeeks>1){
-    const rem=document.createElement('button');
-    rem.className='wtab-action danger';
-    rem.textContent='− Remove';
-    rem.onclick=removeWeek;
-    c.appendChild(rem);
-  }
 }
 
-function addWeek(){
-  appData.bw.push(Array(7).fill(''));
-  appData.steps.push(Array(7).fill(''));
-  appData.sleep.push(Array(7).fill(''));
-  appData.weeklyCheckin.push(freshCheckin());
-  totalWeeks++; currentWeek=totalWeeks-1;
-  save(); renderTabs(); render();
-}
-function removeWeek(){
-  if(totalWeeks<=1) return;
-  appData.bw.pop(); appData.steps.pop(); appData.sleep.pop(); appData.weeklyCheckin.pop();
-  totalWeeks--;
-  if(currentWeek>=totalWeeks) currentWeek=totalWeeks-1;
+function changeProgramDuration(){
+  const el=document.getElementById('programDuration');
+  appData.programDuration=el&&el.value?el.value:(appData.programDuration||'8');
+  if(typeof DevFitProgress!=='undefined') appData=DevFitProgress.ensureTimeline(appData,parseInt(appData.programDuration,10)||8);
+  totalWeeks=appData.bw.length;
   save(); renderTabs(); render();
 }
 
@@ -1470,10 +1437,19 @@ function buildGrid(id,key,dotFn){
     const val=row[i]===undefined?'':row[i];
     const dot=val!==''?dotFn(parseFloat(val)):'';
     const dt=weekDayDate(currentWeek,i);
-    el.innerHTML+=`<div class="day-card"><div class="day-lbl">${d}</div><div class="day-date">${dt.getDate()} ${mon(dt)}</div>
-      <input type="number" value="${val}" placeholder="—" step="0.1" inputmode="decimal"
-        onblur="setDay('${key}',${currentWeek},${i},this.value)">
-      <div class="day-dot ${dot}"></div></div>`;
+    let control='';
+    if(key==='steps'){
+      let opts='<option value="">—</option>';
+      for(let n=1000;n<=20000;n+=1000) opts+='<option value="'+n+'"'+(String(val)===String(n)?' selected':'')+'>'+n/1000+'k</option>';
+      control='<select aria-label="'+d+' steps" onchange="setDay(\'steps\','+currentWeek+','+i+',this.value)">'+opts+'</select>';
+    }else if(key==='sleep'){
+      let opts='<option value="">—</option>';
+      for(let n=1;n<=12;n+=0.5){const label=(n%1?n.toFixed(1):n.toFixed(0))+'h';opts+='<option value="'+n+'"'+(String(val)===String(n)?' selected':'')+'>'+label+'</option>';}
+      control='<select aria-label="'+d+' sleep" onchange="setDay(\'sleep\','+currentWeek+','+i+',this.value)">'+opts+'</select>';
+    }else{
+      control='<input aria-label="'+d+' bodyweight" type="number" value="'+val+'" placeholder="—" step="0.1" inputmode="decimal" onblur="setDay(\'bw\','+currentWeek+','+i+',this.value)">';
+    }
+    el.innerHTML+='<div class="day-card"><div class="day-lbl">'+d+'</div><div class="day-date">'+dt.getDate()+' '+mon(dt)+'</div>'+control+'<div class="day-dot '+dot+'"></div></div>';
   });
 }
 
@@ -1841,7 +1817,7 @@ function drawRingBig(id, score, color){
 }
 
 function renderScoreSection(){
-  const {overall,scores}=calcTrueScore(currentWeek);
+  const {overall,scores,coverage,confidence,signalCount}=calcTrueScore(currentWeek);
   document.getElementById('score-week-num').textContent=currentWeek+1;
   setTimeout(()=>drawRingBig('ring-overall',overall,null),50);
 
@@ -1849,7 +1825,7 @@ function renderScoreSection(){
   Object.values(scores).forEach(s=>{
     const pct=s.val!==null?s.val:0;
     const barColor=pct>=75?'#2f9e57':pct>=50?'#c6902f':'#cc0000';
-    const zone=s.val===null?'Not logged':pct>=75?'Great':pct>=50?'Okay':'Low';
+    const zone=s.val===null?(s.status||'Not logged'):pct>=75?'Great':pct>=50?'Okay':'Low';
     const display=s.val!==null?pct+'%':'—';
     html+='<div class="score-bar-row">'+
       '<div class="score-bar-label">'+s.label+' <span style="color:#aaa;font-size:10px;">'+s.weight+'%</span></div>'+
@@ -1858,6 +1834,7 @@ function renderScoreSection(){
       '</div>'+
       '<div style="font-size:10px;color:#999;margin:-4px 0 6px 0;padding-left:94px;">'+zone+'</div>';
   });
+  html+='<div style="margin-top:9px;padding:9px 11px;border-radius:9px;background:#17171a;border:1px solid #303036;font-size:10px;color:#aaa;display:flex;justify-content:space-between;gap:10px"><span>Data coverage · '+signalCount+'/7 signals</span><strong style="color:#fff">'+coverage+'% · '+confidence+'</strong></div>';
   document.getElementById('score-breakdown').innerHTML=html;
 }
 
@@ -1967,13 +1944,15 @@ function render(){
     else if(ci.bfDir==='rise_slight') fb+='Body fat slightly increasing — tighten diet and increase activity. ';
     else if(ci.bfDir==='rise_clear') fb+='Body fat clearly rising — diet needs immediate attention. ';
     if(stepsAvg!==null&&stepsAvg<5000) fb+='Steps are critically low — daily movement must improve. ';
-    if(sleepAvg!==null&&sleepAvg<6) fb+='Sleep is insufficient — this is slowing all progress by up to 20%. ';
+    if(sleepAvg!==null&&sleepAvg<6) fb+='Sleep is below the recommended range — prioritise recovery this week. ';
     if(ci.diet==='binge') fb+='Diet adherence broke down — biggest lever to fix this week. ';
     if(ci.stress==='high') fb+='High stress detected — managing this protects your progress. ';
     if(overall!==null){
       const scoreColor=overall>=75?'#2f9e57':overall>=50?'#c6902f':'#cc0000';
       const scoreMsg=overall>=75?'Strong week overall — keep this momentum!':overall>=50?'Decent week — small improvements across the board will unlock faster results.':'Tough week — focus on sleep, steps, and hitting the gym consistently.';
       fb+=`<br><span style="color:${scoreColor};font-weight:600">True Progress Score: ${overall}% — ${scoreMsg}</span>`;
+    } else {
+      fb+=`<br><span style="color:#aaa;font-weight:600">Score pending — log at least 3 signals covering 40% of the weekly score.</span>`;
     }
   }
   document.getElementById('feedback-box').innerHTML=fb;
@@ -1983,6 +1962,7 @@ function render(){
   renderExtraCards();
   renderTodayOverview();
   renderTrainingStatus();
+  renderProgramHistory();
   updateChart();
 }
 
@@ -1990,9 +1970,9 @@ function populateRangeDropdowns(){
   ['bw-chart-range','score-chart-range'].forEach(id=>{
     const sel=document.getElementById(id);
     if(!sel) return;
-    // Default to the current program week (not "All weeks"); keep the user's
-    // pick once they change it. First populate has no value → follow the program.
-    const cur=sel.value||String(currentWeek);
+    // Analytics opens on the full current-program trend. A specific week remains
+    // available for day-by-day inspection, but is never mistaken for history.
+    const cur=sel.value||'all';
     sel.innerHTML='<option value="all">All weeks</option>';
     for(let w=0;w<totalWeeks;w++){
       const opt=document.createElement('option');
@@ -2000,7 +1980,7 @@ function populateRangeDropdowns(){
       opt.textContent='Week '+(w+1);
       sel.appendChild(opt);
     }
-    sel.value = [...sel.options].some(o=>o.value===cur) ? cur : String(currentWeek);
+    sel.value = [...sel.options].some(o=>o.value===cur) ? cur : 'all';
   });
 }
 
@@ -2018,7 +1998,9 @@ function updateChart(){
     weeks.forEach(w=>{
       if(rangeVal==='all'){
         // All view: one point per week — use calcTrueScore for consistency
-        const bwA=avg(appData.bw[w]);
+        // Weekly trend uses the median, which is less distorted by one unusually
+        // high/low weigh-in than a simple mean.
+        const bwA=median(appData.bw[w]);
         labels.push('Week '+(w+1));
         bwData.push(bwA);
         const {overall}=calcTrueScore(w);
@@ -2038,7 +2020,7 @@ function updateChart(){
           const slv=appData.sleep[w][d]!==''?parseFloat(appData.sleep[w][d]):null;
           bwData.push(bv);
           let s=0,wt=0;
-          if(sv!==null){const v=stepsScore(sv);if(v!==null){s+=v*10;wt+=10;}}
+          if(sv!==null){const v=stepsScore(sv,appData.targetSteps);if(v!==null){s+=v*10;wt+=10;}}
           if(slv!==null){const v=sleepScore(slv);if(v!==null){s+=v*10;wt+=10;}}
           if(olS!==null){s+=olS*22;wt+=22;}
           if(dietS!==null){s+=dietS*23;wt+=23;}
@@ -2063,7 +2045,7 @@ function updateChart(){
     let msg='Keep logging to see your trend.';
     if(filled.length>=2){
       const diff=parseFloat((filled[filled.length-1]-filled[0]).toFixed(1));
-      const span=bwRange==='all'?totalWeeks+' weeks':7+' days';
+      const span=bwRange==='all'?filled.length+' logged week'+(filled.length===1?'':'s'):7+' days';
       if(gt==='loss') msg=diff<-0.2?'Down '+Math.abs(diff)+' kg over '+span+' — on track!':diff>0.2?'Up '+diff+' kg — review diet.':'Holding steady.';
       else if(gt==='gain') msg=diff>0.2?'Up '+diff+' kg — gaining well!':diff<-0.2?'Down '+Math.abs(diff)+' kg — eat more.':'Steady — push surplus.';
       else msg='Change: '+(diff>0?'+':'')+diff+' kg.';
@@ -2124,13 +2106,6 @@ function updateChart(){
   } else document.getElementById('progress-summary').textContent='Log steps, sleep, overload, diet, stress or body fat to see progress.';
 }
 
-function clearWeek(){
-  appData.bw[currentWeek]=Array(7).fill('');
-  appData.steps[currentWeek]=Array(7).fill('');
-  appData.sleep[currentWeek]=Array(7).fill('');
-  appData.weeklyCheckin[currentWeek]=freshCheckin();
-  save(); render();
-}
 function clearAll(){
   if(!confirm('Reset all weekly data? This cannot be undone.')) return;
   if(trendChart){trendChart.destroy();trendChart=null;}
@@ -2450,10 +2425,9 @@ function reminderTodayCell(){
 showCountdown();
 scheduleAccessCheck();
 // Cloud sync — runs after localStorage render so UI is never blocked
-// Program-setup fields that live at the top of appData (not inside the weeks, so
-// they have no _proHistory backup). A stale or partial cloud copy must NEVER blank
-// one that's already set locally — that's what wiped a user's start/target weight
-// on downgrade. We keep the local value, persist it, and heal the cloud copy.
+// Compatibility profile fields at the top of appData. Program identity and its
+// dated history are reconciled by progress-model.js; this guard only heals a
+// partial legacy document that omitted a still-valid profile value.
 var PROFILE_FIELDS = ['clientName','goal','goalType','startWeight','programDuration','targetSteps','targetSleep'];
 function mergeProfileFields(incoming, prev){
   var healed=false;
@@ -2475,8 +2449,8 @@ function runProgressSync(){
     try{ localStorage.setItem('progressLog2', JSON.stringify(appData)); }catch(e){}
     totalWeeks=appData.bw.length||4;
     currentWeek=Math.min(currentWeek,totalWeeks-1);
-    // Re-apply tier reconciliation — the cloud copy may hold multi-week (Pro) data
-    // or a preserved _proHistory, which must be restored/reduced here too.
+    // Re-apply the shared program model after every cloud replacement. Tier only
+    // changes visibility; it never reshapes or moves the saved weeks.
     reconcileTierWeeks();
     renderTabs();render();applyTierGates();
     // If we restored fields the cloud was missing, push the repaired copy back up

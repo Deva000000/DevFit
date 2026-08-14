@@ -19,6 +19,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:ital,wght@1,700;1,800&family=Lora:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600;1,700&family=Anton&family=Righteous&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="progress-model.js"></script><!-- versioned programs + safe backup merge -->
 <script src="scoring.js"></script><!-- shared scoring engine (app score === report score) -->
 <script src="report-engine.js"></script><!-- shared report analysis + narrative (also owns the week/date helpers) -->
 <script src="devfit-pdf.js"></script><!-- named PDF downloads (jsPDF's own save() loses the filename on iOS) -->
@@ -319,7 +320,7 @@ html.nosplash #devfit-splash{display:none!important}
 
       <div class="guide-item"><div class="gi-ic" style="background:rgba(59,130,246,0.16);color:#60a5fa">🍎</div><div class="gi-tx"><b>Nutrition — targets, then a food diary</b>Start with the <b>macro calculator</b>: it works out your maintenance calories (Mifflin-St Jeor, or Katch-McArdle if you know your body fat) and multiplies by your activity level, then splits the result into protein, carbs and fat for your goal. Then log meals against those targets in the daily diary — search by name, or <b>scan a barcode</b> with your camera. The ring at the top shows how much of the day you have left.</div></div>
 
-      <div class="guide-item"><div class="gi-ic" style="background:rgba(198,144,47,0.16);color:#fbbf24">★</div><div class="gi-tx"><b>Score &amp; Analytics <span style="color:#fbbf24">(Pro)</span></b>Your weekly <b>True Progress Score</b> is one number out of 100, blending six signals — bodyweight direction, training overload, diet adherence, sleep, steps and stress — using standard coaching weights. It answers the question a scale can't: <i>is this plan working?</i> Charts plot your bodyweight and score over time, and you can export a weekly or full-program PDF report.</div></div>
+      <div class="guide-item"><div class="gi-ic" style="background:rgba(198,144,47,0.16);color:#fbbf24">★</div><div class="gi-tx"><b>Score &amp; Analytics <span style="color:#fbbf24">(Pro)</span></b>Your weekly <b>True Progress Score</b> blends seven logged signals — bodyweight direction, optional body-fat direction, training overload, diet adherence, sleep, steps and stress — using DevFit's clearly shown product weighting. The headline score appears only when at least three signals provide enough coverage. Charts plot your bodyweight and score over time, and you can export a weekly or full-program PDF report.</div></div>
 
       <div class="guide-item"><div class="gi-ic" style="background:rgba(168,85,247,0.16);color:#c4b5fd">⤬</div><div class="gi-tx"><b>Share cards</b>Turn a session into a clean branded image you can post. Tap <b>Share today's win</b> at the bottom of Log Session for a workout or cardio card, or share a weekly progress card from Progress. Light, dark and transparent themes. Set your @handle and card font under <b>Personal → Share Card</b> below.</div></div>
 
@@ -556,7 +557,7 @@ html.nosplash #devfit-splash{display:none!important}
 
   <div class="footer">
     DevFit · Dominance Through Discipline<br>
-    <a href="https://wa.me/60183679177">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.75.0
+    <a href="https://wa.me/60183679177">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.76.0
   </div>
 
 
@@ -712,6 +713,7 @@ let appData = {
     const s = localStorage.getItem('progressLog2');
     if(s){
       appData = JSON.parse(s);
+      if(window.DevFitProgress) appData=DevFitProgress.ensureDocument(appData);
       totalWeeks = appData.bw.length || 4;
     }
     // Use last week with data as currentWeek for sync/export
@@ -949,11 +951,13 @@ function resetAll(){
   if(!confirm('Reset ALL weekly data? This cannot be undone.')) return;
   if(!confirm('Are you sure? All bodyweight, steps, sleep, and check-in data will be erased.')) return;
   totalWeeks = 4; currentWeek = 0;
-  appData.bw = Array.from({length:totalWeeks},()=>Array(7).fill(''));
-  appData.steps = Array.from({length:totalWeeks},()=>Array(7).fill(''));
-  appData.sleep = Array.from({length:totalWeeks},()=>Array(7).fill(''));
-  appData.weeklyCheckin = Array.from({length:totalWeeks},freshCheckin);
+  appData={clientName:appData.clientName||'',goal:'',goalType:'loss',startWeight:'',programDuration:'4',programStart:'',
+    bw:Array.from({length:totalWeeks},()=>Array(7).fill('')),steps:Array.from({length:totalWeeks},()=>Array(7).fill('')),
+    sleep:Array.from({length:totalWeeks},()=>Array(7).fill('')),weeklyCheckin:Array.from({length:totalWeeks},freshCheckin)};
+  if(window.DevFitProgress) appData=DevFitProgress.ensureDocument(appData);
+  appData.resetAt=new Date().toISOString();
   try{localStorage.setItem('progressLog2', JSON.stringify(appData));}catch(e){}
+  try{if(window.DevFitDB&&DevFitDB.cloudSave)DevFitDB.cloudSave('progress',appData);}catch(e){}
   toast('All data reset');
 }
 
@@ -1056,13 +1060,9 @@ function reportName(){ return DevFitReport.reportName(); }
 // Two separate under-counts this replaces:
 //   1. Days/weeks came from appData.bw alone, so someone training 3× a week who
 //      doesn't weigh in daily read as "2 days tracked" next to 14 workouts.
-//   2. On Free, normalizeFreeTierWeeksView() collapses appData down to the ONE
-//      current week and parks every other week in appData._proHistory. A loop over
-//      the visible weeks could therefore only ever return "1 week logged" — which
-//      is exactly what a Pro→Free switch produced.
 // Usage is account history, not a paid feature: it must read the same on Free and
-// on Pro, for the same email. Both archives are scanned, each against its own
-// programStart anchor, so no week is missed and none is counted twice.
+// on Pro, for the same email. Every versioned program is scanned against its own
+// start anchor, so overlapping program dates never collide or disappear.
 function computeUsage(){
   const days=new Set(), weeks=new Set();
   const markWeek=k=>{ if(k) weeks.add(k); };
@@ -1095,8 +1095,9 @@ function computeUsage(){
     }
   }
   let acctStart=''; try{ acctStart=(JSON.parse(localStorage.getItem('devfit_user')||'{}').startDate)||''; }catch(e){}
-  scanGrid(appData, appData.programStart || acctStart);
-  scanGrid(appData._proHistory, appData._proHistory && appData._proHistory.programStart);
+  if(Array.isArray(appData.programs)&&appData.programs.length){
+    appData.programs.forEach(p=>scanGrid(p,p.start));
+  }else scanGrid(appData, appData.programStart || acctStart);
 
   // (b) Training sessions — a session you actually logged is a tracked day.
   let workouts=0;

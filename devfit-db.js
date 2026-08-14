@@ -288,6 +288,20 @@
   // two devices edit different weeks or different days without confusing index 0
   // from programs with different start dates.
   function mergeProgress(win, los) {
+    // v2 programs carry immutable ids. Two programs may cover the same Monday,
+    // so calendar date alone is no longer an identity and must never re-anchor a
+    // new Week 1 onto an older program. The model also migrates both legacy docs
+    // before merging, preserving every old week as a recoverable program.
+    if (global.DevFitProgress && typeof global.DevFitProgress.mergeDocuments === 'function') {
+      return global.DevFitProgress.mergeDocuments(win, los);
+    }
+    // Fail closed if the model script was unavailable: preserving the preferred
+    // complete document is safer than combining distinct programs by date. A
+    // later healthy load will perform the full program-aware merge.
+    if ((win && win.progressSchema === 2) || (los && los.progressSchema === 2) ||
+        (win && los && win.programStart && los.programStart && win.programStart !== los.programStart)) {
+      return fillGaps(win, los);
+    }
     const out = fillGaps(win, los);
     const weeks = new Map();
     const collectTimeline = function (source) {

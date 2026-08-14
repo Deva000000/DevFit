@@ -54,10 +54,12 @@ test('DevFit sessions persist until logout and legacy expiring tokens upgrade sa
 
 test('workout merge keeps sessions recorded independently on two devices', () => {
   const code = fs.readFileSync(new URL('../devfit-db.js', import.meta.url), 'utf8');
+  const progressModel = fs.readFileSync(new URL('../progress-model.js', import.meta.url), 'utf8');
   const storage = new Map();
   const localStorage = { getItem: (k) => storage.has(k) ? storage.get(k) : null, setItem: (k, v) => storage.set(k, String(v)), removeItem: (k) => storage.delete(k) };
   const context = { localStorage, fetch: async () => ({ status: 501, ok: false }), console, setTimeout: () => 0, clearTimeout: () => {}, document: { readyState: 'complete', getElementById: () => null, querySelector: () => null, addEventListener: () => {} }, Map, Date, JSON, Object, Array, Number, String, Math };
   context.window = context;
+  vm.runInNewContext(progressModel, context);
   vm.runInNewContext(code, context);
   const a = { sessions: [{ date: '2026-08-01', workoutId: 'legs', logs: [{ name: 'Hamstring Curl', sets: [{ weight: 30, reps: 12 }] }] }] };
   const b = { sessions: [{ date: '2026-08-08', workoutId: 'legs', logs: [{ name: 'Hamstring Curl', sets: [{ weight: 35, reps: 10 }] }] }] };
@@ -70,6 +72,56 @@ test('workout merge keeps sessions recorded independently on two devices', () =>
   const progress = context.DevFitDB._merge('progress', progressA, progressB);
   assert.equal(progress.bw[0][0], 70);
   assert.equal(progress.bw[0][1], 69.8);
+});
+
+test('a new program cannot be re-anchored onto an older overlapping program', () => {
+  const code = fs.readFileSync(new URL('../progress-model.js', import.meta.url), 'utf8');
+  const context = { console, Date, JSON, Object, Array, Number, String, Math, Map, crypto: { randomUUID: () => 'new-program-id' } };
+  context.window=context;
+  vm.runInNewContext(code,context);
+  const oldDoc={programStart:'2026-06-29',programDuration:'12',goalType:'gain',bw:Array.from({length:7},()=>Array(7).fill('')),steps:Array.from({length:7},()=>Array(7).fill('')),sleep:Array.from({length:7},()=>Array(7).fill('')),weeklyCheckin:Array.from({length:7},()=>({}))};
+  oldDoc.bw[6][0]=70.6;
+  const local=context.DevFitProgress.ensureDocument(structuredClone(oldDoc));
+  const next=context.DevFitProgress.startProgram(local,{start:'2026-08-13',duration:12,startWeight:'70.7',goal:'75',goalType:'gain'});
+  next.bw[0][1]='70.5';
+  context.DevFitProgress.captureActive(next);
+  const merged=context.DevFitProgress.mergeDocuments(next,oldDoc);
+  assert.equal(merged.programStart,'2026-08-10');
+  assert.equal(merged.activeProgramId,'new-program-id');
+  assert.equal(merged.programs.length,2);
+  assert.equal(merged.bw[0][0],'70.7');
+  assert.equal(merged.bw[0][1],'70.5');
+  assert.equal(merged.programs.some(p=>p.start==='2026-06-29'&&p.bw[6][0]===70.6),true);
+});
+
+test('progress UI provisions weeks automatically and uses quick sleep and step selectors', () => {
+  const html=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
+  assert.match(html,/Weeks managed automatically/);
+  assert.match(html,/Start new program/);
+  assert.doesNotMatch(html,/function addWeek\(|function removeWeek\(|>\+ Add<|>− Remove</);
+  assert.match(html,/for\(let n=1000;n<=20000;n\+=1000\)/);
+  assert.match(html,/for\(let n=1;n<=12;n\+=0\.5\)/);
+});
+
+test('weekly score requires enough weight data and reports coverage', () => {
+  const code=fs.readFileSync(new URL('../scoring.js',import.meta.url),'utf8');
+  const context={console,Number,Object,Array,Math,appData:{goal:'65',goalType:'loss',targetSteps:'7000',bw:[[70,70.1,'','','','',''],[69.7,69.6,'','','','','']],steps:[[7000],[7000]],sleep:[[7],[7]],weeklyCheckin:[{},{}]},freshCheckin:()=>({})};
+  vm.runInNewContext(code,context);
+  const sparse=context.calcTrueScore(1);
+  assert.equal(sparse.scores.bw.val,null);
+  assert.equal(sparse.signalCount,2);
+  assert.equal(sparse.coverage,20);
+  assert.equal(sparse.overall,null);
+  context.appData.bw=[[70,70.1,69.9,'','','',''],[69.7,69.6,69.5,'','','','']];
+  const sufficient=context.calcTrueScore(1);
+  assert.notEqual(sufficient.scores.bw.val,null);
+  assert.equal(sufficient.signalCount,3);
+  assert.equal(sufficient.coverage,37);
+  assert.equal(sufficient.overall,null);
+  context.appData.weeklyCheckin[1].diet='met';
+  const covered=context.calcTrueScore(1);
+  assert.equal(covered.coverage,60);
+  assert.notEqual(covered.overall,null);
 });
 
 test('data API rejects a stale whole-document write with the current row', async () => {
@@ -159,7 +211,7 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
   assert.match(settings, /<div class="title">Install DevFit App<\/div>/);
   assert.match(settings, /if\(!deferredInstallPrompt\)\{\s*showIosHint\(\)/);
   assert.equal(manifest.display, 'standalone');
-  assert.match(worker, /devfit-v4\.75\.0/);
+  assert.match(worker, /devfit-v4\.76\.0/);
   assert.doesNotMatch(worker, /\.then\(\(\) => self\.skipWaiting\(\)\)/);
 
   for (const html of [index, settings]) {

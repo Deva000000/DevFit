@@ -244,6 +244,13 @@
   html[data-theme="light"] .usage-val{color:#14110e}
   html[data-theme="light"] .cloud-note{background:rgba(47,158,87,0.09);color:#2f6b45;border-color:rgba(47,158,87,0.28)}
   html[data-theme="light"] .cloud-note svg{stroke:#2f9e57}
+  .ig-platform{padding:14px;border:1px solid #2a2a2f;border-radius:12px;background:#101013;margin-bottom:14px}
+  .ig-platform-title{font-size:15px;font-weight:800;color:#fff;margin-bottom:5px}
+  .ig-platform-sub{font-size:12px;line-height:1.55;color:#8f949e;margin-bottom:10px}
+  .ig-steps{margin:0;padding-left:20px;color:#c8cbd1;font-size:13px;line-height:1.7}
+  .ig-steps li{padding-left:3px;margin-bottom:4px}.ig-steps strong{color:#fff}.ig-steps .red{color:#ef6464}
+  .ig-primary,.ig-secondary{display:block;width:100%;border-radius:10px;padding:11px 14px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:800;cursor:pointer;margin:10px 0 12px}
+  .ig-primary{background:#cc0000;color:#fff;border:1px solid #e11}.ig-secondary{background:#202026;color:#fff;border:1px solid #383840}
 </style>
 <style>
 html.nosplash #devfit-splash{display:none!important}
@@ -549,41 +556,45 @@ html.nosplash #devfit-splash{display:none!important}
 
   <div class="footer">
     DevFit · Dominance Through Discipline<br>
-    <a href="https://wa.me/60183679177">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.74.0
+    <a href="https://wa.me/60183679177">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.75.0
   </div>
 
 
 </div>
 
 <!-- Install guide modal (outside .page so it covers the entire viewport cleanly) -->
-<div id="ios-hint-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;padding:1rem;overflow-y:auto">
+<div id="ios-hint-modal" role="dialog" aria-modal="true" aria-labelledby="ig-title" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;padding:1rem;overflow-y:auto">
   <div style="background:#151518;border:1px solid #2a2a2a;border-top:3px solid #cc0000;border-radius:16px;padding:22px 20px;max-width:400px;width:100%;max-height:88vh;overflow-y:auto">
-    <div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:4px;text-align:center">Install DevFit on your phone</div>
-    <div style="font-size:12px;color:#8a8f98;margin-bottom:14px;text-align:center">One-tap access, works offline, feels like a real app.</div>
+    <div id="ig-title" style="font-size:19px;font-weight:800;color:#fff;margin-bottom:4px;text-align:center">Install DevFit</div>
+    <div id="ig-subtitle" style="font-size:12px;color:#8a8f98;margin-bottom:14px;text-align:center">Choose your phone below and follow the exact steps.</div>
 
     <!-- Context note (filled in by JS for the user's actual browser) -->
     <div id="ig-note" style="display:none;font-size:12.5px;line-height:1.6;border-radius:10px;padding:11px 13px;margin-bottom:16px"></div>
 
-    <!-- ANDROID -->
-    <div style="font-size:14px;font-weight:800;color:#fff;margin:0 0 8px">🤖 Android (Chrome)</div>
-    <div style="font-size:13px;color:#c4c8ce;line-height:1.75;margin-bottom:18px">
-      1. Tap the <strong style="color:#fff">⋮</strong> menu (top-right of Chrome).<br>
-      2. Tap <strong style="color:#cc4444">"Add to Home screen"</strong> (or <strong style="color:#cc4444">"Install app"</strong>).<br>
-      3. Tap <strong style="color:#cc4444">Add</strong> / <strong style="color:#cc4444">Install</strong> to confirm.<br>
-      4. Open <strong style="color:#fff">DevFit</strong> from your home screen and sign in there.
-    </div>
+    <section id="ig-android" class="ig-platform">
+      <div class="ig-platform-title">Android · Google Chrome</div>
+      <div class="ig-platform-sub">Chrome can install DevFit directly as a full-screen app.</div>
+      <button id="ig-android-install" class="ig-primary" type="button" style="display:none">Install DevFit now</button>
+      <ol class="ig-steps">
+        <li>Open <strong>devfitportal.vercel.app</strong> in <strong>Chrome</strong>.</li>
+        <li>If the red install button appears above, tap it. Otherwise tap Chrome’s <strong>⋮ menu</strong>.</li>
+        <li>Choose <strong class="red">Install app</strong> or <strong class="red">Add to Home screen</strong>.</li>
+        <li>Tap <strong>Install</strong> to confirm, then open DevFit from your home screen.</li>
+      </ol>
+    </section>
 
-    <!-- IPHONE -->
-    <div style="font-size:14px;font-weight:800;color:#fff;margin:0 0 8px">🍎 iPhone / iPad</div>
-    <div style="font-size:12px;color:#e0b400;background:rgba(224,180,0,.09);border:1px solid rgba(224,180,0,.25);border-radius:9px;padding:9px 11px;line-height:1.55;margin-bottom:10px">
-      ⚠️ On iPhone this <strong>only works in Safari</strong> — Apple blocks it in Chrome, Firefox &amp; Edge. If you're in another browser, open <strong>devfitportal.vercel.app</strong> in <strong>Safari</strong> first.
-    </div>
-    <div style="font-size:13px;color:#c4c8ce;line-height:1.75;margin-bottom:20px">
-      1. In <strong style="color:#fff">Safari</strong>, tap the <strong style="color:#cc4444">Share</strong> button (the square with an up-arrow, at the bottom).<br>
-      2. Scroll down and tap <strong style="color:#cc4444">"Add to Home Screen"</strong>.<br>
-      3. Tap <strong style="color:#cc4444">Add</strong> (top-right).<br>
-      4. Open <strong style="color:#fff">DevFit</strong> from your home screen and sign in there.
-    </div>
+    <section id="ig-ios" class="ig-platform">
+      <div class="ig-platform-title">iPhone / iPad · Safari</div>
+      <div class="ig-platform-sub" style="color:#e4ba37">Apple allows home-screen installation only from Safari. Chrome, Firefox and Edge on iPhone cannot install it.</div>
+      <button id="ig-copy-link" class="ig-secondary" type="button" style="display:none">Copy DevFit link for Safari</button>
+      <ol class="ig-steps">
+        <li>Open <strong>devfitportal.vercel.app</strong> in <strong>Safari</strong>.</li>
+        <li>Tap Safari’s <strong class="red">Share</strong> icon—the square with the upward arrow.</li>
+        <li>Scroll down and choose <strong class="red">Add to Home Screen</strong>.</li>
+        <li>Keep the name <strong>DevFit</strong>, then tap <strong>Add</strong> in the top-right.</li>
+        <li>Open the DevFit icon from your home screen and sign in once.</li>
+      </ol>
+    </section>
 
     <button id="ios-hint-close" type="button" style="display:block;width:100%;background:#cc0000;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer">Got it</button>
   </div>
@@ -1662,6 +1673,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredInstallPrompt = e;
   document.getElementById('install-app-btn').style.display = 'flex';
+  const guideInstall=document.getElementById('ig-android-install');
+  if(guideInstall && document.getElementById('ios-hint-modal').style.display==='flex') guideInstall.style.display='block';
 });
 
 function installApp(){
@@ -1700,6 +1713,17 @@ window.addEventListener('appinstalled',()=>{
 // Open the install guide, tailoring the top note to the user's actual browser.
 function showIosHint(){
   const note = document.getElementById('ig-note');
+  const android = document.getElementById('ig-android');
+  const ios = document.getElementById('ig-ios');
+  const nativeBtn = document.getElementById('ig-android-install');
+  const copyBtn = document.getElementById('ig-copy-link');
+  const subtitle = document.getElementById('ig-subtitle');
+  const onIOS=isIOS(), onAndroid=isAndroidDevice();
+  if(android) android.style.display=onIOS?'none':'block';
+  if(ios) ios.style.display=onAndroid?'none':'block';
+  if(nativeBtn) nativeBtn.style.display=(onAndroid&&deferredInstallPrompt)?'block':'none';
+  if(copyBtn) copyBtn.style.display=isIOSNonSafari()?'block':'none';
+  if(subtitle) subtitle.textContent=onIOS?'Follow these Safari steps exactly.':onAndroid?'Use the install button or Chrome menu below.':'Android and iPhone installation instructions.';
   if(note){
     if(isStandalone()){
       note.style.display='block'; note.style.color='#22c55e';
@@ -1723,6 +1747,14 @@ function showIosHint(){
   }
   document.getElementById('ios-hint-modal').style.display = 'flex';
 }
+
+async function copyInstallLink(){
+  const url='https://devfitportal.vercel.app';
+  try{ await navigator.clipboard.writeText(url); toast('Link copied — paste it in Safari ✓'); }
+  catch(e){ prompt('Copy this link, then paste it in Safari:',url); }
+}
+
+function closeInstallGuide(){ document.getElementById('ios-hint-modal').style.display='none'; }
 
 // ---------- CHECK FOR UPDATES ----------
 async function checkForUpdates(){
@@ -1913,7 +1945,9 @@ const ACTION_MAP = {
   'check-updates-btn'         : () => checkForUpdates(),
   'reset-all-btn'             : () => resetAll(),
   'logout-btn'                : () => logout(),
-  'ios-hint-close'            : () => { document.getElementById('ios-hint-modal').style.display = 'none'; }
+  'ios-hint-close'            : () => closeInstallGuide(),
+  'ig-android-install'        : () => { closeInstallGuide(); installApp(); },
+  'ig-copy-link'              : () => copyInstallLink()
 };
 
 function runAction(id, ev){
@@ -1952,6 +1986,8 @@ document.addEventListener('click', (ev) => {
     runAction(target.id, ev);
   }
 }, true);
+document.addEventListener('keydown', (ev) => { if(ev.key==='Escape') closeInstallGuide(); });
+document.getElementById('ios-hint-modal').addEventListener('click', function(ev){ if(ev.target===this) closeInstallGuide(); });
 
 // ---------- SERVICE WORKER ----------
 if('serviceWorker' in navigator){

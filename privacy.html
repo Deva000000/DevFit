@@ -13,7 +13,7 @@
 </style>
 </head>
 <body><main class="wrap">
-<header><div class="brand">DEV<b>FIT</b></div><a class="back" href="landing.html">← Back to DevFit</a></header>
+<header><div class="brand">DEV<b>FIT</b></div><a class="back" href="landing.html" onclick="returnToPrevious(event)">← Back</a></header>
 <h1>Privacy Policy</h1><div class="date">Effective 14 August 2026</div>
 <div class="box">DevFit uses only the information needed to run your account, protect your records, and support the app. We do not sell personal data.</div>
 <h2>Information we process</h2>
@@ -33,4 +33,4 @@
 <h2>Changes and contact</h2>
 <p>Material policy changes will be posted on this page with a new effective date. For privacy, deletion, training-plan questions, or app-bug feedback, <a href="https://wa.me/60183679177">contact DevFit on WhatsApp</a>.</p>
 <footer>© DevFit 2026 · <a href="terms.html">Terms &amp; Refunds</a> · <a href="login.html">Login</a></footer>
-</main><script src="pwa-update.js"></script></body></html>
+</main><script>function returnToPrevious(e){e.preventDefault();try{if(document.referrer&&new URL(document.referrer).origin===location.origin){history.back();return;}}catch(_){}location.href='landing.html';}</script><script src="pwa-update.js"></script></body></html>

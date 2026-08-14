@@ -159,7 +159,7 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
   assert.match(settings, /<div class="title">Install DevFit App<\/div>/);
   assert.match(settings, /if\(!deferredInstallPrompt\)\{\s*showIosHint\(\)/);
   assert.equal(manifest.display, 'standalone');
-  assert.match(worker, /devfit-v4\.74\.0/);
+  assert.match(worker, /devfit-v4\.75\.0/);
   assert.doesNotMatch(worker, /\.then\(\(\) => self\.skipWaiting\(\)\)/);
 
   for (const html of [index, settings]) {
@@ -196,6 +196,27 @@ test('public pages contain legal links and no retired sync or trainer claims', (
 test('login has no obsolete browser Supabase or magic-link handler', () => {
   const html = fs.readFileSync(new URL('../login.html', import.meta.url), 'utf8');
   assert.doesNotMatch(html, /supabase\.min\.js|handleLegacyLink|SB_KEY|SB_URL/);
+  assert.doesNotMatch(html, /devfit_theme.*light|src="theme\.js"/);
+  assert.match(html, /removeAttribute\('data-theme'\)/);
+});
+
+test('legal pages return to the same-origin previous screen', () => {
+  for (const name of ['privacy.html','terms.html']) {
+    const html = fs.readFileSync(new URL('../'+name, import.meta.url), 'utf8');
+    assert.match(html, /document\.referrer/);
+    assert.match(html, /new URL\(document\.referrer\)\.origin===location\.origin/);
+    assert.match(html, /history\.back\(\)/);
+  }
+});
+
+test('settings install guide is device-focused and exposes real platform actions', () => {
+  const html = fs.readFileSync(new URL('../settings.html', import.meta.url), 'utf8');
+  assert.match(html, /id="ig-android-install"/);
+  assert.match(html, /id="ig-copy-link"/);
+  assert.match(html, /android\.style\.display=onIOS\?'none':'block'/);
+  assert.match(html, /ios\.style\.display=onAndroid\?'none':'block'/);
+  assert.match(html, /Add to Home Screen/);
+  assert.match(html, /navigator\.clipboard\.writeText\(url\)/);
 });
 
 test('verification records only the signed token email', () => {

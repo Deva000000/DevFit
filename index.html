@@ -321,7 +321,7 @@
   .renewal-btn{background:#cc0000;color:#fff;border:none;border-radius:20px;padding:8px 16px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block;}
 
   /* PWA INSTALL BAR + UPDATE BANNER + iOS HINT */
-  #pwa-install-bar{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:9999;background:#111;color:#fff;border:1.5px solid #cc0000;border-radius:30px;padding:10px 18px;display:none;align-items:center;gap:12px;box-shadow:0 6px 24px rgba(0,0,0,.35);font-family:'DM Sans',sans-serif;font-size:13px;max-width:90vw}
+  #pwa-install-bar{position:fixed;bottom:92px;left:50%;transform:translateX(-50%);z-index:9999;background:#111;color:#fff;border:1.5px solid #cc0000;border-radius:30px;padding:10px 18px;display:none;align-items:center;gap:12px;box-shadow:0 6px 24px rgba(0,0,0,.35);font-family:'DM Sans',sans-serif;font-size:13px;max-width:92vw;white-space:nowrap}
   #pwa-install-bar.show{display:flex}
   #pwa-install-bar button.btn-install{background:#cc0000;color:#fff;border:none;border-radius:20px;padding:6px 14px;font-weight:700;cursor:pointer;font-family:inherit;font-size:12px}
   #pwa-install-bar button.btn-x{background:transparent;border:none;color:#999;padding:0 6px;font-size:18px;line-height:1;cursor:pointer}
@@ -927,9 +927,9 @@ html.nosplash #devfit-splash{display:none!important}
 
 <!-- PWA INSTALL / UPDATE / iOS HINT -->
 <div id="pwa-install-bar">
-  <span>Install DevFit on your phone</span>
-  <button class="btn-install" onclick="pwaInstall()">Install</button>
-  <button class="btn-x" onclick="pwaDismiss()" aria-label="Dismiss">×</button>
+  <span>Install DevFit</span>
+  <button class="btn-install" onclick="pwaInstall()">Install App</button>
+  <button class="btn-x" onclick="pwaDismiss()" aria-label="Hide for now">×</button>
 </div>
 <div id="pwa-update-bar" onclick="pwaApplyUpdate()">New version available — tap to update</div>
 <div id="ios-hint">
@@ -2749,19 +2749,31 @@ document.addEventListener('visibilitychange',function(){
 <script>
 (function(){
   let dp=null;
+  let dismissedForThisPage=false;
+  const installBar=()=>document.getElementById('pwa-install-bar');
+  function showInstallBar(){
+    if(isStandalone||dismissedForThisPage) return;
+    const b=installBar(); if(b) b.classList.add('show');
+  }
   window.addEventListener('beforeinstallprompt',(e)=>{
     e.preventDefault(); dp=e;
-    if(localStorage.getItem('pwa-install-dismissed')==='1') return;
-    const b=document.getElementById('pwa-install-bar'); if(b) b.classList.add('show');
+    showInstallBar();
   });
   window.pwaInstall=async function(){
-    if(!dp) return;
-    dp.prompt(); await dp.userChoice; dp=null;
-    const b=document.getElementById('pwa-install-bar'); if(b) b.classList.remove('show');
+    if(dp){
+      dp.prompt(); const choice=await dp.userChoice; dp=null;
+      if(choice&&choice.outcome==='accepted'){
+        const b=installBar(); if(b) b.classList.remove('show');
+        return;
+      }
+    }
+    // iPhone/iPad cannot launch a native prompt. The same button opens the
+    // Safari steps; Android falls back here if its prompt is not ready.
+    if(window.devfitShowInstallGuide) window.devfitShowInstallGuide(true);
   };
   window.pwaDismiss=function(){
-    localStorage.setItem('pwa-install-dismissed','1');
-    const b=document.getElementById('pwa-install-bar'); if(b) b.classList.remove('show');
+    dismissedForThisPage=true;
+    const b=installBar(); if(b) b.classList.remove('show');
   };
   const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
   // Chrome/Firefox/Edge on iPhone CANNOT add to the home screen — only Safari can.
@@ -2773,10 +2785,10 @@ document.addEventListener('visibilitychange',function(){
   // Runs once per browser after the user is logged in. Guides them to add DevFit
   // to the home screen and to log in inside the installed app — avoiding the
   // "installed the empty app, now I have to log in again" confusion.
-  function showInstallGuide(){
+  function showInstallGuide(force){
     if(isStandalone){ try{localStorage.setItem('devfit_install_banner_seen','1');}catch(e){} return; }
     let seen=false; try{ seen=localStorage.getItem('devfit_install_banner_seen')==='1'; }catch(e){}
-    if(seen) return;
+    if(seen&&!force) return;
     let loggedIn=false; try{ loggedIn=!!(JSON.parse(localStorage.getItem('devfit_user')||'{}').email); }catch(e){}
     if(!loggedIn) return;
     const guide=document.getElementById('devfit-install-guide');
@@ -2788,52 +2800,59 @@ document.addEventListener('visibilitychange',function(){
     if(isIOSNonSafari){
       steps.innerHTML='<li><strong>Important:</strong> on iPhone this only works in <strong>Safari</strong> — not this browser.</li>'+
         '<li>Open <strong>devfitportal.vercel.app</strong> in <strong>Safari</strong>.</li>'+
-        '<li>Tap <strong>Share</strong> → <strong>Add to Home Screen</strong> → <strong>Add</strong>, then log in there.</li>';
-      action.textContent='Got it';
+        '<li>Tap <strong>Copy DevFit Link</strong> below, paste it in Safari, then tap <strong>Share</strong> → <strong>Add to Home Screen</strong>.</li>';
+      action.textContent='Copy DevFit Link';
+      action.dataset.installAction='copy';
     } else if(isIOS){
       steps.innerHTML='<li>Tap the <strong>Share</strong> icon in Safari (square with an up-arrow).</li>'+
         '<li>Scroll and tap <strong>Add to Home Screen</strong>.</li>'+
         '<li>Tap <strong>Add</strong>, then open DevFit from your home screen and log in there.</li>';
       action.textContent='Got it';
+      action.dataset.installAction='guide';
     } else if(isAndroid){
       steps.innerHTML='<li>Tap <strong>Install</strong> below (or the ⋮ menu → <strong>Install app</strong>).</li>'+
         '<li>Confirm <strong>Add to Home screen</strong>.</li>'+
         '<li>Open DevFit from your home screen and log in there.</li>';
       action.textContent = dp ? 'Install' : 'Got it';
+      action.dataset.installAction=dp?'native':'guide';
     } else {
       steps.innerHTML='<li>Click the <strong>install icon</strong> in your browser’s address bar.</li>'+
         '<li>Confirm <strong>Install</strong>.</li>'+
         '<li>Open DevFit from your desktop and log in there.</li>';
       action.textContent = dp ? 'Install' : 'Got it';
+      action.dataset.installAction=dp?'native':'guide';
     }
 
     function close(){ try{localStorage.setItem('devfit_install_banner_seen','1');}catch(e){} guide.classList.remove('show'); }
     if(later && !later._b){ later._b=1; later.addEventListener('click', close); }
     if(!action._b){ action._b=1; action.addEventListener('click', async ()=>{
+      if(action.dataset.installAction==='copy'){
+        try{
+          await navigator.clipboard.writeText('https://devfitportal.vercel.app');
+          action.textContent='Link copied ✓';
+          setTimeout(close,900);
+          return;
+        }catch(e){
+          action.textContent='devfitportal.vercel.app';
+          return;
+        }
+      }
       if(dp){ try{ await window.pwaInstall(); }catch(e){} }
       close();
     }); }
-    setTimeout(()=>guide.classList.add('show'), 1400);
+    setTimeout(()=>guide.classList.add('show'), force ? 0 : 1400);
   }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', showInstallGuide);
-  else showInstallGuide();
+  window.devfitShowInstallGuide=showInstallGuide;
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', ()=>showInstallGuide(false));
+  else showInstallGuide(false);
 
-  // Legacy small iOS hint — only after the full guide has been seen, so first
-  // login shows one clear prompt, not two.
-  if(isIOS && !isStandalone && localStorage.getItem('devfit_install_banner_seen')==='1' && localStorage.getItem('ios-hint-dismissed')!=='1'){
-    const hint=document.getElementById('ios-hint');
-    if(hint){
-      if(isIOSNonSafari){
-        const t=document.getElementById('ios-hint-text');
-        if(t) t.innerHTML='Open <strong>devfitportal.vercel.app</strong> in <strong>Safari</strong> to install (iPhone can’t install from this browser).';
-      }
-      setTimeout(()=>hint.classList.add('show'),3000); hint.querySelector('.x').addEventListener('click',()=>localStorage.setItem('ios-hint-dismissed','1'));
-    }
-  }
+  // Keep one clear install button available on every browser visit. Dismissing
+  // hides it only for the current page; installed standalone mode never shows it.
+  setTimeout(showInstallBar,2600);
   window.addEventListener('appinstalled',()=>{
     localStorage.setItem('pwa-installed-at',new Date().toISOString());
     try{localStorage.setItem('devfit_install_banner_seen','1');}catch(e){}
-    const b=document.getElementById('pwa-install-bar'); if(b) b.classList.remove('show');
+    const b=installBar(); if(b) b.classList.remove('show');
     const g=document.getElementById('devfit-install-guide'); if(g) g.classList.remove('show');
   });
 })();

@@ -144,3 +144,26 @@ test('login uses ID credentials and has no redirect-based email or sales panel',
     if (match[1].trim()) new Function(match[1]);
   }
 });
+
+test('PWA install control supports Android prompt and honest iPhone fallback', () => {
+  const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const settings = fs.readFileSync(new URL('../settings.html', import.meta.url), 'utf8');
+  const manifest = JSON.parse(fs.readFileSync(new URL('../manifest.json', import.meta.url), 'utf8'));
+  const worker = fs.readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
+
+  assert.match(index, /beforeinstallprompt/);
+  assert.match(index, />Install App<\/button>/);
+  assert.match(index, /navigator\.clipboard\.writeText\('https:\/\/devfitportal\.vercel\.app'\)/);
+  assert.match(index, /Share<\/strong> → <strong>Add to Home Screen/);
+  assert.doesNotMatch(index, /localStorage\.setItem\('pwa-install-dismissed'/);
+  assert.match(settings, /<div class="title">Install DevFit App<\/div>/);
+  assert.match(settings, /if\(!deferredInstallPrompt\)\{\s*showIosHint\(\)/);
+  assert.equal(manifest.display, 'standalone');
+  assert.match(worker, /devfit-v4\.73\.0/);
+
+  for (const html of [index, settings]) {
+    for (const match of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)) {
+      if (match[1].trim()) new Function(match[1]);
+    }
+  }
+});

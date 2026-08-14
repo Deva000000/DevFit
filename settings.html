@@ -457,11 +457,11 @@ html.nosplash #devfit-splash{display:none!important}
   <div class="card" id="card-app">
     <div class="section-label">App</div>
 
-    <button class="setting-btn" id="install-app-btn" type="button" style="display:none">
+    <button class="setting-btn" id="install-app-btn" type="button">
       <div class="icon">↓</div>
       <div class="body">
-        <div class="title">Install DevFit</div>
-        <div class="desc">Add to your home screen for one-tap access</div>
+        <div class="title">Install DevFit App</div>
+        <div class="desc">Android install prompt or iPhone home-screen steps</div>
       </div>
       <div class="chev">›</div>
     </button>
@@ -1670,7 +1670,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 
 function installApp(){
   if(!deferredInstallPrompt){
-    toast('Install prompt not available — your browser may have already installed it');
+    showIosHint();
     return;
   }
   deferredInstallPrompt.prompt();
@@ -1697,6 +1697,10 @@ function isAndroidDevice(){ return /Android/i.test(navigator.userAgent); }
 function isStandalone(){
   return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 }
+if(isStandalone()) document.getElementById('install-app-btn').style.display='none';
+window.addEventListener('appinstalled',()=>{
+  const b=document.getElementById('install-app-btn'); if(b) b.style.display='none';
+});
 // Open the install guide, tailoring the top note to the user's actual browser.
 function showIosHint(){
   const note = document.getElementById('ig-note');

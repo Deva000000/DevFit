@@ -23,6 +23,7 @@
 <script src="scoring.js"></script><!-- shared scoring engine (app score === report score) -->
 <script src="report-engine.js"></script><!-- shared report analysis + narrative (also owns the week/date helpers) -->
 <script src="devfit-pdf.js"></script><!-- named PDF downloads (jsPDF's own save() loses the filename on iOS) -->
+<script src="report-pdf.js"></script><!-- adaptive premium PDF composition -->
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
@@ -562,7 +563,7 @@ html.nosplash #devfit-splash{display:none!important}
 
   <div class="footer">
     DevFit · Dominance Through Discipline<br>
-    <a href="https://wa.me/60183679177">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.77.0
+    <a href="https://wa.me/60183679177">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.78.0
   </div>
 
 
@@ -990,10 +991,18 @@ function buildExportCharts(A){
   const rows = A.rows;
   const dot = (id) => document.getElementById(id).getContext('2d');
   const kill = (k) => { if(window[k]) { window[k].destroy(); window[k]=null; } };
-  const baseOpts = (extra) => Object.assign({
-    responsive:false, animation:false, plugins:{legend:{display:false}},
-    scales:{ x:{ticks:{font:{size:8}, maxRotation:60, minRotation:0}}, y:{ticks:{font:{size:10}}} }
-  }, extra||{});
+  const axis={
+    border:{display:false}, grid:{color:'#eceef2',drawTicks:false},
+    ticks:{color:'#777982',padding:8,font:{family:'Arial',size:9},maxRotation:0,minRotation:0}
+  };
+  const xAxis=()=>Object.assign({},axis,{grid:{display:false},ticks:Object.assign({},axis.ticks,{maxTicksLimit:12})});
+  const yAxis=()=>Object.assign({},axis,{ticks:Object.assign({},axis.ticks,{maxTicksLimit:5})});
+  const baseOpts=(extra)=>({
+    responsive:false,animation:false,maintainAspectRatio:false,
+    layout:{padding:{left:5,right:9,top:8,bottom:2}},
+    plugins:{legend:{display:false},tooltip:{enabled:false}},
+    scales:{x:xAxis(),y:yAxis()},...(extra||{})
+  });
 
   // ── Bodyweight: every logged day, labelled by date ──
   const bwLabels=[], bwData=[];
@@ -1005,65 +1014,79 @@ function buildExportCharts(A){
   kill('_expBwChart');
   window._expBwChart = new Chart(dot('exp-bw'), {
     type:'line',
-    data:{ labels:bwLabels, datasets:[{ data:bwData, borderColor:'#cc0000', backgroundColor:'rgba(204,0,0,0.10)', tension:0.3, pointRadius:2.5, borderWidth:2, fill:true }] },
-    options: baseOpts({ scales:{ x:{ticks:{font:{size:7}, maxTicksLimit:14, maxRotation:60}}, y:{ticks:{font:{size:10}}} } })
+    data:{labels:bwLabels,datasets:[{
+      data:bwData,borderColor:'#d60000',backgroundColor:'rgba(214,0,0,0.07)',
+      tension:.34,pointRadius:bwData.length>18?0:2.4,pointHoverRadius:0,
+      pointBackgroundColor:'#fff',pointBorderColor:'#d60000',pointBorderWidth:1.5,
+      borderWidth:2.2,fill:true
+    }]},
+    options:baseOpts()
   });
 
   // ── Weekly score ──
-  const scLabels=rows.map(r=>'W'+r.n), scData=rows.map(r=>r.score==null?0:r.score);
+  const scLabels=rows.map(r=>'W'+r.n), scData=rows.map(r=>r.score==null?null:r.score);
   kill('_expScChart');
   window._expScChart = new Chart(dot('exp-score'), {
     type:'bar',
-    data:{ labels:scLabels, datasets:[{ data:scData, backgroundColor:scData.map(v=>v>=85?'#2d7a3a':v>=65?'#b8860b':v>=40?'#cc5500':'#cc0000'), borderRadius:5 }] },
-    options: baseOpts({ scales:{ x:{ticks:{font:{size:9}}}, y:{beginAtZero:true, max:100, ticks:{font:{size:10}}} } })
+    data:{labels:scLabels,datasets:[{data:scData,
+      backgroundColor:scData.map(v=>v==null?'#e8e9ed':v>=85?'#2d7a3a':v>=65?'#b8860b':v>=40?'#cc5500':'#cc0000'),
+      borderRadius:7,maxBarThickness:26}]},
+    options:baseOpts({scales:{x:xAxis(),y:Object.assign(yAxis(),{beginAtZero:true,max:100})}})
   });
 
   // ── Weekly training volume ──
   // The headline training trend: is the work going up over the block? Weekly,
   // not per session — session counts vary and that makes a per-session line
   // jump around for reasons that have nothing to do with progress.
-  const volData=A.training.perWeekTonnage;
+  const volData=A.training.perWeekTonnage.map((v,i)=>A.training.perWeek[i]>0?v:null);
   kill('_expVolChart');
   window._expVolChart = new Chart(dot('exp-vol'), {
     type:'bar',
     data:{ labels:rows.map(r=>'W'+r.n), datasets:[
-      { data:volData, backgroundColor:'#8c1c1c', borderRadius:5 },
-      { type:'line', data:A.training.perWeek.map(c=>c), borderColor:'#556070', borderWidth:2,
-        pointRadius:3, yAxisID:'y1', spanGaps:true }
+      {data:volData,backgroundColor:'#d60000',borderRadius:7,maxBarThickness:26},
+      {type:'line',data:A.training.perWeek.map(v=>v>0?v:null),borderColor:'#596274',borderWidth:2,
+        pointRadius:2.4,pointBackgroundColor:'#fff',pointBorderColor:'#596274',pointBorderWidth:1.4,
+        yAxisID:'y1',spanGaps:false}
     ]},
     options: baseOpts({ scales:{
-      x:{ticks:{font:{size:9}}},
-      y:{beginAtZero:true, position:'left', ticks:{font:{size:8}}},
-      y1:{beginAtZero:true, position:'right', grid:{drawOnChartArea:false}, ticks:{font:{size:8}, stepSize:1}}
+      x:xAxis(),
+      y:Object.assign(yAxis(),{beginAtZero:true,position:'left'}),
+      y1:Object.assign(yAxis(),{beginAtZero:true,position:'right',grid:{display:false},ticks:Object.assign({},axis.ticks,{stepSize:1})})
     }})
   });
 
   // ── Weekly average calories against target ──
   // Weekly, not daily: 56 daily bars is noise, 8 weekly bars is a trend.
   const tCal=Number(A.nutrition.target.cal)||null;
-  const calData=A.nutrition.perWeek.map(p=>p.cal==null?0:p.cal);
+  const calData=A.nutrition.perWeek.map(p=>p.cal==null?null:p.cal);
   kill('_expCalChart');
   window._expCalChart = new Chart(dot('exp-cal'), {
     type:'bar',
     data:{ labels:rows.map(r=>'W'+r.n), datasets:[
-      { data:calData, backgroundColor:calData.map(v=>!v?'#d5d5db':(tCal?(v>tCal*1.1?'#cc0000':(v<tCal*0.9?'#b8860b':'#2d7a3a')):'#556070')), borderRadius:5 },
-      { type:'line', data:tCal?calData.map(()=>tCal):[], borderColor:'#111', borderWidth:1.5, borderDash:[5,3], pointRadius:0, fill:false }
+      {data:calData,backgroundColor:calData.map(v=>v==null?'#e8e9ed':(tCal?(v>tCal*1.1?'#cc0000':v<tCal*.9?'#b8860b':'#2d7a3a'):'#596274')),borderRadius:7,maxBarThickness:26},
+      {type:'line',data:tCal?calData.map(()=>tCal):[],borderColor:'#111318',borderWidth:1.4,borderDash:[5,3],pointRadius:0,fill:false}
     ]},
-    options: baseOpts({ scales:{ x:{ticks:{font:{size:9}}}, y:{beginAtZero:true, ticks:{font:{size:9}}} } })
+    options:baseOpts({scales:{x:xAxis(),y:Object.assign(yAxis(),{beginAtZero:true})}})
   });
 
   // ── Sleep + steps, weekly averages, twin axis ──
+  // A one-week report uses seven daily positions. Longer reports use weekly
+  // averages. This prevents a single giant bar from looking like a broken chart.
+  const actLabels=A.meta.single?rows[0].days.map(d=>d.label):rows.map(r=>'W'+r.n);
+  const actSteps=A.meta.single?rows[0].days.map(d=>d.steps):rows.map(r=>r.stepsAvg==null?null:Math.round(r.stepsAvg));
+  const actSleep=A.meta.single?rows[0].days.map(d=>d.sleep):rows.map(r=>r.sleepAvg==null?null:r.sleepAvg);
   kill('_expActChart');
   window._expActChart = new Chart(dot('exp-act'), {
     type:'bar',
-    data:{ labels:rows.map(r=>'W'+r.n), datasets:[
-      { data:rows.map(r=>r.stepsAvg==null?0:Math.round(r.stepsAvg)), backgroundColor:'#556070', borderRadius:4, yAxisID:'y' },
-      { type:'line', data:rows.map(r=>r.sleepAvg==null?null:r.sleepAvg), borderColor:'#cc0000', borderWidth:2, pointRadius:3, yAxisID:'y1', spanGaps:true }
+    data:{labels:actLabels,datasets:[
+      {data:actSteps,backgroundColor:'#596274',borderRadius:6,maxBarThickness:25,yAxisID:'y'},
+      {type:'line',data:actSleep,borderColor:'#d60000',borderWidth:2.2,pointRadius:2.4,
+        pointBackgroundColor:'#fff',pointBorderColor:'#d60000',pointBorderWidth:1.4,yAxisID:'y1',spanGaps:false}
     ]},
     options: baseOpts({ scales:{
-      x:{ticks:{font:{size:9}}},
-      y:{beginAtZero:true, position:'left', ticks:{font:{size:8}}},
-      y1:{beginAtZero:true, suggestedMax:10, position:'right', grid:{drawOnChartArea:false}, ticks:{font:{size:8}}}
+      x:xAxis(),
+      y:Object.assign(yAxis(),{beginAtZero:true,position:'left'}),
+      y1:Object.assign(yAxis(),{beginAtZero:true,suggestedMax:10,position:'right',grid:{display:false}})
     }})
   });
 }
@@ -1181,7 +1204,7 @@ function makeReportDoc(A){
   function runningHead(){
     setFill(RED); pdf.rect(0,0,PW,7,'F');
     font('bold',7); setText([255,255,255]);
-    pdf.text('DEVFIT  ·  '+String(A.meta.name).toUpperCase(), M, 4.8);
+    pdf.text('DEVFIT  -  '+String(A.meta.name).toUpperCase(), M, 4.8);
     font('normal',7); setText([255,208,208]);
     pdf.text(String(S.section||'').toUpperCase(), PW-M, 4.8, {align:'right'});
   }
@@ -1327,9 +1350,9 @@ function makeReportDoc(A){
       cols.forEach((c,ci)=>{
         const cell=r[ci];
         const obj=(cell&&typeof cell==='object')?cell:{t:cell};
-        const txt=(obj.t==null||obj.t==='')?'—':String(obj.t);
+        const txt=(obj.t==null||obj.t==='')?'-':String(obj.t);
         font(obj.bold?'bold':'normal', o.size||7.6);
-        setText(obj.color || (txt==='—'?[176,176,182]:[52,52,58]));
+        setText(obj.color || (txt==='-'?[176,176,182]:[52,52,58]));
         const tx=c.align==='right' ? x+c.w-2 : x+2;
         pdf.text(txt, tx, S.y+rh*0.68, c.align==='right'?{align:'right'}:undefined);
         x+=c.w;
@@ -1383,9 +1406,9 @@ function makeReportDoc(A){
       pdf.setPage(p);
       setFill(RED); pdf.rect(0,PH-10,PW,10,'F');
       font('normal',7.5); setText([255,255,255]);
-      pdf.text('DevFit · Dominance Through Discipline · '+A.meta.title, M, PH-3.6);
+      pdf.text('DevFit - Dominance Through Discipline - '+A.meta.title, M, PH-3.6);
       setText([255,205,205]);
-      pdf.text('Page '+p+' of '+pages+'  ·  devfitportal.vercel.app', PW-M, PH-3.6, {align:'right'});
+      pdf.text('Page '+p+' of '+pages+'  -  devfitportal.vercel.app', PW-M, PH-3.6, {align:'right'});
     }
   }
 
@@ -1422,7 +1445,12 @@ function generateReport(range){
   // Chart.js paints on the next frame; give the canvases time to exist before
   // they are rasterised into the PDF.
   setTimeout(()=>{
-    try{ paintReport(A, N); }
+    try{
+      // Keep the proven legacy renderer as an emergency fallback if a partial
+      // offline cache ever misses the premium module during an update.
+      if(window.DevFitPremiumPDF) DevFitPremiumPDF.paint(A,N);
+      else paintReport(A,N);
+    }
     catch(e){ console.error(e); toast('Export failed', true); }
   }, 400);
 }

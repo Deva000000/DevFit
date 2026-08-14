@@ -211,7 +211,7 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
   assert.match(settings, /<div class="title">Install DevFit App<\/div>/);
   assert.match(settings, /if\(!deferredInstallPrompt\)\{\s*showIosHint\(\)/);
   assert.equal(manifest.display, 'standalone');
-  assert.match(worker, /devfit-v4\.77\.0/);
+  assert.match(worker, /devfit-v4\.78\.0/);
   assert.doesNotMatch(worker, /\.then\(\(\) => self\.skipWaiting\(\)\)/);
 
   for (const html of [index, settings]) {
@@ -292,6 +292,25 @@ test('verification records only the signed token email', () => {
   const recordedAt = source.indexOf('recordLogin(payload.email');
   assert.ok(verifiedAt >= 0 && recordedAt > verifiedAt);
   assert.doesNotMatch(source, /recordLogin\(body\.email/);
+});
+
+test('paid reports use the adaptive premium renderer and never plot missing values as zero', () => {
+  const settings = fs.readFileSync(new URL('../settings.html', import.meta.url), 'utf8');
+  const reportPdf = fs.readFileSync(new URL('../report-pdf.js', import.meta.url), 'utf8');
+  const worker = fs.readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
+
+  new Function(reportPdf);
+  assert.match(settings, /<script src="report-pdf\.js"><\/script>/);
+  assert.match(settings, /DevFitPremiumPDF\.paint\(A,N\)/);
+  assert.match(worker, /'\.\/report-pdf\.js'/);
+  assert.match(reportPdf, /if\(A\.weight\.daysLogged>=2\)/);
+  assert.match(reportPdf, /if\(A\.training\.sessions>0\)/);
+  assert.match(reportPdf, /if\(A\.nutrition\.daysLogged>0\)/);
+  assert.match(reportPdf, /if\(A\.score\.weeksScored>=2\)/);
+  assert.match(reportPdf, /A\.meta\.single/);
+  assert.doesNotMatch(settings, /r=>r\.score==null\?0:r\.score/);
+  assert.doesNotMatch(settings, /p=>p\.cal==null\?0:p\.cal/);
+  assert.doesNotMatch(settings, /r=>r\.stepsAvg==null\?0/);
 });
 
 test('all edited HTML inline scripts parse', () => {

@@ -1,4 +1,4 @@
-/* DevFit Service Worker — v4.76.0
+/* DevFit Service Worker — v4.77.0
    Strategy (atomic updates — no stale code can ever mix with fresh HTML):
    - HTML pages + app logic (.js/.css): NETWORK-FIRST with cache fallback, so every
      online load gets a consistent, up-to-date set. This is what prevents the
@@ -10,7 +10,7 @@
    - Apps Script / /api/*: network-only (never cached).
 */
 
-const VERSION = 'devfit-v4.76.0';
+const VERSION = 'devfit-v4.77.0';
 const APP_SHELL = 'devfit-shell-' + VERSION;
 const RUNTIME = 'devfit-runtime-' + VERSION;
 

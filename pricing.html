@@ -46,10 +46,15 @@
   .price{font-size:48px;font-weight:800;color:#fff;line-height:1}
   .price small{font-size:14px;color:#888;font-weight:600;margin-left:6px}
   .price-note{font-size:11px;color:#666;margin-top:4px;margin-bottom:22px}
-  .pro-card ul{list-style:none;margin-bottom:6px}
-  .pro-card li{font-size:13px;color:#ccc;padding:9px 0;border-bottom:1px solid #1f1f1f;display:flex;align-items:flex-start;gap:8px}
-  .pro-card li:last-child{border-bottom:none}
-  .pro-card li::before{content:"\2713";color:#cc0000;font-weight:800;flex-shrink:0}
+  .pro-feature-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px}
+  .pro-feature{background:#171717;border:1px solid #262626;border-radius:12px;padding:15px 14px;min-width:0}
+  .pro-feature .feature-kicker{font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#cc0000;margin-bottom:6px}
+  .pro-feature h4{font-size:14px;font-weight:800;color:#fff;line-height:1.25;margin-bottom:8px}
+  .pro-feature ul{list-style:none;margin:0}
+  .pro-feature li{position:relative;font-size:11.5px;color:#bdbdc2;line-height:1.45;padding:3px 0 3px 14px}
+  .pro-feature li::before{content:"\2713";position:absolute;left:0;top:3px;color:#cc0000;font-weight:800}
+  .pro-proof{margin-top:12px;padding:13px 14px;border-radius:10px;background:rgba(204,0,0,.08);border:1px solid rgba(204,0,0,.25);font-size:11px;color:#aaa;line-height:1.55}
+  .pro-proof b{display:block;color:#fff;font-size:12px;margin-bottom:2px}
 
   /* Payment section */
   .pay-section{background:#111;border:1px solid #2a2a2a;border-radius:16px;padding:28px 24px;margin-bottom:24px}
@@ -94,7 +99,7 @@
   .cmp-col li{font-size:12px;color:#c7c2bd;line-height:1.45;padding:4px 0 4px 15px;position:relative}
   .cmp-col li::before{content:"\2713";position:absolute;left:0;top:4px;color:#5a5a5a;font-weight:800;font-size:10px}
   .cmp-col.pro li::before{color:#cc0000}
-  @media(max-width:460px){ .cmp-cols{grid-template-columns:1fr} }
+  @media(max-width:460px){ .cmp-cols,.pro-feature-grid{grid-template-columns:1fr} }
 </style>
 <!-- Shared theme: early-apply (no flash) + override stylesheet + controller -->
 <script>try{if(localStorage.getItem('devfit_theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
@@ -127,17 +132,48 @@
     <div class="sub">No tiers. No upsells. Cancel anytime.</div>
     <div class="price"><span id="pc-amt">RM19.90</span><small>/month</small></div>
     <div class="price-note"><span id="pc-perday">≈ 66 sen a day</span> &middot; 30 days full access &middot; DuitNow QR</div>
-    <ul>
-      <li><b>Go back in time</b> — open any past session, week or month</li>
-      <li><b>See if it's working</b> — six-signal True Progress Score</li>
-      <li><b>Every lift charted</b> — progression, estimated 1RM &amp; personal records</li>
-      <li><b>Know when you've stalled</b> — plateau detection &amp; deload prompts</li>
-      <li><b>Your whole journey</b> — full timeline, trend smoothing &amp; goal projection</li>
-      <li><b>Nutrition that adapts</b> — barcode scanning, saved meals, calorie cycling</li>
-      <li><b>Proof you can hold</b> — weekly, monthly &amp; full-program PDF reports</li>
-      <li><b>Keep your history</b> — records remain linked to your account</li>
-      <li>Install as an app &middot; works offline</li>
-    </ul>
+    <div class="pro-feature-grid">
+      <section class="pro-feature">
+        <div class="feature-kicker">Progress intelligence</div>
+        <h4>Know whether the program is working</h4>
+        <ul>
+          <li>Complete week and program history</li>
+          <li>Seven-signal score with data coverage</li>
+          <li>Bodyweight and score trend charts</li>
+        </ul>
+      </section>
+      <section class="pro-feature">
+        <div class="feature-kicker">Training analytics</div>
+        <h4>Turn every session into evidence</h4>
+        <ul>
+          <li>Open and log previous training dates</li>
+          <li>Per-exercise progression and volume</li>
+          <li>Estimated 1RM, records and plateau alerts</li>
+        </ul>
+      </section>
+      <section class="pro-feature">
+        <div class="feature-kicker">Nutrition review</div>
+        <h4>See beyond a single week</h4>
+        <ul>
+          <li>30-day calorie trend</li>
+          <li>Nutrition PDF export</li>
+          <li>Premium share-card themes</li>
+        </ul>
+      </section>
+      <section class="pro-feature">
+        <div class="feature-kicker">Professional reports</div>
+        <h4>Keep a clear record of the work</h4>
+        <ul>
+          <li>Single-week progress reports</li>
+          <li>Recent 4-week and 8-week reports</li>
+          <li>Program-to-date, workout and nutrition PDFs</li>
+        </ul>
+      </section>
+    </div>
+    <div class="pro-proof">
+      <b>Pro unlocks analysis — it never holds your data hostage.</b>
+      Account-linked saving, personal backup files, PWA installation and offline access remain available on both plans.
+    </div>
   </div>
 
   <!-- Free vs Pro -->
@@ -163,14 +199,12 @@
           <div class="cmp-tier">Pro</div>
           <ul>
             <li>Full historical timeline</li>
-            <li>True Progress Score</li>
-            <li>Weight-trend smoothing</li>
-            <li>Weekly &amp; monthly comparisons</li>
-            <li>Goal-projection estimate</li>
-            <li>Body-measurement trends</li>
-            <li>Custom date ranges</li>
-            <li>Adherence analysis</li>
-            <li>Plateau detection</li>
+            <li>Program and week history</li>
+            <li>Seven-signal True Progress Score</li>
+            <li>Visible data-coverage rating</li>
+            <li>Bodyweight and score trend charts</li>
+            <li>Weekly check-in analysis</li>
+            <li>Progress PDF reports</li>
           </ul>
         </div>
       </div>
@@ -192,15 +226,7 @@
         <div class="cmp-col pro">
           <div class="cmp-tier">Pro</div>
           <ul>
-            <li>30-day &amp; full-history trends</li>
-            <li>Macro adherence trends</li>
-            <li>Meal copying &amp; full-day copying</li>
-            <li>Saved meals &amp; recipes</li>
-            <li>Barcode scanning</li>
-            <li>Advanced food database</li>
-            <li>Weekly calorie averaging</li>
-            <li>Adjustable calorie cycling</li>
-            <li>Training-day / rest-day targets</li>
+            <li>30-day calorie trend</li>
             <li>Nutrition PDF reports</li>
           </ul>
         </div>
@@ -227,11 +253,8 @@
             <li>Full session history</li>
             <li>Estimated 1RM</li>
             <li>Personal records</li>
-            <li>Volume &amp; intensity trends</li>
+            <li>Training-volume trends</li>
             <li>Plateau detection</li>
-            <li>Deload recommendations</li>
-            <li>Exercise notes &amp; substitutions</li>
-            <li>Multiple programs</li>
             <li>Workout PDF export</li>
           </ul>
         </div>
@@ -244,19 +267,21 @@
         <div class="cmp-col">
           <div class="cmp-tier">Free</div>
           <ul>
-            <li>White share card on every page</li>
+            <li>Account-linked saving</li>
+            <li>Personal backup file export</li>
+            <li>Installable PWA with offline access</li>
+            <li>White share-card theme</li>
             <li>No PDF report export</li>
-            <li>No monthly progress data</li>
+            <li>Current-week views only</li>
           </ul>
         </div>
         <div class="cmp-col pro">
           <div class="cmp-tier">Pro</div>
           <ul>
-            <li>Account-linked history</li>
-            <li>Personal backup file export</li>
-            <li>Complete PDF export</li>
+            <li>Full historical views</li>
+            <li>Progress, workout and nutrition PDFs</li>
             <li>Full progress analytics</li>
-            <li>Advanced share cards</li>
+            <li>Premium share-card themes</li>
           </ul>
         </div>
       </div>
@@ -296,7 +321,7 @@
 
   <!-- Info -->
   <div class="info-note">
-    <strong>Coached by Deva personally?</strong> Your access is included — no payment needed. Just login with your Gmail and you're activated.
+    <strong>Trained by DevFit?</strong> If Pro access is included with your training plan, no payment is required. Sign in with the Gmail registered for your plan.
   </div>
 
   <div class="footer">

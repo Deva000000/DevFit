@@ -88,9 +88,13 @@
   .setting-btn.danger:hover{border-color:#cc0000}
 
   /* RANGE PICKER ROW */
-  .range-row{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:6px;align-items:center}
-  .range-row select{font-family:'DM Sans',sans-serif;font-size:13px;padding:9px 14px;border:1px solid #3a3a3a;border-radius:20px;background:#1a1a1a;color:#fff;outline:none;cursor:pointer}
-  .range-row .pdf-btn{background:#cc0000;color:#fff;border:none;border-radius:20px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s;white-space:nowrap}
+  .range-row{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:10px;align-items:end}
+  .range-picker-label{display:block;font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#aaa;margin:0 0 6px 4px}
+  .range-row select{width:100%;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;padding:11px 14px;border:1px solid #3a3a3a;border-radius:11px;background:#1a1a1a;color:#fff;outline:none;cursor:pointer}
+  .range-row select:focus{border-color:#cc0000;box-shadow:0 0 0 3px rgba(204,0,0,.12)}
+  .range-summary{margin-top:8px;padding:10px 12px;border-radius:9px;background:#17171a;border:1px solid #303036;color:#999;font-size:11px;line-height:1.45}
+  .range-summary strong{display:block;color:#fff;font-size:12px;margin-bottom:2px}
+  .range-row .pdf-btn{background:#cc0000;color:#fff;border:none;border-radius:11px;padding:11px 20px;font-size:13px;font-weight:800;cursor:pointer;transition:background .15s;white-space:nowrap}
   .range-row .pdf-btn:hover{background:#aa0000}
 
   /* SUBSCRIPTION */
@@ -441,20 +445,21 @@ html.nosplash #devfit-splash{display:none!important}
       <div class="icon">P</div>
       <div class="body">
         <div class="title">Progress Report (PDF)</div>
-        <div class="desc">Pick any week, month or block — trends and your full log</div>
+        <div class="desc">Choose a period from your program — future weeks stay hidden</div>
       </div>
       <div class="chev">›</div>
     </button>
 
     <div id="range-row" class="range-row" style="display:none">
-      <select id="program-report-range">
-        <option value="0">All weeks</option>
-      </select>
-      <button class="pdf-btn" id="program-report-btn" type="button">Generate</button>
+      <div>
+        <label class="range-picker-label" for="program-report-range">Report period</label>
+        <select id="program-report-range"><option value="0">This week</option></select>
+        <div class="range-summary" id="report-range-summary" aria-live="polite"></div>
+      </div>
+      <button class="pdf-btn" id="program-report-btn" type="button">Create PDF</button>
     </div>
     <div style="font-size:11px;color:#888;margin-top:10px;line-height:1.55">
-      Trends for weight, training volume, calories, sleep and steps over the dates you pick, then your
-      full day-by-day log. Files are named for the report, e.g. <b>DevFit_Week1_to_Week5_Report.pdf</b>.
+      Every report includes progress trends, training, nutrition and the day-by-day logs recorded during the selected period.
     </div>
   </div>
 
@@ -557,7 +562,7 @@ html.nosplash #devfit-splash{display:none!important}
 
   <div class="footer">
     DevFit · Dominance Through Discipline<br>
-    <a href="https://wa.me/60183679177">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.76.0
+    <a href="https://wa.me/60183679177">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.77.0
   </div>
 
 
@@ -835,9 +840,29 @@ function fmtDate(d){ try{ const x=new Date(d); if(isNaN(x)) return '—'; return
 })();
 
 // ---------- REPORT RANGE PICKER ----------
-// Every option carries the exact week span it means AND the name the exported
-// file will take, so the PDF is never named after something the user did not pick.
-// (REPORT_RANGES itself is declared with totalWeeks — see the note there.)
+// Report choices follow elapsed program time, not planned duration. A 12-week
+// program in Week 1 must never offer future Week 12 as "latest" or "last".
+function reportableEndWeek(){
+  const start=programStartDate();
+  if(!start) return Math.max(0,Math.min(totalWeeks-1,currentWeek));
+  const now=mondayOf(new Date());
+  const elapsed=Math.max(0,Math.floor((now-start)/(7*86400000)));
+  return Math.max(0,Math.min(totalWeeks-1,elapsed));
+}
+
+function updateReportRangeSummary(){
+  const sel=document.getElementById('program-report-range');
+  const box=document.getElementById('report-range-summary');
+  if(!sel||!box) return;
+  const range=REPORT_RANGES[parseInt(sel.value,10)]||REPORT_RANGES[0];
+  if(!range){box.innerHTML='<strong>No reportable weeks yet</strong>Start logging to create a report.';return;}
+  const d1=weekDateStrings(range.startW), d2=weekDateStrings(range.endW);
+  const weeks=range.endW-range.startW+1;
+  const weekText=weeks===1?'Week '+(range.startW+1):'Weeks '+(range.startW+1)+'–'+(range.endW+1);
+  const dateText=d1&&d2?DevFitReport.fmtSpan(d1[0],d2[6]):'Program dates unavailable';
+  box.innerHTML='<strong>'+weekText+' · '+dateText+'</strong>'+weeks+' program week'+(weeks===1?'':'s')+' · '+(weeks*7)+' calendar days';
+}
+
 function buildRangeOptions(){
   const sel = document.getElementById('program-report-range');
   if(!sel) return;
@@ -847,48 +872,43 @@ function buildRangeOptions(){
     return '  ·  '+DevFitReport.fmtSpan(d1[0],d2[6]);
   };
   REPORT_RANGES = [];
+  sel.innerHTML='';
+  const endW=reportableEndWeek();
+  currentWeek=Math.min(currentWeek,endW);
+  const add=(group,r)=>{
+    const i=REPORT_RANGES.push(r)-1;
+    const opt=document.createElement('option');
+    opt.value=String(i);
+    opt.textContent=r.label;
+    group.appendChild(opt);
+  };
 
-  // Whole program.
-  REPORT_RANGES.push({
-    label:'All weeks (1–'+totalWeeks+')', startW:0, endW:totalWeeks-1, kind:'range',
-    title:'Full Program Report',
-    fileBase: totalWeeks===1 ? 'Week1_Report' : ('Week1_to_Week'+totalWeeks+'_Report')
-  });
-
-  // Calendar months — the "monthly report" people actually ask for.
-  DevFitReport.monthPresets(totalWeeks).reverse().forEach(m=>{
-    REPORT_RANGES.push({
-      label:m.label+' (weeks '+(m.startW+1)+'–'+(m.endW+1)+')',
-      startW:m.startW, endW:m.endW, kind:'month', title:m.title, fileBase:m.fileBase
-    });
-  });
-
-  // Trailing blocks — last 4 weeks, last 8, and so on down to the single week.
-  [4,8,12].forEach(nWk=>{
-    if(nWk>=totalWeeks) return;
-    const s=totalWeeks-nWk;
-    REPORT_RANGES.push({
-      label:'Last '+nWk+' weeks ('+(s+1)+'–'+totalWeeks+')', startW:s, endW:totalWeeks-1, kind:'range',
-      title:'Week '+(s+1)+' to Week '+totalWeeks+' Report',
-      fileBase:'Week'+(s+1)+'_to_Week'+totalWeeks+'_Report'
-    });
-  });
-
-  // Every individual week, newest first.
-  for(let w=totalWeeks-1; w>=0; w--){
-    REPORT_RANGES.push({
-      label:'Week '+(w+1)+' only', startW:w, endW:w, kind:'week',
-      title:'Week '+(w+1)+' Report', fileBase:'Week_'+(w+1)+'_Report'
+  const overview=document.createElement('optgroup'); overview.label='Recommended'; sel.appendChild(overview);
+  if(endW===0){
+    add(overview,{label:'This week — Week 1',startW:0,endW:0,kind:'week',title:'Week 1 Report',fileBase:'Week_1_Report'});
+  }else{
+    add(overview,{label:'Program to date — Weeks 1–'+(endW+1),startW:0,endW,kind:'range',
+      title:'Program to Date Report',fileBase:'Week1_to_Week'+(endW+1)+'_Report'});
+    [4,8].forEach(nWk=>{
+      if(endW+1<=nWk) return; // equal span would duplicate "Program to date"
+      const startW=endW-nWk+1;
+      add(overview,{label:'Recent '+nWk+' weeks — Weeks '+(startW+1)+'–'+(endW+1),startW,endW,kind:'range',
+        title:'Recent '+nWk+' Weeks Report',fileBase:'Week'+(startW+1)+'_to_Week'+(endW+1)+'_Report'});
     });
   }
 
-  sel.innerHTML='';
-  REPORT_RANGES.forEach((r,i)=>{
-    const opt=document.createElement('option');
-    opt.value=String(i);
-    opt.textContent=r.label+spanLabel(r.startW,r.endW);
-    sel.appendChild(opt);
-  });
+  if(endW>0){
+    const individual=document.createElement('optgroup'); individual.label='Individual weeks'; sel.appendChild(individual);
+    for(let w=endW;w>=0;w--){
+      const prefix=w===endW?'This week — ':'';
+      add(individual,{label:prefix+'Week '+(w+1),startW:w,endW:w,kind:'week',
+        title:'Week '+(w+1)+' Report',fileBase:'Week_'+(w+1)+'_Report'});
+    }
+  }
+
+  sel.value='0';
+  sel.onchange=updateReportRangeSummary;
+  updateReportRangeSummary();
 
   // Name the one-tap button after the week it will actually export.
   const wt=document.getElementById('week-report-title');
@@ -896,7 +916,7 @@ function buildRangeOptions(){
   if(wt) wt.textContent='Week '+(currentWeek+1)+' Report (PDF)';
   if(wd){
     const span=spanLabel(currentWeek,currentWeek).replace(/^\s*·\s*/,'');
-    wd.textContent = span ? (span+' — trends and your day-by-day log') : 'Trends and your day-by-day log';
+    wd.textContent = span ? (span+' — your latest logged week') : 'Your latest logged week';
   }
 }
 

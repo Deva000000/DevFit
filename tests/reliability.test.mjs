@@ -211,7 +211,7 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
   assert.match(settings, /<div class="title">Install DevFit App<\/div>/);
   assert.match(settings, /if\(!deferredInstallPrompt\)\{\s*showIosHint\(\)/);
   assert.equal(manifest.display, 'standalone');
-  assert.match(worker, /devfit-v4\.76\.0/);
+  assert.match(worker, /devfit-v4\.77\.0/);
   assert.doesNotMatch(worker, /\.then\(\(\) => self\.skipWaiting\(\)\)/);
 
   for (const html of [index, settings]) {
@@ -231,6 +231,21 @@ test('backup restore is account-bound, merge-only and monitored', () => {
   assert.match(settings, /devfit_pre_import_backup::/);
   assert.doesNotMatch(settings, /Import anyway\? It replaces/);
   assert.match(errors, /window\.DevFitErrors/);
+});
+
+test('pricing is accurate and report periods never use future planned weeks', () => {
+  const pricing = fs.readFileSync(new URL('../pricing.html', import.meta.url), 'utf8');
+  const settings = fs.readFileSync(new URL('../settings.html', import.meta.url), 'utf8');
+  assert.match(pricing, /Trained by DevFit\?/);
+  assert.match(pricing, /Seven-signal score with data coverage/);
+  assert.match(pricing, /Pro unlocks analysis — it never holds your data hostage/);
+  assert.doesNotMatch(pricing, /Coached by Deva|six-signal|deload prompts|goal projection/i);
+  assert.match(settings, /function reportableEndWeek\(\)/);
+  assert.match(settings, /Program to date — Weeks 1–/);
+  assert.match(settings, /\[4,8\]\.forEach\(nWk/);
+  assert.match(settings, /label:'Recent '\+nWk\+' weeks — Weeks '/);
+  assert.match(settings, /future weeks stay hidden/i);
+  assert.doesNotMatch(settings, /label:'All weeks \(1–'\+totalWeeks|const s=totalWeeks-nWk/);
 });
 
 test('public pages contain legal links and no retired sync or trainer claims', () => {

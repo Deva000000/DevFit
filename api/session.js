@@ -57,13 +57,18 @@ export default async function handler(req, res) {
   // upgrade the trainer activates from admin.html. A row only becomes non-approved
   // when the trainer explicitly revokes/bans it — those stay locked out.
   let sub = await getSubscriber(email);
+  if (typeof sub === 'undefined') {
+    res.status(503).json({ error: 'account_store_unavailable' });
+    return;
+  }
   if (!sub) {
     const created = await sbUpsert(
       'devfit_subscribers',
       { email, name: verifiedName || email.split('@')[0], tier: 'free', approved: true, updated_at: new Date().toISOString() },
       'email'
     );
-    sub = (Array.isArray(created) ? created[0] : created) || { email, tier: 'free', approved: true };
+    sub = (Array.isArray(created) ? created[0] : created) || null;
+    if (!sub) { res.status(503).json({ error: 'account_create_failed' }); return; }
   }
   if (!sub.approved) { res.status(200).json({ approved: false, status: 'pending' }); return; }
 

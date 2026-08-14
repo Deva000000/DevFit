@@ -13,7 +13,7 @@
 
 import crypto from 'crypto';
 import {
-  haveServerConfig, verifyToken, sbSelect, sbInsert, sbInsertReturning, sbPatch, readJsonBody
+  haveServerConfig, verifyToken, getSubscriber, sbSelect, sbInsert, sbInsertReturning, sbPatch, readJsonBody
 } from './_lib.js';
 
 const TYPES = ['progress', 'nutrition', 'workouts', 'prefs'];
@@ -65,6 +65,13 @@ export default async function handler(req, res) {
   const payload = verifyToken(body.token);
   if (!payload || !payload.email) { res.status(401).json({ error: 'invalid_token' }); return; }
   const email = String(payload.email).toLowerCase();
+
+  // Persistent sessions must stop working immediately when the trainer revokes
+  // an account. Check the authoritative subscriber row for data calls too, not
+  // only during page-load verification.
+  const subscriber = await getSubscriber(email);
+  if (typeof subscriber === 'undefined') { res.status(503).json({ error: 'account_store_unavailable' }); return; }
+  if (!subscriber || !subscriber.approved) { res.status(403).json({ error: 'revoked' }); return; }
 
   const op = String(body.op || '');
   try {

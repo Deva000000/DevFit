@@ -36,6 +36,22 @@ test('Google ID tokens require a valid signature, audience and lifetime', async 
   assert.equal(await identityFromGoogleIdToken(valid[0] + '.' + changedClaims + '.' + valid[2]), null);
 });
 
+test('DevFit sessions persist until logout and legacy expiring tokens upgrade safely', async () => {
+  process.env.DEVFIT_JWT_SECRET = 'persistent-session-test-secret';
+  const { signToken, verifyToken } = await import(new URL('../api/_lib.js?persistent-session-test', import.meta.url));
+  const persistent = signToken({ email: 'person@gmail.com', tier: 'free' });
+  const persistentPayload = verifyToken(persistent);
+  assert.equal(persistentPayload.email, 'person@gmail.com');
+  assert.equal(Object.hasOwn(persistentPayload, 'exp'), false);
+
+  // A correctly signed legacy session that crossed its former seven-day expiry
+  // remains acceptable once, allowing /api/verify to rotate it transparently.
+  const header = b64({ alg: 'HS256', typ: 'JWT' });
+  const oldPayload = b64({ email: 'person@gmail.com', exp: Math.floor(Date.now() / 1000) - 3600 });
+  const signature = crypto.createHmac('sha256', 'persistent-session-test-secret').update(header + '.' + oldPayload).digest().toString('base64url');
+  assert.equal(verifyToken(header + '.' + oldPayload + '.' + signature).email, 'person@gmail.com');
+});
+
 test('workout merge keeps sessions recorded independently on two devices', () => {
   const code = fs.readFileSync(new URL('../devfit-db.js', import.meta.url), 'utf8');
   const storage = new Map();
@@ -61,6 +77,7 @@ test('data API rejects a stale whole-document write with the current row', async
   process.env.SUPABASE_SERVICE_KEY = 'test-service-key';
   const current = { data_type: 'workouts', data: { sessions: [{ date: '2026-08-08' }] }, updated_at: '2026-08-14T01:00:00.000Z' };
   globalThis.fetch = async (url) => {
+    if (String(url).includes('/rest/v1/devfit_subscribers?')) return { ok: true, json: async () => [{ email: 'person@gmail.com', approved: true }] };
     if (String(url).includes('/rest/v1/devfit_data?')) return { ok: true, json: async () => [current] };
     throw new Error('A stale write must not reach a mutation');
   };
@@ -75,6 +92,47 @@ test('data API rejects a stale whole-document write with the current row', async
   assert.equal(status, 409);
   assert.equal(body.error, 'conflict');
   assert.deepEqual(body.row, current);
+});
+
+test('persistent session cannot access cloud data after account revocation', async () => {
+  process.env.DEVFIT_JWT_SECRET = 'test-secret';
+  process.env.SUPABASE_SERVICE_KEY = 'test-service-key';
+  globalThis.fetch = async (url) => {
+    if (String(url).includes('/rest/v1/devfit_subscribers?')) return { ok: true, json: async () => [{ email: 'person@gmail.com', approved: false }] };
+    throw new Error('Revoked sessions must not reach account data');
+  };
+  const { default: handler } = await import(new URL('../api/data.js?revocation-test', import.meta.url));
+  const header = b64({ alg: 'HS256', typ: 'JWT' });
+  const payload = b64({ email: 'person@gmail.com' });
+  const signature = crypto.createHmac('sha256', 'test-secret').update(header + '.' + payload).digest().toString('base64url');
+  const req = { method: 'POST', body: { token: header + '.' + payload + '.' + signature, op: 'get' } };
+  let status = 0, body;
+  const res = { setHeader() {}, status(value) { status = value; return this; }, json(value) { body = value; } };
+  await handler(req, res);
+  assert.equal(status, 403);
+  assert.equal(body.error, 'revoked');
+});
+
+test('temporary verification outage keeps the existing client session', async () => {
+  const code = fs.readFileSync(new URL('../devfit-auth.js', import.meta.url), 'utf8');
+  const storage = new Map([
+    ['devfit_user', JSON.stringify({ email: 'person@gmail.com', approved: true, tier: 'free' })],
+    ['devfit_token', 'signed-token']
+  ]);
+  const localStorage = { getItem: (k) => storage.has(k) ? storage.get(k) : null, setItem: (k, v) => storage.set(k, String(v)), removeItem: (k) => storage.delete(k) };
+  const context = {
+    localStorage,
+    fetch: async () => ({ status: 503, json: async () => ({ error: 'account_store_unavailable' }) }),
+    crypto: { randomUUID: () => 'device-test' }, self: { crypto: { randomUUID: () => 'device-test' } },
+    console, setTimeout: () => 0,
+    document: { body: null, documentElement: { appendChild() {} }, createElement: () => ({ style: {}, parentNode: null }) },
+    location: { href: '', reload() {} }, Date, JSON, Object, Array, Number, String, Math
+  };
+  context.window = context;
+  vm.runInNewContext(code, context);
+  assert.equal(await context.DevFitAuth.reverify(), 'skip');
+  assert.equal(JSON.parse(storage.get('devfit_user')).email, 'person@gmail.com');
+  assert.equal(storage.get('devfit_token'), 'signed-token');
 });
 
 test('login uses ID credentials and has no redirect-based email or sales panel', () => {

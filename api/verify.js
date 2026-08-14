@@ -1,8 +1,8 @@
 // DevFit — POST /api/verify
 // Called on every app page load. Validates the signed session token (signature
-// + expiry), then RE-READS the subscriber row so revocation and plan expiry are
-// live. Returns the authoritative tier and a freshly-signed token (sliding
-// window) so a long-active user stays logged in without re-authenticating.
+// + integrity), then RE-READS the subscriber row so revocation and plan expiry
+// are live. Returns the authoritative tier and a freshly-signed persistent token
+// so the user stays logged in until manual logout or account revocation.
 //
 // This is what defeats forged localStorage: a hand-made session has no valid
 // token, so verify returns approved:false and the client kicks it to login.
@@ -42,6 +42,10 @@ export default async function handler(req, res) {
   }
 
   const sub = await getSubscriber(payload.email);
+  if (typeof sub === 'undefined') {
+    res.status(503).json({ error: 'account_store_unavailable' });
+    return;
+  }
   if (!sub || !sub.approved) {
     res.status(200).json({ approved: false, reason: 'revoked' });
     return;

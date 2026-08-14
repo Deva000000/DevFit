@@ -32,9 +32,15 @@ function b64urlJson(obj) { return b64url(JSON.stringify(obj)); }
 function fromB64url(s) { return Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString(); }
 
 // ── Signed session token (JWT, HS256) ────────────────────────────────────────
-export function signToken(payload, ttlSeconds = 7 * 24 * 3600) {
+export function signToken(payload, ttlSeconds = null) {
   const now = Math.floor(Date.now() / 1000);
-  const body = { ...payload, iat: now, exp: now + ttlSeconds };
+  // DevFit sessions intentionally persist until the user logs out (or the
+  // trainer revokes the account). Google proves the email once at sign-in; this
+  // signed server token is then re-checked against the subscriber row on every
+  // online app load. A finite TTL can still be requested explicitly for tests or
+  // one-off server uses, but normal app sessions do not expire with time.
+  const body = { ...payload, iat: now };
+  if (Number.isFinite(ttlSeconds) && ttlSeconds > 0) body.exp = now + ttlSeconds;
   const head = b64urlJson({ alg: 'HS256', typ: 'JWT' });
   const p = head + '.' + b64urlJson(body);
   const sig = b64url(crypto.createHmac('sha256', JWT_SECRET).update(p).digest());
@@ -52,7 +58,9 @@ export function verifyToken(token) {
     const a = Buffer.from(s), b = Buffer.from(expected);
     if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
     const payload = JSON.parse(fromB64url(p));
-    if (payload.exp && Math.floor(Date.now() / 1000) > payload.exp) return null;
+    // Legacy DevFit tokens carried a seven-day exp. Accepting their valid
+    // signature lets /api/verify replace them with the new persistent token
+    // without forcing every existing client to sign in once more.
     return payload;
   } catch (e) { return null; }
 }
@@ -205,6 +213,9 @@ export async function identityFromGoogleIdToken(idToken) {
 // ── Subscriber lookup + tier computation ─────────────────────────────────────
 export async function getSubscriber(email) {
   const rows = await sbSelect('devfit_subscribers', 'email=eq.' + encodeURIComponent(email) + '&select=*');
+  // undefined = backend unavailable; null = lookup succeeded with no account.
+  // Callers must not confuse a temporary outage with a revoked account.
+  if (rows === null) return undefined;
   return (Array.isArray(rows) && rows[0]) ? rows[0] : null;
 }
 

@@ -215,7 +215,7 @@
     return data;
   }
 
-  // Re-verify the current session against the server. Updates the cached tier.
+  // Re-verify the persistent session against the server. Updates the cached tier.
   // Returns 'ok' | 'reload' | 'kick' | 'skip' (skip = offline/not-configured).
   async function reverify() {
     var u = getUser();
@@ -226,6 +226,9 @@
         body: JSON.stringify({ token: getToken(), email: u.email, deviceId: deviceId() })
       });
       if (res.status === 501) return 'skip'; // not configured yet → trust cache
+      // A temporary backend outage must never look like account revocation and
+      // log out a valid installed PWA. Keep the cached session and retry later.
+      if (res.status === 429 || res.status >= 500) return 'skip';
       var data = await res.json();
       if (data && data.approved) {
         var oldTier = (u.tier || '').toLowerCase();

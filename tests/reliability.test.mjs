@@ -288,6 +288,58 @@ test('data API rejects oversized account documents before any data mutation', as
   assert.equal(dataStoreTouched, false);
 });
 
+test('owner backup API only exposes fixed tables in bounded non-cacheable pages', async () => {
+  process.env.DEVFIT_JWT_SECRET = 'test-secret';
+  process.env.SUPABASE_SERVICE_KEY = 'test-service-key';
+  process.env.DEVFIT_ADMIN_PASSWORD = 'owner-test-password';
+  let selectedUrl = '';
+  globalThis.fetch = async (url) => {
+    selectedUrl = String(url);
+    return { ok: true, json: async () => [{ email: 'person@gmail.com', data_type: 'progress', data: { startWeight: 70 } }] };
+  };
+  const { default: handler } = await import(new URL('../api/admin.js?backup-page-test', import.meta.url));
+  const run = async (table) => {
+    let status = 0, body;
+    const headers = {};
+    const req = { method: 'POST', headers: {}, body: { password: 'owner-test-password', action: 'backupPage', table, offset: 0 } };
+    const res = { setHeader(name, value) { headers[name] = value; }, status(value) { status = value; return this; }, json(value) { body = value; } };
+    await handler(req, res);
+    return { status, body, headers };
+  };
+  const valid = await run('devfit_data');
+  assert.equal(valid.status, 200);
+  assert.equal(valid.body.rows.length, 1);
+  assert.match(valid.headers['Cache-Control'], /no-store/);
+  assert.match(selectedUrl, /\/rest\/v1\/devfit_data\?/);
+  assert.match(selectedUrl, /limit=50/);
+
+  selectedUrl = '';
+  const invalid = await run('private_secrets');
+  assert.equal(invalid.status, 400);
+  assert.equal(invalid.body.error, 'bad_backup_table');
+  assert.equal(selectedUrl, '');
+});
+
+test('owner backup encryption round-trips and detects tampering', async () => {
+  const html = fs.readFileSync(new URL('../admin.html', import.meta.url), 'utf8');
+  const helper = html.match(/var BACKUP_TABLES=[\s\S]*?(?=async function fetchBackupTable)/);
+  assert.ok(helper, 'backup crypto helper should remain independently testable');
+  const context = { crypto: crypto.webcrypto, TextEncoder, TextDecoder, Uint8Array, JSON, Object, Array, String, btoa, atob };
+  vm.runInNewContext(helper[0], context);
+  const tables = {};
+  Array.from(context.BACKUP_TABLES).forEach((table) => { tables[table] = []; });
+  tables.devfit_data.push({ email: 'person@gmail.com', data_type: 'progress', data: { startWeight: 70 } });
+  const payload = { format: 'devfit-owner-backup-payload', version: 1, createdAt: '2026-08-18T00:00:00.000Z', tables };
+  const encrypted = await context.encryptBackup(payload, 'correct horse battery staple');
+  assert.equal(encrypted.format, 'devfit-owner-backup');
+  assert.doesNotMatch(JSON.stringify(encrypted), /person@gmail\.com|startWeight/);
+  const restored = await context.decryptBackup(encrypted, 'correct horse battery staple');
+  assert.equal(restored.tables.devfit_data[0].data.startWeight, 70);
+  const tampered = structuredClone(encrypted);
+  tampered.cipher.data = tampered.cipher.data.slice(0, -2) + 'AA';
+  await assert.rejects(() => context.decryptBackup(tampered, 'correct horse battery staple'));
+});
+
 test('persistent session cannot access cloud data after account revocation', async () => {
   process.env.DEVFIT_JWT_SECRET = 'test-secret';
   process.env.SUPABASE_SERVICE_KEY = 'test-service-key';

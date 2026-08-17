@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="robots" content="noindex,nofollow">
-<title>DevFit — Trainer Admin</title>
+<title>DevFit — Owner Admin</title>
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#0a0a0b;color:#e8e8ea;min-height:100vh;padding:20px 14px 60px}
@@ -74,7 +74,7 @@
 <body>
 <div class="wrap">
   <div class="brand">DEV<b>FIT</b> Admin</div>
-  <div class="sub">Trainer activation panel</div>
+  <div class="sub">Owner operations panel</div>
 
   <!-- LOGIN -->
   <div class="card" id="login-card">
@@ -92,6 +92,7 @@
       <button id="tab-manage" class="on">Activate & Plans</button>
       <button id="tab-logins">Logins & Devices</button>
       <button id="tab-errors">Production Alerts</button>
+      <button id="tab-backups">Backups</button>
     </div>
 
     <!-- ===== MANAGE VIEW ===== -->
@@ -177,6 +178,31 @@
       </div>
     </div>
 
+    <!-- ===== OWNER BACKUPS VIEW ===== -->
+    <div id="view-backups" class="hide">
+      <div class="card">
+        <h2>Encrypted owner backup</h2>
+        <div class="hint" style="margin-top:0;margin-bottom:12px">Downloads subscribers, saved account records, recovery versions, device records and app configuration. The file is encrypted on this device before it is saved.</div>
+        <label>New backup password</label>
+        <input type="password" id="backup-pass" autocomplete="new-password" placeholder="At least 12 characters">
+        <label>Confirm backup password</label>
+        <input type="password" id="backup-pass-confirm" autocomplete="new-password" placeholder="Type it again">
+        <button class="btn" id="backup-download">Download encrypted backup</button>
+        <div class="msg" id="backup-msg"></div>
+        <div class="hint"><b>Important:</b> keep the file in a separate private location such as your protected Drive, and keep its password somewhere else. DevFit cannot recover a forgotten backup password.</div>
+      </div>
+      <div class="card">
+        <h2>Verify a backup file</h2>
+        <label>Encrypted DevFit backup</label>
+        <input type="file" id="backup-file" accept="application/json,.devfitbackup">
+        <label>Backup password</label>
+        <input type="password" id="backup-verify-pass" autocomplete="off" placeholder="Backup password">
+        <button class="btn ghost" id="backup-verify">Decrypt and verify</button>
+        <div class="msg" id="backup-verify-msg"></div>
+        <div class="hint">Verification happens locally in this browser. It confirms the file can be decrypted and reports the row counts; it does not alter the live database.</div>
+      </div>
+    </div>
+
     <button class="btn ghost" id="logout-btn">Lock panel</button>
   </div>
 </div>
@@ -231,6 +257,90 @@ async function call(action, extra){
   var res = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
   var data = await res.json().catch(function(){ return {}; });
   return { status: res.status, data: data };
+}
+
+/* ---------- encrypted owner backup ---------- */
+var BACKUP_TABLES=['devfit_subscribers','devfit_data','devfit_data_versions','devfit_logins','devfit_config'];
+var BACKUP_AAD='DevFit Owner Backup v1';
+function bytesToB64(bytes){
+  var out='', chunk=0x8000;
+  for(var i=0;i<bytes.length;i+=chunk) out+=String.fromCharCode.apply(null,bytes.subarray(i,i+chunk));
+  return btoa(out);
+}
+function b64ToBytes(s){
+  var raw=atob(String(s||'')), out=new Uint8Array(raw.length);
+  for(var i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i);
+  return out;
+}
+async function backupKey(password,salt){
+  var enc=new TextEncoder();
+  var material=await crypto.subtle.importKey('raw',enc.encode(password),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:600000,hash:'SHA-256'},material,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+async function encryptBackup(payload,password){
+  var enc=new TextEncoder(), salt=crypto.getRandomValues(new Uint8Array(16)), iv=crypto.getRandomValues(new Uint8Array(12));
+  var key=await backupKey(password,salt);
+  var ciphertext=await crypto.subtle.encrypt({name:'AES-GCM',iv:iv,additionalData:enc.encode(BACKUP_AAD)},key,enc.encode(JSON.stringify(payload)));
+  return {format:'devfit-owner-backup',version:1,createdAt:payload.createdAt,kdf:{name:'PBKDF2',hash:'SHA-256',iterations:600000,salt:bytesToB64(salt)},cipher:{name:'AES-GCM',iv:bytesToB64(iv),data:bytesToB64(new Uint8Array(ciphertext))}};
+}
+async function decryptBackup(envelope,password){
+  if(!envelope||envelope.format!=='devfit-owner-backup'||envelope.version!==1) throw new Error('Not a supported DevFit backup file.');
+  var enc=new TextEncoder(), key=await backupKey(password,b64ToBytes(envelope.kdf&&envelope.kdf.salt));
+  var plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64ToBytes(envelope.cipher&&envelope.cipher.iv),additionalData:enc.encode(BACKUP_AAD)},key,b64ToBytes(envelope.cipher&&envelope.cipher.data));
+  var payload=JSON.parse(new TextDecoder().decode(plain));
+  if(!payload||payload.format!=='devfit-owner-backup-payload'||payload.version!==1||!payload.tables) throw new Error('Backup contents are invalid.');
+  BACKUP_TABLES.forEach(function(t){ if(!Array.isArray(payload.tables[t])) throw new Error('Backup is missing '+t+'.'); });
+  return payload;
+}
+async function fetchBackupTable(table,onProgress){
+  var rows=[], offset=0, safety=0;
+  while(safety++<100000){
+    var r=await call('backupPage',{table:table,offset:offset});
+    if(r.status!==200) throw new Error('Could not back up '+table+': '+(r.data.error||r.status));
+    var page=Array.isArray(r.data.rows)?r.data.rows:[];
+    rows=rows.concat(page);
+    if(onProgress) onProgress(table,rows.length);
+    if(r.data.done) return rows;
+    if(!page.length||Number(r.data.nextOffset)<=offset) throw new Error('Backup paging stopped safely; no data was skipped.');
+    offset=Number(r.data.nextOffset);
+  }
+  throw new Error('Backup exceeded the safe page limit.');
+}
+async function downloadOwnerBackup(){
+  var pass=$('backup-pass').value||'', confirmPass=$('backup-pass-confirm').value||'', btn=$('backup-download');
+  if(pass.length<12){ msg($('backup-msg'),'Use at least 12 characters for the backup password.',false); return; }
+  if(pass!==confirmPass){ msg($('backup-msg'),'The two backup passwords do not match.',false); return; }
+  btn.disabled=true; btn.textContent='Preparing backup…';
+  try{
+    var tables={};
+    for(var i=0;i<BACKUP_TABLES.length;i++){
+      var table=BACKUP_TABLES[i];
+      tables[table]=await fetchBackupTable(table,function(t,n){ msg($('backup-msg'),'Reading '+t+' — '+n+' rows…',true); });
+    }
+    var createdAt=new Date().toISOString();
+    var counts={}; BACKUP_TABLES.forEach(function(t){counts[t]=tables[t].length;});
+    var payload={format:'devfit-owner-backup-payload',version:1,createdAt:createdAt,counts:counts,tables:tables};
+    btn.textContent='Encrypting…';
+    var envelope=await encryptBackup(payload,pass);
+    var blob=new Blob([JSON.stringify(envelope)],{type:'application/json'});
+    var link=document.createElement('a'); link.href=URL.createObjectURL(blob); link.download='DevFit-Owner-Backup-'+createdAt.slice(0,10)+'.devfitbackup';
+    document.body.appendChild(link); link.click(); link.remove(); setTimeout(function(){URL.revokeObjectURL(link.href);},1000);
+    $('backup-pass').value=''; $('backup-pass-confirm').value='';
+    msg($('backup-msg'),'Encrypted backup downloaded and ready to verify. '+Object.keys(counts).map(function(k){return k.replace('devfit_','')+': '+counts[k];}).join(' · '),true);
+  }catch(e){ msg($('backup-msg'),'Backup failed safely: '+(e.message||e)+'. No live data was changed.',false); }
+  finally{ btn.disabled=false; btn.textContent='Download encrypted backup'; }
+}
+async function verifyOwnerBackup(){
+  var file=$('backup-file').files&&$('backup-file').files[0], pass=$('backup-verify-pass').value||'', btn=$('backup-verify');
+  if(!file||!pass){ msg($('backup-verify-msg'),'Choose the backup file and enter its password.',false); return; }
+  btn.disabled=true; btn.textContent='Verifying…';
+  try{
+    var envelope=JSON.parse(await file.text());
+    var payload=await decryptBackup(envelope,pass);
+    var counts=payload.counts||{};
+    msg($('backup-verify-msg'),'Verified ✓ '+new Date(payload.createdAt).toLocaleString()+' · '+BACKUP_TABLES.map(function(t){return t.replace('devfit_','')+': '+(counts[t]||payload.tables[t].length);}).join(' · '),true);
+  }catch(e){ msg($('backup-verify-msg'),'Could not verify: wrong password, damaged file, or unsupported backup.',false); }
+  finally{ btn.disabled=false; btn.textContent='Decrypt and verify'; $('backup-verify-pass').value=''; }
 }
 
 /* ---------- duration helpers ---------- */
@@ -630,9 +740,9 @@ async function refreshErrors(){
 /* ---------- tabs ---------- */
 function showTab(which){
   var m=which==='manage';
-  var l=which==='logins', e=which==='errors';
-  $('tab-manage').classList.toggle('on',m); $('tab-logins').classList.toggle('on',l); $('tab-errors').classList.toggle('on',e);
-  $('view-manage').classList.toggle('hide',!m); $('view-logins').classList.toggle('hide',!l); $('view-errors').classList.toggle('hide',!e);
+  var l=which==='logins', e=which==='errors', b=which==='backups';
+  $('tab-manage').classList.toggle('on',m); $('tab-logins').classList.toggle('on',l); $('tab-errors').classList.toggle('on',e); $('tab-backups').classList.toggle('on',b);
+  $('view-manage').classList.toggle('hide',!m); $('view-logins').classList.toggle('hide',!l); $('view-errors').classList.toggle('hide',!e); $('view-backups').classList.toggle('hide',!b);
   if(l) refreshLogins();
   if(e) refreshErrors();
 }
@@ -708,9 +818,12 @@ $('logout-btn').addEventListener('click', function(){ pw=''; $('pw').value=''; $
 $('refresh').addEventListener('click', refreshList);
 $('refresh-logins').addEventListener('click', refreshLogins);
 $('refresh-errors').addEventListener('click', refreshErrors);
+$('backup-download').addEventListener('click', downloadOwnerBackup);
+$('backup-verify').addEventListener('click', verifyOwnerBackup);
 $('tab-manage').addEventListener('click', function(){ showTab('manage'); });
 $('tab-logins').addEventListener('click', function(){ showTab('logins'); });
 $('tab-errors').addEventListener('click', function(){ showTab('errors'); });
+$('tab-backups').addEventListener('click', function(){ showTab('backups'); });
 $('start').addEventListener('change', updateDuration);
 $('end').addEventListener('change', updateDuration);
 Array.prototype.forEach.call($('presets').children, function(b){

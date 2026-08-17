@@ -10,6 +10,7 @@
 //   action 'extend'   { email, days=30 }           → adds days to current expiry
 //   action 'deactivate' { email }                  → tier 'free' (data kept)
 //   action 'revoke'   { email }                    → approved:false (kicked out)
+//   action 'backupPage' { table, offset }          → bounded owner-backup page
 
 import crypto from 'crypto';
 import {
@@ -18,6 +19,15 @@ import {
 } from './_lib.js';
 
 const ADMIN_PW = process.env.DEVFIT_ADMIN_PASSWORD || '';
+const BACKUP_TABLES = {
+  devfit_subscribers: 'email.asc',
+  devfit_data: 'email.asc,data_type.asc',
+  devfit_data_versions: 'id.asc',
+  devfit_logins: 'email.asc,device_id.asc',
+  devfit_config: 'id.asc'
+};
+const BACKUP_PAGE_ROWS = 50;
+const BACKUP_PAGE_BYTES = 2500000;
 
 // Constant-time password check so response timing can't leak how many leading
 // characters matched. Length-mismatch still returns false without comparing.
@@ -34,6 +44,7 @@ function addDays(base, n) { const d = new Date(base); d.setDate(d.getDate() + n)
 
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
   if (req.method !== 'POST') { res.status(405).json({ error: 'method' }); return; }
   if (!haveServerConfig() || !ADMIN_PW) { res.status(501).json({ error: 'not_configured' }); return; }
 
@@ -69,6 +80,35 @@ export default async function handler(req, res) {
     if (action === 'errors') {
       const rows = await sbSelect('devfit_errors', 'select=*&order=at.desc&limit=100');
       res.status(200).json({ errors: rows || [] });
+      return;
+    }
+
+    // Password-gated, whitelisted and paged. The server never accepts an
+    // arbitrary table name, and the admin page encrypts every page into one
+    // off-site backup before it is downloaded.
+    if (action === 'backupPage') {
+      const table = String(body.table || '');
+      const order = BACKUP_TABLES[table];
+      if (!order) { res.status(400).json({ error: 'bad_backup_table' }); return; }
+      const offset = Math.max(0, Math.min(parseInt(body.offset || '0', 10) || 0, 10000000));
+      const rows = await sbSelect(table,
+        'select=*&order=' + encodeURIComponent(order) + '&offset=' + offset + '&limit=' + BACKUP_PAGE_ROWS);
+      if (!Array.isArray(rows)) { res.status(503).json({ error: 'backup_store_unavailable' }); return; }
+      const page = [];
+      let bytes = 2;
+      for (const row of rows) {
+        const rowBytes = Buffer.byteLength(JSON.stringify(row), 'utf8') + 1;
+        if (page.length && bytes + rowBytes > BACKUP_PAGE_BYTES) break;
+        page.push(row);
+        bytes += rowBytes;
+      }
+      const consumed = page.length;
+      res.status(200).json({
+        table,
+        rows: page,
+        nextOffset: offset + consumed,
+        done: consumed === rows.length && rows.length < BACKUP_PAGE_ROWS
+      });
       return;
     }
 

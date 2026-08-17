@@ -74,6 +74,42 @@ test('workout merge keeps sessions recorded independently on two devices', () =>
   assert.equal(progress.bw[0][1], 69.8);
 });
 
+test('account restore distinguishes saved data from an unavailable account check', async () => {
+  const code = fs.readFileSync(new URL('../devfit-db.js', import.meta.url), 'utf8');
+  const createContext = (fetchImpl) => {
+    const storage = new Map([['devfit_token', 'signed-session']]);
+    const localStorage = { getItem: (k) => storage.has(k) ? storage.get(k) : null, setItem: (k, v) => storage.set(k, String(v)), removeItem: (k) => storage.delete(k) };
+    const context = { localStorage, fetch: fetchImpl, console, setTimeout: () => 0, clearTimeout: () => {}, document: { addEventListener: () => {} }, Map, Date, JSON, Object, Array, Number, String, Math };
+    context.window = context;
+    vm.runInNewContext(code, context);
+    return { context, storage };
+  };
+
+  const saved = createContext(async () => ({
+    status: 200,
+    ok: true,
+    json: async () => ({ rows: [{ data_type: 'progress', updated_at: '2026-08-18T04:00:00.000Z', data: { startWeight: 70, bw: [[70, '', '', '', '', '', '']] } }] })
+  }));
+  const restored = await saved.context.DevFitDB.restoreAccount();
+  assert.equal(restored.ok, true);
+  assert.equal(restored.hasData, true);
+  assert.equal(JSON.parse(saved.storage.get('progressLog2')).startWeight, 70);
+
+  const unavailable = createContext(async () => ({ status: 503, ok: false, json: async () => ({}) }));
+  const failed = await unavailable.context.DevFitDB.restoreAccount();
+  assert.equal(failed.ok, false);
+  assert.equal(unavailable.storage.has('progressLog2'), false);
+});
+
+test('first-run UI never treats a timeout or account error as an empty account', () => {
+  const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /id="restore-overlay"/);
+  assert.match(html, /result && result\.ok && !result\.hasData && !done/);
+  assert.match(html, /result && result\.ok && !result\.hasData && done/);
+  assert.doesNotMatch(html, /setTimeout\([^\n]*showOnboardingOverlay/);
+  assert.doesNotMatch(html, /catch\([^\n]*showOnboardingOverlay/);
+});
+
 test('a new program cannot be re-anchored onto an older overlapping program', () => {
   const code = fs.readFileSync(new URL('../progress-model.js', import.meta.url), 'utf8');
   const context = { console, Date, JSON, Object, Array, Number, String, Math, Map, crypto: { randomUUID: () => 'new-program-id' } };

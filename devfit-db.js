@@ -522,6 +522,54 @@
     if (merged) await push(dataType, merged);
   }
 
+  // Read the account once and restore every durable document without writing
+  // anything back. This is intentionally separate from forceSyncAll(): first-run
+  // detection must be able to tell the difference between "the account is empty"
+  // and "the account could not be checked". Treating a timeout as an empty
+  // account is what made returning users see the setup wizard over saved data.
+  async function restoreAccount() {
+    if (!CLOUD_SYNC_ENABLED) return { ok: false, reason: 'Account storage is unavailable' };
+    if (!getToken()) return { ok: false, reason: 'Not signed in' };
+    setIndicator('syncing');
+    try {
+      const r = await apiCall('get');
+      if (!r || r.skip) {
+        setIndicator('offline');
+        return { ok: false, reason: 'Could not verify saved account data' };
+      }
+      const rows = r.rows || [];
+      let restored = 0;
+      Object.keys(LOCAL_KEY).forEach(function (dataType) {
+        const row = rows.filter(function (x) { return x.data_type === dataType; })[0];
+        if (!row || !row.data) return;
+        const before = JSON.stringify(readLocal(dataType) || null);
+        const cloudTs = new Date(row.updated_at).getTime();
+        const localTs = localTsFor(dataType);
+        const local = readLocal(dataType);
+        const cloudWins = cloudTs > localTs + 3000;
+        const merged = cloudWins
+          ? mergeDoc(dataType, row.data, local)
+          : mergeDoc(dataType, local, row.data);
+        cloudVersion[dataType] = row.updated_at || '';
+        writeLocal(dataType, merged);
+        localStorage.setItem('devfit_cloud_ts_' + dataType, String(cloudTs));
+        pulled[dataType] = true;
+        if (JSON.stringify(merged) !== before) restored++;
+        if (typeof notify[dataType] === 'function') {
+          try { notify[dataType](merged); } catch (e) {}
+        }
+      });
+      setIndicator('ok');
+      return { ok: true, hasData: rows.some(function (row) {
+        return Object.prototype.hasOwnProperty.call(LOCAL_KEY, row.data_type) && !!row.data;
+      }), restored: restored };
+    } catch (e) {
+      console.warn('[DevFit Cloud] account restore failed:', e.message || e);
+      setIndicator('err');
+      return { ok: false, reason: 'Could not reach saved account data' };
+    }
+  }
+
   // ── Restore-on-load sync (all types, timestamp-safe) ─────────────────────
   /**
    * Reconcile every data type with the cloud. Non-destructive by construction:
@@ -616,6 +664,7 @@
   global.DevFitDB = {
     cloudSave: cloudSave,
     cloudSync: cloudSync,
+    restoreAccount: restoreAccount,
     forceSyncAll: forceSyncAll,
     pushAllLocal: pushAllLocal,
     setIndicator: setIndicator,

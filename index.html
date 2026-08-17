@@ -336,6 +336,10 @@
   .onb-btn.primary:disabled{background:#5a0000;color:rgba(255,255,255,0.72);cursor:not-allowed;transform:none;box-shadow:none}
   .onb-btn.ghost{flex:0 0 auto;padding:14px 20px;background:transparent;border:1.5px solid #2c2c31;color:#aaa}
   .onb-btn.ghost:hover{border-color:#444;color:#fff}
+  .restore-spinner{width:42px;height:42px;border:3px solid #303036;border-top-color:#cc0000;border-radius:50%;margin:4px 0 22px;animation:restoreSpin .8s linear infinite}
+  @keyframes restoreSpin{to{transform:rotate(360deg)}}
+  .restore-status{min-height:42px;margin-bottom:4px}
+  #restore-retry{display:none;width:100%;margin-top:16px}
 
   /* RENEWAL PROMPT */
   .renewal-banner{background:#1a0000;border:1px solid #cc0000;border-radius:var(--radius-lg);padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
@@ -872,6 +876,21 @@ html.nosplash #devfit-splash{display:none!important}
     <div class="welcome-detail" id="welcome-detail">Your program is ready. Start logging daily to track your progress.</div>
     <div id="welcome-stats"></div>
     <button class="welcome-btn" onclick="dismissWelcome()">Let's Go!</button>
+  </div>
+</div>
+
+<!-- Account check shown only when a signed-in device has no local program yet. -->
+<div class="onb-overlay" id="restore-overlay" role="status" aria-live="polite" aria-label="Restoring your DevFit account">
+  <div class="onb-card">
+    <div class="onb-top">
+      <img class="onb-logo" src="icon-192.png" alt="" onerror="this.style.display='none'">
+      <div class="onb-brand"><span class="d">DEV</span><span class="f">FIT</span></div>
+    </div>
+    <div class="restore-spinner" aria-hidden="true"></div>
+    <div class="onb-eyebrow">Your account</div>
+    <div class="onb-h">Restoring your records</div>
+    <div class="onb-p restore-status" id="restore-status">Checking for your saved program and history. Keep DevFit open for a moment.</div>
+    <button class="onb-btn primary" id="restore-retry" type="button" onclick="startFirstRun(true)">Try again</button>
   </div>
 </div>
 
@@ -2343,35 +2362,72 @@ function localHasProgress(){
     return !!(d && (d.startWeight || (d.bw && d.bw[0] && d.bw[0].some(v=>v!==''&&v!=null))));
   }catch(e){ return false; }
 }
-function startFirstRun(){
+var restoreAttempt=0;
+function showRestoreState(message, retry){
+  const ov=document.getElementById('restore-overlay');
+  const status=document.getElementById('restore-status');
+  const btn=document.getElementById('restore-retry');
+  if(status && message) status.textContent=message;
+  if(btn) btn.style.display=retry?'block':'none';
+  if(ov) ov.classList.add('show');
+}
+function hideRestoreState(){
+  const ov=document.getElementById('restore-overlay');
+  if(ov) ov.classList.remove('show');
+}
+function applyRestoredProgress(){
+  try{
+    appData=JSON.parse(localStorage.getItem('progressLog2'));
+    totalWeeks=(appData.bw&&appData.bw.length)||4;
+    currentWeek=Math.min(currentWeek,totalWeeks-1);
+    reconcileTierWeeks();
+    onbMarkDone();
+    const onb=document.getElementById('onb-overlay'); if(onb) onb.classList.remove('show');
+    hideRestoreState();
+    renderTabs(); render(); applyTierGates();
+    showWelcomeScreen();
+  }catch(e){}
+}
+function startFirstRun(isRetry){
+  const attempt=++restoreAttempt;
   let email=''; try{ email=(JSON.parse(localStorage.getItem('devfit_user')||'{}').email)||''; }catch(e){}
   let done=false; try{ done=!!localStorage.getItem('devfit_onboarded_'+email); }catch(e){}
-  if(done){ showWelcomeScreen(); return; }
   // Existing users who already have data shouldn't be interrupted — mark done silently.
   const hasData = appData.startWeight || (appData.bw && appData.bw[0] && appData.bw[0].some(v=>v!==''&&v!=null));
-  if(hasData){ onbMarkDone(); showWelcomeScreen(); return; }
+  if(hasData){ onbMarkDone(); hideRestoreState(); showWelcomeScreen(); return Promise.resolve({ok:true}); }
 
   // No local data + not onboarded → this may be a RETURNING user on a new device
-  // or a fresh browser/tab. Pull the cloud FIRST; if their account already has
-  // data, restore it and skip onboarding entirely. Only genuinely-new accounts
-  // (cloud also empty) see the wizard. A timeout guards against a dead network.
-  if(typeof DevFitDB!=='undefined' && DevFitDB.forceSyncAll){
-    let decided=false;
-    const fallback=setTimeout(()=>{ if(!decided){ decided=true; showOnboardingOverlay(); } }, 4500);
-    DevFitDB.forceSyncAll().then(()=>{
-      if(decided) return;
-      decided=true; clearTimeout(fallback);
+  // or a fresh browser/tab. A slow/error response must NEVER mean "new user".
+  // The wizard is shown only after the signed-in account explicitly returns empty.
+  showRestoreState(isRetry?'Checking your saved account again…':'Checking for your saved program and history. Keep DevFit open for a moment.',false);
+  if(typeof DevFitDB!=='undefined' && DevFitDB.restoreAccount){
+    const slow=setTimeout(function(){
+      if(attempt===restoreAttempt) showRestoreState('Still checking your account. Your records have not been removed. Check your connection, then try again.',true);
+    },4500);
+    return DevFitDB.restoreAccount().then((result)=>{
+      if(attempt!==restoreAttempt) return result;
+      clearTimeout(slow);
       if(localHasProgress()){
-        try{ appData=JSON.parse(localStorage.getItem('progressLog2')); totalWeeks=(appData.bw&&appData.bw.length)||4; reconcileTierWeeks(); }catch(e){}
-        onbMarkDone();
-        try{ renderTabs(); render(); applyTierGates(); }catch(e){}
-        showWelcomeScreen();
-      } else {
+        applyRestoredProgress();
+      } else if(result && result.ok && !result.hasData && !done){
+        hideRestoreState();
         showOnboardingOverlay();
+      } else if(result && result.ok && !result.hasData && done){
+        showRestoreState('Your device remembers this account, but its saved program is not available yet. Nothing new will replace it. Please try again or contact DevFit.',true);
+      } else if(result && result.ok && result.hasData){
+        showRestoreState('Your account contains saved records, but the program could not be opened yet. Nothing has been deleted. Please try again.',true);
+      } else {
+        showRestoreState('DevFit could not reach your saved account. Your records are safe. Check your connection and try again.',true);
       }
-    }).catch(()=>{ if(!decided){ decided=true; clearTimeout(fallback); showOnboardingOverlay(); } });
+      return result;
+    }).catch(()=>{
+      clearTimeout(slow);
+      if(attempt===restoreAttempt) showRestoreState('DevFit could not reach your saved account. Your records are safe. Check your connection and try again.',true);
+      return {ok:false};
+    });
   } else {
-    showOnboardingOverlay();
+    showRestoreState('Account recovery is temporarily unavailable. Your records are safe. Please close and reopen DevFit, then try again.',true);
+    return Promise.resolve({ok:false});
   }
 }
 function showOnboardingOverlay(){
@@ -2480,6 +2536,9 @@ function runProgressSync(){
     // changes visibility; it never reshapes or moves the saved weeks.
     reconcileTierWeeks();
     renderTabs();render();applyTierGates();
+    // A separate background sync may complete before the first-run account check.
+    // If it restored a program, dismiss every recovery/setup surface immediately.
+    if(localHasProgress()) applyRestoredProgress();
     // If we restored fields the cloud was missing, push the repaired copy back up
     // so the cloud (and other devices) stop serving the blanked version.
     if(healed){ try{ if(DevFitDB.cloudSave) DevFitDB.cloudSave('progress',appData); }catch(e){} }
@@ -2488,9 +2547,9 @@ function runProgressSync(){
 // The account recovery layer (devfit-db.js) is loaded at the END of the body.
 // Wait for it before first-run onboarding + the initial reconciliation,
 // so a returning user's saved program is pulled from the cloud instead of the
-// onboarding wizard firing again on every fresh device or browser. Falls through
-// after ~5s if the script cannot load (offline), where startFirstRun's own guard
-// keeps the app usable.
+// onboarding wizard firing again on every fresh device or browser. If the recovery
+// script cannot load, a retry state is shown; an outage is never treated as proof
+// that the account is new.
 (function whenCloudReady(cb){
   function ready(){ return window.DevFitDB && window.DevFitDB.forceSyncAll; }
   if(ready()){ cb(); return; }

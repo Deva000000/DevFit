@@ -350,8 +350,78 @@ var DevFitReport = (function(){
       const pm=planMap[sess.workoutId];
       return (pm&&pm.ex[lg.exId])||'Exercise';
     }
+    function exercisePerformance(lg){
+      let volume=0, totalReps=0, bestE=null, topSet=null, minutes=0, distance=0;
+      (lg.sets||[]).forEach(st=>{
+        const reps=num(st.reps), wt=num(st.weight), mn=num(st.min), km=num(st.km);
+        if(reps!=null&&reps>0){
+          totalReps+=reps;
+          if(wt!=null&&wt>0){
+            volume+=reps*wt;
+            const est=e1rm(wt,reps);
+            if(est!=null&&(bestE==null||est>bestE)){ bestE=est; topSet={reps,weight:wt}; }
+          }
+        }
+        if(mn!=null&&mn>0) minutes+=mn;
+        if(km!=null&&km>0) distance+=km;
+      });
+      if(volume>0) return {kind:'load',value:bestE,volume,bestE1rm:bestE,topSet};
+      if(totalReps>0) return {kind:'reps',value:totalReps,reps:totalReps};
+      if(distance>0) return {kind:'distance',value:distance,distance,minutes};
+      if(minutes>0) return {kind:'time',value:minutes,minutes};
+      return null;
+    }
+    function signedPct(v){
+      if(v==null||!isFinite(v)) return null;
+      const n=Math.round(v); return (n>0?'+':'')+n+'%';
+    }
+    function comparePerformance(now,prev){
+      if(!prev) return {status:'new',changePct:null,remark:'First recorded baseline - compare it next time.'};
+      if(now.kind!==prev.kind) return {status:'new',changePct:null,remark:'Tracking method changed - a new baseline was set.'};
+      const p=(prev.value>0)?((now.value-prev.value)/prev.value*100):null;
+      let decisive=p;
+      let extra='';
+      if(now.kind==='load'){
+        const vp=(prev.volume>0)?((now.volume-prev.volume)/prev.volume*100):null;
+        if((decisive==null||Math.abs(decisive)<=1.5)&&vp!=null&&Math.abs(vp)>1.5) decisive=vp;
+        const nowSet=now.topSet?(now.topSet.weight+' kg x '+now.topSet.reps):'current top set';
+        const oldSet=prev.topSet?(prev.topSet.weight+' kg x '+prev.topSet.reps):'previous top set';
+        extra='Top set '+nowSet+' vs '+oldSet;
+        if(vp!=null) extra+='; volume '+signedPct(vp);
+      }else if(now.kind==='reps') extra=now.reps+' reps vs '+prev.reps;
+      else if(now.kind==='distance') extra=r1(now.distance)+' km vs '+r1(prev.distance)+' km';
+      else extra=Math.round(now.minutes)+' min vs '+Math.round(prev.minutes)+' min';
+      const status=decisive==null?'new':(decisive>1.5?'up':(decisive<-1.5?'down':'flat'));
+      const lead=status==='up'?'Improved '+signedPct(Math.abs(decisive)):
+                 status==='down'?'Down '+signedPct(-Math.abs(decisive)):
+                 status==='flat'?'Held steady':'New baseline';
+      return {status,changePct:decisive,remark:lead+'. '+extra+'.'};
+    }
     const inRange=new Set(); rows.forEach(r=>(r.dates||[]).forEach(d=>inRange.add(d)));
-    const sessions=(train.sessions||[]).filter(s=>inRange.has(s.date)).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    const allSessions=(train.sessions||[]).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    const sessions=allSessions.filter(s=>inRange.has(s.date));
+
+    // Exercise progress for a weekly report is measured against the immediately
+    // previous performance, even when that baseline sits in an earlier week.
+    // Loaded lifts use estimated strength first and total volume as the tie-break;
+    // reps-only and cardio stay in their own units so unlike data is never mixed.
+    const priorByExercise={}, progressByExercise={};
+    allSessions.forEach(s=>{
+      if(!s.date||!A.meta.endDate||s.date>A.meta.endDate) return;
+      (s.logs||[]).forEach(lg=>{
+        const perf=exercisePerformance(lg); if(!perf) return;
+        const name=exNameOf(s,lg), key=name.toLowerCase();
+        if(inRange.has(s.date)){
+          const cmp=comparePerformance(perf,priorByExercise[key]);
+          progressByExercise[key]={name,date:s.date,status:cmp.status,
+            changePct:cmp.changePct,remark:cmp.remark,kind:perf.kind};
+        }
+        priorByExercise[key]=perf;
+      });
+    });
+    const progressOrder={up:0,down:1,flat:2,new:3};
+    const exerciseProgress=Object.keys(progressByExercise).map(k=>progressByExercise[k])
+      .sort((a,b)=>(progressOrder[a.status]-progressOrder[b.status])||a.name.localeCompare(b.name));
 
     const liftHist={};                       // exercise name -> [{date,bestE1rm,topSet,volume}]
     let tonnageTotal=0, hardSets=0, cardioMin=0, cardioKm=0, cardioSessions=0;
@@ -444,6 +514,13 @@ var DevFitReport = (function(){
       tonnagePerSession: null,
       cardioMin:Math.round(cardioMin), cardioKm:r1(cardioKm), cardioSessions,
       lifts, topLifts:lifts.slice(0,6),
+      exerciseProgress,
+      progressCounts:{
+        up:exerciseProgress.filter(x=>x.status==='up').length,
+        down:exerciseProgress.filter(x=>x.status==='down').length,
+        flat:exerciseProgress.filter(x=>x.status==='flat').length,
+        new:exerciseProgress.filter(x=>x.status==='new').length
+      },
       gainers:lifts.filter(l=>l.deltaPct!=null&&l.deltaPct>=2).sort((a,b)=>b.deltaPct-a.deltaPct),
       stalled:lifts.filter(l=>l.deltaPct!=null&&l.deltaPct<1&&l.sessions>=2),
       blankWeeks:perWeekSess.map((c,i)=>c===0?rows[i].n:null).filter(x=>x!=null)
@@ -485,6 +562,31 @@ var DevFitReport = (function(){
       perWeek:perWeekNut,
       biggestDay:nDays.length?nDays.reduce((a,b)=>b.food.cal>a.food.cal?b:a):null,
       leanestDay:nDays.length?nDays.reduce((a,b)=>b.food.cal<a.food.cal?b:a):null
+    };
+    const hasTargets=[tCal,tP,tC,tF].some(x=>x!=null&&x>0);
+    A.nutrition.daily=allDays.map(d=>{
+      if(!d.food) return {date:d.date,label:d.label,status:'unlogged',remark:'No food logged.'};
+      if(!hasTargets) return {date:d.date,label:d.label,status:'logged',remark:'Logged - daily macro targets are not set.'};
+      const misses=[];
+      function band(label,value,target,tolerance,minimumOnly,unit){
+        if(target==null||target<=0) return;
+        const low=target*(1-tolerance), high=target*(1+tolerance);
+        if(value<low) misses.push(label+' '+Math.round(target-value)+(unit||'')+' short');
+        else if(!minimumOnly&&value>high) misses.push(label+' '+Math.round(value-target)+(unit||'')+' over');
+      }
+      band('Calories',d.food.cal,tCal,.10,false,' kcal');
+      band('Protein',d.food.p,tP,.10,true,' g');
+      band('Carbs',d.food.c,tC,.15,false,' g');
+      band('Fat',d.food.f,tF,.15,false,' g');
+      return {date:d.date,label:d.label,status:misses.length?'missed':'met',
+        remark:misses.length?misses.join('; '):'All configured targets met.'};
+    });
+    A.nutrition.adherence={
+      hasTargets,
+      met:A.nutrition.daily.filter(x=>x.status==='met').length,
+      missed:A.nutrition.daily.filter(x=>x.status==='missed').length,
+      unlogged:A.nutrition.daily.filter(x=>x.status==='unlogged').length,
+      loggedNoTargets:A.nutrition.daily.filter(x=>x.status==='logged').length
     };
     if(A.nutrition.avgCal!=null&&tCal!=null) A.nutrition.calDelta=A.nutrition.avgCal-tCal;
     if(A.nutrition.avgP!=null&&tP!=null) A.nutrition.pDelta=A.nutrition.avgP-tP;

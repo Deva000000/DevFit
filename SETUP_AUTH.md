@@ -16,13 +16,14 @@ on your existing Vercel project.
 |------|---------|
 | `api/_lib.js` | Shared: JWT sign/verify, Supabase service REST, rate limiter |
 | `api/session.js` | Login → verifies identity, returns a **signed** session token |
+| `api/google-login.js` | Secure Google redirect callback required by iPhone/iPad |
 | `api/verify.js` | Every page load → validates the token, returns live tier |
 | `api/admin.js` | Password-gated activation backend (rate-limited) |
 | `admin.html` | DevFit panel — activate/extend/revoke clients and view production alerts |
 | `devfit-auth.js` | Shared client gate used by all app pages |
 
 Wired into: `login.html`, `index.html`, `nutrition.html`, `workouts.html`,
-`settings.html`. Current service worker release is **v4.84.0**.
+`settings.html`. Current service worker release is **v4.85.0**.
 
 ---
 
@@ -146,8 +147,14 @@ The login page contains no email-link flow or browser Supabase client. Existing
 signed DevFit sessions remain valid until manual logout or account revocation.
 
 In Google Cloud Console, keep `https://devfitportal.vercel.app` in the OAuth web
-client's Authorized JavaScript origins. The server validates every Google ID
-token's signature, issuer, expiry and audience before creating a DevFit session.
+client's Authorized JavaScript origins and keep this exact Authorized redirect
+URI:
+
+- `https://devfitportal.vercel.app/api/google-login`
+
+iPhone and iPad use Google's required redirect mode; Android and desktop keep
+the popup flow. The redirect handler checks Google's double-submit CSRF token
+before the server validates the ID token and creates a DevFit session.
 
 ## Step 3 — Migrate your current clients
 

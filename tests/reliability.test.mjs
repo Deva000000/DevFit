@@ -225,10 +225,13 @@ test('temporary verification outage keeps the existing client session', async ()
   assert.equal(storage.get('devfit_token'), 'signed-token');
 });
 
-test('login uses ID credentials and has no redirect-based email or sales panel', () => {
+test('login uses Google ID credentials, with redirect mode only on iOS', () => {
   const html = fs.readFileSync(new URL('../login.html', import.meta.url), 'utf8');
   assert.match(html, /google\.accounts\.id\.initialize/);
   assert.match(html, /finishLogin\('google_id'/);
+  assert.match(html, /iPad\|iPhone\|iPod/);
+  assert.match(html, /config\.ux_mode='redirect'/);
+  assert.match(html, /config\.login_uri=location\.origin\+'\/api\/google-login'/);
   assert.doesNotMatch(html, /initTokenClient|emailRedirectTo|signInWithOtp|verifyOtp|Use an email code|Email me a sign-in link|contact-box|Want Pro/i);
   for (const match of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)) {
     if (match[1].trim()) new Function(match[1]);
@@ -249,7 +252,7 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
   assert.match(settings, /<div class="title">Install DevFit App<\/div>/);
   assert.match(settings, /if\(!deferredInstallPrompt\)\{\s*showIosHint\(\)/);
   assert.equal(manifest.display, 'standalone');
-  assert.match(worker, /devfit-v4\.84\.0/);
+  assert.match(worker, /devfit-v4\.85\.0/);
   assert.doesNotMatch(worker, /\.then\(\(\) => self\.skipWaiting\(\)\)/);
 
   for (const html of [index, settings]) {
@@ -257,6 +260,43 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
       if (match[1].trim()) new Function(match[1]);
     }
   }
+});
+
+test('iOS Google redirect handler enforces CSRF and never caches credentials', () => {
+  const source = fs.readFileSync(new URL('../api/google-login.js', import.meta.url), 'utf8');
+  assert.match(source, /req\.method !== 'POST'/);
+  assert.match(source, /readCookie\(req, 'g_csrf_token'\)/);
+  assert.match(source, /sameSecret\(cookieCsrf, bodyCsrf\)/);
+  assert.match(source, /timingSafeEqual/);
+  assert.match(source, /Cache-Control', 'no-store, no-cache, must-revalidate'/);
+  assert.match(source, /DevFitAuth\.startSession\('google_id'/);
+  assert.match(source, /location\.replace\('\/index\.html'\)/);
+  assert.doesNotMatch(source, /setHeader\('Location'[^\n]*credential/);
+});
+
+test('iOS Google redirect handler rejects forged posts and accepts matching CSRF', async () => {
+  const { default: handler } = await import(new URL('../api/google-login.js?redirect-handler-test', import.meta.url));
+  const run = async (req) => {
+    let status = 0;
+    let body = '';
+    const headers = {};
+    const res = {
+      setHeader(name, value) { headers[name] = value; },
+      status(value) { status = value; return this; },
+      send(value) { body = String(value); }
+    };
+    await handler(req, res);
+    return { status, body, headers };
+  };
+
+  const forged = await run({ method: 'POST', headers: { cookie: 'g_csrf_token=real' }, body: { credential: 'id-token', g_csrf_token: 'forged', client_id: CLIENT_ID } });
+  assert.equal(forged.status, 400);
+  assert.doesNotMatch(forged.body, /id-token/);
+
+  const valid = await run({ method: 'POST', headers: { cookie: 'g_csrf_token=same-token' }, body: { credential: 'id-token', g_csrf_token: 'same-token', client_id: CLIENT_ID } });
+  assert.equal(valid.status, 200);
+  assert.match(valid.body, /DevFitAuth\.startSession\('google_id',"id-token"/);
+  assert.equal(valid.headers['Cache-Control'], 'no-store, no-cache, must-revalidate');
 });
 
 test('backup restore is account-bound, merge-only and monitored', () => {

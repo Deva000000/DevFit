@@ -51,10 +51,13 @@ function clearStatus(){['status-checking','status-pending','status-denied'].forE
 function busy(on){el('spinner').style.display=on?'block':'none'}
 function fail(message){busy(false);clearStatus();el('status-denied').textContent=message||'Couldn’t sign you in. Please try again.';show('status-denied')}
 async function finishLogin(provider,token){busy(true);clearStatus();show('status-checking');try{const r=await DevFitAuth.startSession(provider,token,'');busy(false);clearStatus();if(r&&r.approved){document.cookie='devfit_email='+encodeURIComponent(r.email)+';max-age=31536000;path=/;SameSite=Lax;Secure';location.replace('index.html');return}show(r&&r.status==='pending'?'status-pending':'status-denied')}catch(e){fail('Couldn’t sign you in. Check your connection and try again.')}}
-function initGoogle(){if(googleReady||!window.google||!google.accounts||!google.accounts.id)return false;googleReady=true;google.accounts.id.initialize({client_id:CLIENT_ID,callback:function(response){if(response&&response.credential)finishLogin('google_id',response.credential);else fail()},auto_select:false,cancel_on_tap_outside:true});el('google-button').innerHTML='';google.accounts.id.renderButton(el('google-button'),{type:'standard',theme:'outline',size:'large',text:'continue_with',shape:'rectangular',logo_alignment:'left',width:Math.min(344,el('google-button').clientWidth||344)});return true}
+function isIOS(){return /iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)}
+function initGoogle(){if(googleReady||!window.google||!google.accounts||!google.accounts.id)return false;googleReady=true;const config={client_id:CLIENT_ID,auto_select:false,cancel_on_tap_outside:true};if(isIOS()){config.ux_mode='redirect';config.login_uri=location.origin+'/api/google-login'}else{config.callback=function(response){if(response&&response.credential)finishLogin('google_id',response.credential);else fail()}}google.accounts.id.initialize(config);el('google-button').innerHTML='';google.accounts.id.renderButton(el('google-button'),{type:'standard',theme:'outline',size:'large',text:'continue_with',shape:'rectangular',logo_alignment:'left',width:Math.min(344,el('google-button').clientWidth||344)});return true}
 document.addEventListener('DOMContentLoaded',function(){
   // Never auto-redirect from a cached browser flag. If the dashboard rejected an
   // expired token, the login form must remain usable instead of forming a loop.
+  const authState=new URLSearchParams(location.search).get('auth');
+  if(authState==='pending')show('status-pending');else if(authState==='denied')show('status-denied');else if(authState==='failed')fail('Google sign-in was not completed. Please try again.');
   if(!initGoogle()){let tries=0;const timer=setInterval(function(){if(initGoogle()||++tries>30)clearInterval(timer)},200)}
 });
 window.addEventListener('pageshow',function(){busy(false)});

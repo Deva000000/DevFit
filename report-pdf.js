@@ -190,12 +190,21 @@
         sess.exercises.forEach(ex=>{
           const setText=clean((ex.sets||[]).join('  |  '));
           R.font('normal',8);
-          const lines=pdf.splitTextToSize(setText,CW-66);
+          const setX=M+62,remarkX=M+138,remarkW=M+CW-remarkX-2;
+          const lines=pdf.splitTextToSize(setText,remarkX-setX-4);
           const h=Math.max(7,lines.length*4.2+2.5);
           if(S.y+h>R.BOT){R.newPage('Weekly Record');sessionHeader(sess,true);}
           R.font('bold',8);R.setText(R.INK);pdf.text(clean(ex.name),M+5,S.y+4.6);
           R.font('normal',7.8);R.setText([72,74,82]);
-          lines.forEach((line,k)=>pdf.text(line,M+66,S.y+4.6+k*4.2));
+          lines.forEach((line,k)=>pdf.text(line,setX,S.y+4.6+k*4.2));
+          const p=ex.progress||null;
+          const color=!p?R.SLATE:p.status==='up'?[33,126,70]:p.status==='down'?R.RED:p.status==='flat'?R.GOLD:R.SLATE;
+          let result=!p||p.status==='new'?'BASELINE':p.status==='flat'?'STEADY':p.status==='up'?'PROGRESS':'DOWN';
+          if(p&&p.changePct!=null&&(p.status==='up'||p.status==='down')){
+            const pct=Math.round(p.changePct);result+=' '+(pct>0?'+':'')+pct+'%';
+          }
+          R.setFill(color);pdf.roundedRect(remarkX,S.y+1.2,remarkW,5.3,2,2,'F');
+          R.font('bold',6.2);R.setText(WHITE);pdf.text(result,remarkX+remarkW/2,S.y+4.8,{align:'center'});
           S.y+=h;
         });
         R.gap(2.5);
@@ -253,27 +262,6 @@
         });
       });
       S.y+=h+4;
-    }
-
-    function exerciseProgressRows(items){
-      if(!items.length){
-        R.block('No comparison yet','No exercise has both a current performance and an earlier comparable entry.',R.SLATE,SOFT);
-        return;
-      }
-      items.forEach((it,i)=>{
-        const color=it.status==='up'?[33,126,70]:it.status==='down'?R.RED:it.status==='flat'?R.GOLD:R.SLATE;
-        const label=it.status==='up'?'PROGRESS':it.status==='down'?'DOWN':it.status==='flat'?'STEADY':'BASELINE';
-        const lines=pdf.splitTextToSize(clean(it.remark),CW-79);
-        const h=Math.max(9,lines.length*4+3);R.need(h);
-        if(i%2===0){R.setFill([249,249,251]);pdf.rect(M,S.y,CW,h,'F');}
-        R.font('bold',8);R.setText(R.INK);pdf.text(clean(it.name),M+3,S.y+5.5);
-        R.setFill(color);pdf.roundedRect(M+48,S.y+2,21,5,2,2,'F');
-        R.font('bold',6.2);R.setText(WHITE);pdf.text(label,M+58.5,S.y+5.5,{align:'center'});
-        R.font('normal',7.3);R.setText([66,68,75]);
-        lines.forEach((line,k)=>pdf.text(line,M+75,S.y+5.5+k*4));
-        S.y+=h;
-      });
-      R.gap(3);
     }
 
     function weeklyNutrition(row){
@@ -385,11 +373,7 @@
       }
       sectionLabel('Daily log','Bodyweight, steps and sleep for all seven days');
       weeklyDailyTable(row);
-      if((A.training.exerciseProgress||[]).length){
-        sectionLabel('Exercise progress','Latest performance versus the previous comparable entry');
-        exerciseProgressRows(A.training.exerciseProgress);
-      }
-      R.need(16);sectionLabel('Workouts this week','Every exercise and completed set');
+      R.need(16);sectionLabel('Workouts this week','Every exercise, completed set and progress remark');
       detailedSessions(A.training.list);
       if(A.training.list.length&&A.nutrition.daysLogged)R.page('Nutrition Review',clean(A.meta.span));
       weeklyNutrition(row);

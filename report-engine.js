@@ -405,7 +405,7 @@ var DevFitReport = (function(){
     // previous performance, even when that baseline sits in an earlier week.
     // Loaded lifts use estimated strength first and total volume as the tie-break;
     // reps-only and cardio stay in their own units so unlike data is never mixed.
-    const priorByExercise={}, progressByExercise={};
+    const priorByExercise={}, progressByExercise={}, progressByOccurrence={};
     allSessions.forEach(s=>{
       if(!s.date||!A.meta.endDate||s.date>A.meta.endDate) return;
       (s.logs||[]).forEach(lg=>{
@@ -413,8 +413,10 @@ var DevFitReport = (function(){
         const name=exNameOf(s,lg), key=name.toLowerCase();
         if(inRange.has(s.date)){
           const cmp=comparePerformance(perf,priorByExercise[key]);
-          progressByExercise[key]={name,date:s.date,status:cmp.status,
+          const progress={name,date:s.date,status:cmp.status,
             changePct:cmp.changePct,remark:cmp.remark,kind:perf.kind};
+          progressByExercise[key]=progress;
+          progressByOccurrence[s.date+'|'+key]=progress;
         }
         priorByExercise[key]=perf;
       });
@@ -460,7 +462,8 @@ var DevFitReport = (function(){
           }
         });
         sTon+=vol;
-        if(shown.length) detail.push({name:nm, sets:shown, volume:Math.round(vol), bestE1rm:bestE});
+        if(shown.length) detail.push({name:nm, sets:shown, volume:Math.round(vol), bestE1rm:bestE,
+          progress:progressByOccurrence[s.date+'|'+nm.toLowerCase()]||null});
         if(setsDone>0){
           if(!liftHist[nm]) liftHist[nm]=[];
           liftHist[nm].push({date:s.date, bestE1rm:bestE, topSet, volume:vol, sets:setsDone});

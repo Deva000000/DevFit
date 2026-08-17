@@ -211,7 +211,7 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
   assert.match(settings, /<div class="title">Install DevFit App<\/div>/);
   assert.match(settings, /if\(!deferredInstallPrompt\)\{\s*showIosHint\(\)/);
   assert.equal(manifest.display, 'standalone');
-  assert.match(worker, /devfit-v4\.80\.0/);
+  assert.match(worker, /devfit-v4\.81\.0/);
   assert.doesNotMatch(worker, /\.then\(\(\) => self\.skipWaiting\(\)\)/);
 
   for (const html of [index, settings]) {
@@ -315,13 +315,16 @@ test('paid reports use the adaptive premium renderer and never plot missing valu
   assert.match(reportPdf, /function scoreBreakdown\(row\)/);
   assert.match(reportPdf, /function detailedSessions\(sessions\)/);
   assert.match(reportPdf, /function compactSignals\(row\)/);
-  assert.match(reportPdf, /function exerciseProgressRows\(items\)/);
+  assert.match(reportPdf, /Every exercise, completed set and progress remark/);
+  assert.match(reportPdf, /const p=ex\.progress\|\|null/);
+  assert.match(reportPdf, /result\+=' '\+\(pct>0\?'\+':''\)\+pct\+'%'/);
   assert.match(reportPdf, /WHAT MOVED FORWARD/);
   assert.match(reportPdf, /WHAT NEEDS ATTENTION/);
-  assert.match(reportPdf, /Every exercise and completed set/);
   assert.match(reportPdf, /Daily macros measured against saved targets/);
   assert.match(reportPdf, /Exactly where the saved targets were missed/);
   assert.match(reportEngine, /exerciseProgress/);
+  assert.match(reportEngine, /progressByOccurrence/);
+  assert.match(reportEngine, /progress:progressByOccurrence/);
   assert.match(reportEngine, /progressCounts/);
   assert.match(reportEngine, /A\.nutrition\.adherence/);
   assert.doesNotMatch(settings, /r=>r\.score==null\?0:r\.score/);

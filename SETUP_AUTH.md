@@ -22,7 +22,7 @@ on your existing Vercel project.
 | `devfit-auth.js` | Shared client gate used by all app pages |
 
 Wired into: `login.html`, `index.html`, `nutrition.html`, `workouts.html`,
-`settings.html`. Current service worker release is **v4.80.0**.
+`settings.html`. Current service worker release is **v4.81.0**.
 
 ---
 

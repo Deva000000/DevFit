@@ -92,8 +92,8 @@ alter table devfit_logins      enable row level security;
 alter table devfit_errors      enable row level security;
 -- No policies = the public anon key cannot read or write. Service key bypasses RLS.
 
--- Append-only recovery history for account data. The app still reads the current
--- devfit_data row, while every accepted version is retained here.
+-- Bounded recovery history for account data. The app reads the current
+-- devfit_data row; distinct previous states are kept here for recovery.
 create table if not exists devfit_data_versions (
   id            bigint generated always as identity primary key,
   email         text not null,

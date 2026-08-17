@@ -14,10 +14,18 @@
 import crypto from 'crypto';
 import {
   haveServerConfig, verifyToken, getSubscriber, sbSelect, sbInsert, sbInsertReturning, sbPatch, readJsonBody,
-  recordServerEvent
+  recordServerEvent, rateLimit, clientIp
 } from './_lib.js';
 
 const TYPES = ['progress', 'nutrition', 'workouts', 'prefs'];
+// These are far above current production documents, but below the point where
+// one account can monopolise a free database or overflow browser localStorage.
+const MAX_DATA_BYTES = {
+  progress: 512 * 1024,
+  nutrition: 768 * 1024,
+  workouts: 1024 * 1024,
+  prefs: 64 * 1024
+};
 
 function stableJson(value) {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
@@ -31,8 +39,8 @@ function contentHash(data) {
 
 async function archiveVersion(email, dataType, data, deviceId) {
   // Best effort during rollout: a missing history table must not stop the current
-  // row being saved. Once SETUP_AUTH's additive migration is run, every distinct
-  // accepted state is retained and can be recovered by the trainer.
+  // row being saved. We archive only the state about to be replaced; the newly
+  // accepted state remains recoverable as the live devfit_data row.
   await sbInsert('devfit_data_versions', {
     email,
     data_type: dataType,
@@ -88,12 +96,39 @@ export default async function handler(req, res) {
     if (op === 'set') {
       const dataType = String(body.dataType || '');
       if (TYPES.indexOf(dataType) < 0) { res.status(400).json({ error: 'bad_type' }); return; }
-      if (typeof body.data === 'undefined') { res.status(400).json({ error: 'no_data' }); return; }
+      if (!body.data || typeof body.data !== 'object' || Array.isArray(body.data)) {
+        res.status(400).json({ error: 'bad_data' }); return;
+      }
+      const bytes = Buffer.byteLength(stableJson(body.data), 'utf8');
+      if (bytes > MAX_DATA_BYTES[dataType]) {
+        res.status(413).json({ error: 'data_too_large', maxBytes: MAX_DATA_BYTES[dataType] }); return;
+      }
+
+      // Normal UI use stays far below these ceilings. Both account and IP limits
+      // are required because verified Google signup is open to free users.
+      const accountKey = crypto.createHash('sha256').update(email).digest('hex').slice(0, 24);
+      const [accountRate, ipRate] = await Promise.all([
+        rateLimit('data_user:' + accountKey, 300, 60 * 60),
+        rateLimit('data_ip:' + clientIp(req), 600, 60 * 60)
+      ]);
+      if (!accountRate.ok || !ipRate.ok) {
+        const retryAfter = Math.max(accountRate.retryAfter || 0, ipRate.retryAfter || 0, 1);
+        res.setHeader('Retry-After', String(retryAfter));
+        res.status(429).json({ error: 'rate_limited', retryAfter }); return;
+      }
+
       const existing = await currentRow(email, dataType);
       const baseUpdatedAt = String(body.baseUpdatedAt || '');
       const now = new Date().toISOString();
 
       if (existing) {
+        // Page loads and cross-device reconciliation often offer the exact state
+        // already stored. A semantic no-op must not update timestamps or grow the
+        // recovery table, even if the caller's base version is stale.
+        if (contentHash(existing.data) === contentHash(body.data)) {
+          res.status(200).json({ ok: true, unchanged: true, updated_at: existing.updated_at });
+          return;
+        }
         // Optimistic concurrency: a device may only replace the exact version it
         // previously read. A stale device receives the current document, merges
         // it locally, then retries. It can never silently overwrite newer data.
@@ -117,7 +152,6 @@ export default async function handler(req, res) {
           res.status(409).json({ error: 'conflict', row: await currentRow(email, dataType) });
           return;
         }
-        await archiveVersion(email, dataType, body.data, body.deviceId);
         res.status(200).json({ ok: true, updated_at: changed[0].updated_at || now });
         return;
       }
@@ -131,7 +165,6 @@ export default async function handler(req, res) {
         await recordServerEvent('data_failure', 'Account data insert failed', { page: '/api/data', status: 500 });
         res.status(500).json({ error: 'save_failed' }); return;
       }
-      await archiveVersion(email, dataType, body.data, body.deviceId);
       res.status(200).json({ ok: true, updated_at: inserted[0].updated_at || now });
       return;
     }

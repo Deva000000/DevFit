@@ -329,9 +329,10 @@ export function sameSiteOnly(req) {
 }
 
 export function clientIp(req) {
-  const xff = req.headers['x-forwarded-for'];
+  const headers = (req && req.headers) || {};
+  const xff = headers['x-forwarded-for'];
   if (xff) return String(xff).split(',')[0].trim();
-  return req.socket && req.socket.remoteAddress || 'unknown';
+  return req && req.socket && req.socket.remoteAddress || 'unknown';
 }
 
 export async function readJsonBody(req) {

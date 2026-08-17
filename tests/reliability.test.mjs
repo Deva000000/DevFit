@@ -220,6 +220,74 @@ test('data API rejects a stale whole-document write with the current row', async
   assert.deepEqual(body.row, current);
 });
 
+test('data API does not grow history for unchanged data and archives one previous state per update', async () => {
+  process.env.DEVFIT_JWT_SECRET = 'test-secret';
+  process.env.SUPABASE_SERVICE_KEY = 'test-service-key';
+  const oldData = { sessions: [{ date: '2026-08-08', logs: [] }] };
+  const current = { data_type: 'workouts', data: oldData, updated_at: '2026-08-14T01:00:00.000Z' };
+  const header = b64({ alg: 'HS256', typ: 'JWT' });
+  const payload = b64({ email: 'person@gmail.com' });
+  const signature = crypto.createHmac('sha256', 'test-secret').update(header + '.' + payload).digest().toString('base64url');
+  const token = header + '.' + payload + '.' + signature;
+  const { default: handler } = await import(new URL('../api/data.js?history-growth-test', import.meta.url));
+  const run = async (data) => {
+    let status = 0, responseBody;
+    const archived = [];
+    globalThis.fetch = async (url, options = {}) => {
+      const target = String(url);
+      const method = options.method || 'GET';
+      if (target.includes('/rest/v1/devfit_subscribers?')) return { ok: true, json: async () => [{ email: 'person@gmail.com', approved: true }] };
+      if (target.includes('/rest/v1/devfit_rate?') && method === 'GET') return { ok: true, json: async () => [] };
+      if (target.includes('/rest/v1/devfit_rate?on_conflict=') && method === 'POST') return { ok: true, json: async () => [{}] };
+      if (target.includes('/rest/v1/devfit_data?') && method === 'GET') return { ok: true, json: async () => [current] };
+      if (target.includes('/rest/v1/devfit_data_versions') && method === 'POST') {
+        archived.push(JSON.parse(options.body));
+        return { ok: true, json: async () => ({}) };
+      }
+      if (target.includes('/rest/v1/devfit_data?') && method === 'PATCH') {
+        return { ok: true, json: async () => [{ updated_at: '2026-08-18T01:00:00.000Z' }] };
+      }
+      throw new Error('unexpected request ' + method + ' ' + target);
+    };
+    const req = { method: 'POST', headers: { 'x-forwarded-for': '127.0.0.1' }, body: { token, op: 'set', dataType: 'workouts', data, baseUpdatedAt: current.updated_at, deviceId: 'test-device' } };
+    const res = { setHeader() {}, status(value) { status = value; return this; }, json(value) { responseBody = value; } };
+    await handler(req, res);
+    return { status, responseBody, archived };
+  };
+
+  const unchanged = await run(structuredClone(oldData));
+  assert.equal(unchanged.status, 200);
+  assert.equal(unchanged.responseBody.unchanged, true);
+  assert.equal(unchanged.archived.length, 0);
+
+  const changed = await run({ sessions: [...oldData.sessions, { date: '2026-08-15', logs: [] }] });
+  assert.equal(changed.status, 200);
+  assert.equal(changed.archived.length, 1);
+  assert.deepEqual(changed.archived[0].data, oldData);
+});
+
+test('data API rejects oversized account documents before any data mutation', async () => {
+  process.env.DEVFIT_JWT_SECRET = 'test-secret';
+  process.env.SUPABASE_SERVICE_KEY = 'test-service-key';
+  let dataStoreTouched = false;
+  globalThis.fetch = async (url) => {
+    if (String(url).includes('/rest/v1/devfit_subscribers?')) return { ok: true, json: async () => [{ email: 'person@gmail.com', approved: true }] };
+    dataStoreTouched = true;
+    throw new Error('oversized data must be rejected before storage calls');
+  };
+  const { default: handler } = await import(new URL('../api/data.js?size-limit-test', import.meta.url));
+  const header = b64({ alg: 'HS256', typ: 'JWT' });
+  const payload = b64({ email: 'person@gmail.com' });
+  const signature = crypto.createHmac('sha256', 'test-secret').update(header + '.' + payload).digest().toString('base64url');
+  const req = { method: 'POST', body: { token: header + '.' + payload + '.' + signature, op: 'set', dataType: 'prefs', data: { oversized: 'x'.repeat(70 * 1024) } } };
+  let status = 0, body;
+  const res = { setHeader() {}, status(value) { status = value; return this; }, json(value) { body = value; } };
+  await handler(req, res);
+  assert.equal(status, 413);
+  assert.equal(body.error, 'data_too_large');
+  assert.equal(dataStoreTouched, false);
+});
+
 test('persistent session cannot access cloud data after account revocation', async () => {
   process.env.DEVFIT_JWT_SECRET = 'test-secret';
   process.env.SUPABASE_SERVICE_KEY = 'test-service-key';

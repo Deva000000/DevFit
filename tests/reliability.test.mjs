@@ -103,6 +103,29 @@ test('progress UI provisions weeks automatically and uses quick sleep and step s
   assert.match(html,/for\(let n=1;n<=12;n\+=0\.5\)/);
 });
 
+test('training plan reorders workout days and exercises without rebuilding their records', () => {
+  const html=fs.readFileSync(new URL('../workouts.html',import.meta.url),'utf8');
+  const helper=html.match(/function orderItemsByIds\(items,ids\)\{[\s\S]*?\n\}(?=\n\nlet activePlanReorder)/);
+  assert.ok(helper,'reorder helper should remain independently testable');
+  const context={Map,String,Array};
+  vm.runInNewContext(helper[0],context);
+  const a={id:'day-a',exercises:[{id:'press'}]}, b={id:'day-b',exercises:[{id:'row'}]}, c={id:'day-c',exercises:[{id:'curl'}]};
+  const days=context.orderItemsByIds([a,b,c],['day-c','day-a','day-b']);
+  assert.deepEqual(Array.from(days,d=>d.id),['day-c','day-a','day-b']);
+  assert.equal(days[0],c);
+  assert.equal(days[1].exercises[0].id,'press');
+  const exercises=context.orderItemsByIds([{id:'squat',sets:[1]},{id:'hinge',sets:[2]}],['hinge','squat']);
+  assert.deepEqual(Array.from(exercises,e=>e.id),['hinge','squat']);
+  assert.equal(exercises[0].sets[0],2);
+  assert.match(html,/data-reorder-kind="workout"/);
+  assert.match(html,/data-reorder-kind="exercise"/);
+  assert.match(html,/touch-action:none/);
+  assert.match(html,/pointercancel/);
+  assert.match(html,/ArrowUp/);
+  assert.match(html,/Workout order saved/);
+  assert.match(html,/Exercise order saved/);
+});
+
 test('weekly score requires enough weight data and reports coverage', () => {
   const code=fs.readFileSync(new URL('../scoring.js',import.meta.url),'utf8');
   const context={console,Number,Object,Array,Math,appData:{goal:'65',goalType:'loss',targetSteps:'7000',bw:[[70,70.1,'','','','',''],[69.7,69.6,'','','','','']],steps:[[7000],[7000]],sleep:[[7],[7]],weeklyCheckin:[{},{}]},freshCheckin:()=>({})};
@@ -222,7 +245,7 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
   assert.match(settings, /<div class="title">Install DevFit App<\/div>/);
   assert.match(settings, /if\(!deferredInstallPrompt\)\{\s*showIosHint\(\)/);
   assert.equal(manifest.display, 'standalone');
-  assert.match(worker, /devfit-v4\.82\.0/);
+  assert.match(worker, /devfit-v4\.83\.0/);
   assert.doesNotMatch(worker, /\.then\(\(\) => self\.skipWaiting\(\)\)/);
 
   for (const html of [index, settings]) {

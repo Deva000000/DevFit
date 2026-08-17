@@ -99,7 +99,15 @@
   .workout-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
   .workout-head input{flex:1;border:none;font-family:'DM Sans',system-ui,sans-serif;font-size:15px;font-weight:800;color:#111;outline:none;padding:4px 6px;background:transparent}
   .workout-head input:focus{background:#f8fafc;border-radius:6px}
-  .ex-row{display:grid;grid-template-columns:1.6fr .55fr .55fr 28px;gap:6px;align-items:center;padding:6px 0;border-top:1px solid #f1f5f9}
+  .reorder-hint{display:flex;align-items:center;gap:7px;margin:-2px 0 10px;color:#aaa;font-size:10.5px;line-height:1.4}
+  .reorder-hint .reorder-symbol{color:#ff6b6b;font-size:17px;line-height:1}
+  .reorder-handle{display:inline-flex;align-items:center;justify-content:center;width:26px;height:32px;flex:0 0 26px;border:0;border-radius:7px;background:transparent;color:#94a3b8;font-size:20px;line-height:1;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+  .reorder-handle:hover,.reorder-handle:focus-visible{background:#f1f5f9;color:#cc0000;outline:none}
+  .reorder-handle:active{cursor:grabbing}
+  .workout-card.is-reordering{opacity:.76;transform:scale(.99);border-color:#cc0000;box-shadow:0 10px 24px rgba(0,0,0,.22);position:relative;z-index:4}
+  .ex-row.is-reordering{background:#fff7f7;border:1px solid #cc0000;border-radius:8px;box-shadow:0 7px 16px rgba(0,0,0,.16);opacity:.82;position:relative;z-index:5}
+  body.plan-reordering{user-select:none;-webkit-user-select:none}
+  .ex-row{display:grid;grid-template-columns:26px 1.6fr .55fr .55fr 28px;gap:6px;align-items:center;padding:6px 0;border-top:1px solid #f1f5f9}
   .ex-row:first-of-type{border-top:none}
   .ex-row input{font-family:'DM Sans',system-ui,sans-serif;font-size:13px;border:none;background:transparent;outline:none;padding:4px 6px;color:#111;width:100%}
   .ex-row .ex-name{font-weight:600}
@@ -107,11 +115,11 @@
   .ex-row .ex-num::placeholder{color:#bbb}
   .ex-row input:focus{background:#f8fafc;border-radius:6px}
   .ex-head{font-size:9px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.04em;text-align:center;padding:0 6px}
-  .ex-head:first-child{text-align:left}
+  .ex-head.exercise{text-align:left}
   .del-mini{background:transparent;border:none;color:#cbd5e1;font-size:18px;cursor:pointer;line-height:1;padding:0}
   .del-mini:hover{color:#cc0000}
   /* Cardio exercise row in plan editor — name + target min + target km */
-  .ex-row-cardio{grid-template-columns:1.6fr 0.8fr 0.8fr 28px}
+  .ex-row-cardio{grid-template-columns:26px 1.6fr 0.8fr 0.8fr 28px}
   .ex-cardio-tag{display:inline-flex;align-items:center;justify-content:center;background:#fef2f2;color:#cc0000;border:1px solid #fecaca;border-radius:8px;font-size:9px;font-weight:800;letter-spacing:.06em;padding:4px 0}
   .add-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
   .add-row .add-btn{margin-top:0}
@@ -239,7 +247,9 @@
   @media(max-width:540px){
     body{padding:.5rem;overflow-x:hidden}
     .page{max-width:100%}
-    .ex-row{grid-template-columns:1.4fr .5fr .5fr 24px;gap:3px}
+    .ex-row{grid-template-columns:24px 1.4fr .5fr .5fr 24px;gap:3px}
+    .ex-row-cardio{grid-template-columns:24px 1.35fr .65fr .65fr 24px}
+    .reorder-handle{width:24px;flex-basis:24px}
     .ex-row input{font-size:12px;padding:4px}
     .sets-grid{grid-template-columns:24px minmax(0,1fr) minmax(0,1fr) minmax(0,0.8fr) 22px;gap:3px}
     .sets-grid input{font-size:12px;padding:4px 2px;min-width:0}
@@ -257,7 +267,8 @@
   }
   @media(max-width:380px){
     .sets-grid{grid-template-columns:22px minmax(0,1fr) minmax(0,1fr) minmax(0,0.7fr) 20px;gap:2px}
-    .ex-row{grid-template-columns:1.3fr .5fr .5fr 22px;gap:2px}
+    .ex-row{grid-template-columns:22px 1.3fr .5fr .5fr 22px;gap:2px}
+    .ex-row-cardio{grid-template-columns:22px 1.25fr .6fr .6fr 22px}
   }
   /* PREMIUM POLISH — glass cards, balanced gradient, safe motion */
   .card{background:rgba(28,28,32,0.62)!important;border:1px solid rgba(255,255,255,0.08)!important;backdrop-filter:saturate(160%) blur(14px);-webkit-backdrop-filter:saturate(160%) blur(14px);box-shadow:0 12px 40px rgba(0,0,0,0.55),0 1px 0 rgba(255,255,255,0.06) inset}
@@ -359,6 +370,7 @@ html.nosplash #devfit-splash{display:none!important}
     </div>
     <div class="card">
       <div class="section-label">Workout plan</div>
+      <div class="reorder-hint"><span class="reorder-symbol" aria-hidden="true">⠿</span><span>Hold and drag the dotted handle to reorder workout days or exercises. Changes save automatically.</span></div>
       <div id="plan-list"></div>
       <button class="add-btn" id="add-workout-btn">+ Add workout</button>
       <div style="font-size:11px;color:#aaa;margin-top:10px;line-height:1.4">Set up your routine. Update target sets/reps every few weeks as the client progresses.</div>
@@ -614,6 +626,118 @@ document.querySelectorAll('.mode-btn').forEach(btn=>{
 });
 
 // ---------- PLAN VIEW ----------
+function orderItemsByIds(items,ids){
+  const source=Array.isArray(items)?items:[];
+  const byId=new Map(source.map(item=>[String(item.id),item]));
+  const ordered=[];
+  (ids||[]).forEach(id=>{ const item=byId.get(String(id)); if(item){ ordered.push(item); byId.delete(String(id)); } });
+  source.forEach(item=>{ if(byId.has(String(item.id))){ ordered.push(item); byId.delete(String(item.id)); } });
+  return ordered;
+}
+
+let activePlanReorder=null;
+function directPlanChildren(container,selector){
+  return Array.from(container.children).filter(el=>el.matches(selector));
+}
+function planOrderIds(container,selector,key){
+  return directPlanChildren(container,selector).map(el=>el.dataset[key]).filter(Boolean);
+}
+function commitPlanReorder(state){
+  if(state.kind==='workout'){
+    data.plan.workouts=orderItemsByIds(data.plan.workouts,planOrderIds(state.container,'.workout-card','workoutId'));
+  } else {
+    const workout=data.plan.workouts.find(w=>w.id===state.workoutId);
+    if(!workout) return;
+    workout.exercises=orderItemsByIds(workout.exercises,planOrderIds(state.container,'.ex-row:not(.ex-head-row)','exerciseId'));
+  }
+  save();
+}
+function cleanupPlanReorder(cancelled){
+  const state=activePlanReorder;
+  if(!state) return;
+  state.handle.removeEventListener('pointermove',movePlanReorder);
+  state.handle.removeEventListener('pointerup',finishPlanReorder);
+  state.handle.removeEventListener('pointercancel',cancelPlanReorder);
+  try{ state.handle.releasePointerCapture(state.pointerId); }catch(e){}
+  state.item.classList.remove('is-reordering');
+  document.body.classList.remove('plan-reordering');
+  activePlanReorder=null;
+  if(cancelled){ renderPlan(); return; }
+  const endIds=planOrderIds(state.container,state.selector,state.key);
+  const changed=endIds.join('|')!==state.startIds.join('|');
+  if(changed){ commitPlanReorder(state); toast(state.kind==='workout'?'Workout order saved':'Exercise order saved'); }
+}
+function movePlanReorder(e){
+  const state=activePlanReorder;
+  if(!state||e.pointerId!==state.pointerId) return;
+  e.preventDefault();
+  const hit=document.elementFromPoint(e.clientX,e.clientY);
+  const target=hit&&hit.closest?hit.closest(state.selector):null;
+  if(target&&target!==state.item&&target.parentElement===state.container){
+    const rect=target.getBoundingClientRect();
+    state.container.insertBefore(state.item,e.clientY<rect.top+rect.height/2?target:target.nextSibling);
+  }
+  if(e.clientY<80) window.scrollBy(0,-12);
+  else if(e.clientY>window.innerHeight-90) window.scrollBy(0,12);
+}
+function finishPlanReorder(e){
+  if(activePlanReorder&&e.pointerId===activePlanReorder.pointerId) cleanupPlanReorder(false);
+}
+function cancelPlanReorder(e){
+  if(activePlanReorder&&e.pointerId===activePlanReorder.pointerId) cleanupPlanReorder(true);
+}
+function startPlanReorder(e,handle){
+  if(activePlanReorder||(e.pointerType==='mouse'&&e.button!==0)) return;
+  const kind=handle.dataset.reorderKind;
+  const item=handle.closest(kind==='workout'?'.workout-card':'.ex-row');
+  const container=kind==='workout'?document.getElementById('plan-list'):item&&item.closest('.exercises');
+  const selector=kind==='workout'?'.workout-card':'.ex-row:not(.ex-head-row)';
+  const key=kind==='workout'?'workoutId':'exerciseId';
+  if(!item||!container) return;
+  if(directPlanChildren(container,selector).length<2){ toast(kind==='workout'?'Add another workout before reordering':'Add another exercise before reordering'); return; }
+  e.preventDefault();
+  activePlanReorder={kind,item,container,selector,key,pointerId:e.pointerId,handle,startIds:planOrderIds(container,selector,key),workoutId:handle.dataset.workoutId||''};
+  item.classList.add('is-reordering');
+  document.body.classList.add('plan-reordering');
+  try{ handle.setPointerCapture(e.pointerId); }catch(_){ }
+  handle.addEventListener('pointermove',movePlanReorder);
+  handle.addEventListener('pointerup',finishPlanReorder);
+  handle.addEventListener('pointercancel',cancelPlanReorder);
+}
+function keyboardPlanReorder(handle,delta){
+  const kind=handle.dataset.reorderKind;
+  let items, id=handle.dataset.reorderId;
+  if(kind==='workout') items=data.plan.workouts;
+  else {
+    const workout=data.plan.workouts.find(w=>w.id===handle.dataset.workoutId);
+    if(!workout) return;
+    items=workout.exercises;
+  }
+  const from=items.findIndex(item=>String(item.id)===String(id));
+  const to=Math.max(0,Math.min(items.length-1,from+delta));
+  if(from<0||to===from) return;
+  const next=items.slice();
+  next.splice(to,0,next.splice(from,1)[0]);
+  if(kind==='workout') data.plan.workouts=next;
+  else {
+    const workout=data.plan.workouts.find(w=>w.id===handle.dataset.workoutId);
+    workout.exercises=next;
+  }
+  save(); renderPlan();
+  const fresh=Array.from(document.querySelectorAll('[data-reorder-kind="'+kind+'"][data-reorder-id]')).find(el=>String(el.dataset.reorderId)===String(id));
+  if(fresh) fresh.focus();
+  toast(kind==='workout'?'Workout order saved':'Exercise order saved');
+}
+function bindPlanReordering(list){
+  list.querySelectorAll('[data-reorder-kind]').forEach(handle=>{
+    handle.addEventListener('pointerdown',e=>startPlanReorder(e,handle));
+    handle.addEventListener('keydown',e=>{
+      if(e.key!=='ArrowUp'&&e.key!=='ArrowDown') return;
+      e.preventDefault(); keyboardPlanReorder(handle,e.key==='ArrowUp'?-1:1);
+    });
+  });
+}
+
 function renderPlan(){
   const list=document.getElementById('plan-list');
   list.innerHTML='';
@@ -623,12 +747,14 @@ function renderPlan(){
   data.plan.workouts.forEach(w=>{
     const card=document.createElement('div');
     card.className='workout-card';
+    card.dataset.workoutId=w.id;
     card.innerHTML=`
       <div class="workout-head">
+        <button type="button" class="reorder-handle" data-reorder-kind="workout" data-reorder-id="${w.id}" aria-label="Reorder ${escapeHTML(w.name||'unnamed workout')}" title="Drag to reorder workout · keyboard: ↑ or ↓">⠿</button>
         <input type="text" placeholder="Workout name (e.g. Push Day)" value="${escapeHTML(w.name)}" data-w="${w.id}" data-f="name">
         <button class="del-mini" data-del-w="${w.id}" aria-label="Delete workout">×</button>
       </div>
-      <div class="ex-row ex-head-row"><div class="ex-head">Exercise</div><div class="ex-head">Sets</div><div class="ex-head">Reps</div><div></div></div>
+      <div class="ex-row ex-head-row"><div></div><div class="ex-head exercise">Exercise</div><div class="ex-head">Sets</div><div class="ex-head">Reps</div><div></div></div>
       <div class="exercises" data-w="${w.id}"></div>
       <div class="add-row">
         <button class="add-btn light" data-add-ex="${w.id}">+ Strength</button>
@@ -638,10 +764,12 @@ function renderPlan(){
     const exDiv=card.querySelector('.exercises');
     w.exercises.forEach(ex=>{
       const row=document.createElement('div');
+      row.dataset.exerciseId=ex.id;
       if(exIsCardio(ex)){
         // Cardio exercise — prescribe a target duration (min) and optional distance (km)
         row.className='ex-row ex-row-cardio';
         row.innerHTML=`
+          <button type="button" class="reorder-handle" data-reorder-kind="exercise" data-reorder-id="${ex.id}" data-workout-id="${w.id}" aria-label="Reorder ${escapeHTML(ex.name||'unnamed exercise')}" title="Drag to reorder exercise · keyboard: ↑ or ↓">⠿</button>
           <input class="ex-name" type="text" placeholder="e.g. Running, Cycling, Swimming" value="${escapeHTML(ex.name)}" data-w="${w.id}" data-ex="${ex.id}" data-f="name">
           <input class="ex-num" type="number" inputmode="numeric" placeholder="min" value="${ex.tMin??''}" data-w="${w.id}" data-ex="${ex.id}" data-f="tMin">
           <input class="ex-num" type="number" inputmode="decimal" placeholder="km" value="${ex.tKm??''}" data-w="${w.id}" data-ex="${ex.id}" data-f="tKm">
@@ -649,6 +777,7 @@ function renderPlan(){
       } else {
         row.className='ex-row';
         row.innerHTML=`
+          <button type="button" class="reorder-handle" data-reorder-kind="exercise" data-reorder-id="${ex.id}" data-workout-id="${w.id}" aria-label="Reorder ${escapeHTML(ex.name||'unnamed exercise')}" title="Drag to reorder exercise · keyboard: ↑ or ↓">⠿</button>
           <input class="ex-name" type="text" placeholder="e.g. Bench Press" value="${escapeHTML(ex.name)}" data-w="${w.id}" data-ex="${ex.id}" data-f="name">
           <input class="ex-num"  type="number" inputmode="numeric" placeholder="—" value="${ex.tSets??''}" data-w="${w.id}" data-ex="${ex.id}" data-f="tSets">
           <input class="ex-num"  type="number" inputmode="numeric" placeholder="—" value="${ex.tReps??''}" data-w="${w.id}" data-ex="${ex.id}" data-f="tReps">
@@ -657,6 +786,8 @@ function renderPlan(){
       exDiv.appendChild(row);
     });
   });
+
+  bindPlanReordering(list);
 
   list.querySelectorAll('input[data-f]').forEach(inp=>{
     inp.addEventListener('input',e=>{
@@ -668,8 +799,16 @@ function renderPlan(){
         if(!ex) return;
         if(f==='tSets'||f==='tReps'||f==='tMin'||f==='tKm') ex[f]=e.target.value===''?'':Number(e.target.value);
         else ex[f]=e.target.value;
+        if(f==='name'){
+          const handle=e.target.closest('.ex-row')?.querySelector('[data-reorder-kind="exercise"]');
+          if(handle) handle.setAttribute('aria-label','Reorder '+(ex.name.trim()||'unnamed exercise'));
+        }
       } else {
         w[f]=e.target.value;
+        if(f==='name'){
+          const handle=e.target.closest('.workout-card')?.querySelector('[data-reorder-kind="workout"]');
+          if(handle) handle.setAttribute('aria-label','Reorder '+(w.name.trim()||'unnamed workout'));
+        }
       }
       save();
     });

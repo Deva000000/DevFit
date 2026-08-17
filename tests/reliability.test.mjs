@@ -121,6 +121,10 @@ test('training plan reorders workout days and exercises without rebuilding their
   assert.match(html,/data-reorder-kind="exercise"/);
   assert.match(html,/touch-action:none/);
   assert.match(html,/pointercancel/);
+  assert.match(html,/plan-drag-floating/);
+  assert.match(html,/window\.addEventListener\('pointermove',movePlanReorder,\{passive:false\}\)/);
+  assert.match(html,/state\.item\.style\.top=\(e\.clientY-state\.offsetY\)/);
+  assert.match(html,/reorder-placeholder/);
   assert.match(html,/ArrowUp/);
   assert.match(html,/Workout order saved/);
   assert.match(html,/Exercise order saved/);
@@ -245,7 +249,7 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
   assert.match(settings, /<div class="title">Install DevFit App<\/div>/);
   assert.match(settings, /if\(!deferredInstallPrompt\)\{\s*showIosHint\(\)/);
   assert.equal(manifest.display, 'standalone');
-  assert.match(worker, /devfit-v4\.83\.0/);
+  assert.match(worker, /devfit-v4\.84\.0/);
   assert.doesNotMatch(worker, /\.then\(\(\) => self\.skipWaiting\(\)\)/);
 
   for (const html of [index, settings]) {

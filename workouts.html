@@ -101,11 +101,15 @@
   .workout-head input:focus{background:#f8fafc;border-radius:6px}
   .reorder-hint{display:flex;align-items:center;gap:7px;margin:-2px 0 10px;color:#aaa;font-size:10.5px;line-height:1.4}
   .reorder-hint .reorder-symbol{color:#ff6b6b;font-size:17px;line-height:1}
-  .reorder-handle{display:inline-flex;align-items:center;justify-content:center;width:26px;height:32px;flex:0 0 26px;border:0;border-radius:7px;background:transparent;color:#94a3b8;font-size:20px;line-height:1;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+  .reorder-handle{display:inline-flex;align-items:center;justify-content:center;width:26px;height:32px;flex:0 0 26px;border:0;border-radius:7px;background:transparent;color:#94a3b8;font-size:20px;line-height:1;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-user-drag:none}
   .reorder-handle:hover,.reorder-handle:focus-visible{background:#f1f5f9;color:#cc0000;outline:none}
   .reorder-handle:active{cursor:grabbing}
   .workout-card.is-reordering{opacity:.76;transform:scale(.99);border-color:#cc0000;box-shadow:0 10px 24px rgba(0,0,0,.22);position:relative;z-index:4}
   .ex-row.is-reordering{background:#fff7f7;border:1px solid #cc0000;border-radius:8px;box-shadow:0 7px 16px rgba(0,0,0,.16);opacity:.82;position:relative;z-index:5}
+  .plan-drag-floating{position:fixed!important;z-index:10020!important;pointer-events:none!important;margin:0!important;opacity:.94!important;transform:scale(1.015)!important;transition:none!important;box-shadow:0 18px 42px rgba(0,0,0,.42)!important}
+  .plan-drag-floating *{pointer-events:none!important}
+  .reorder-placeholder{pointer-events:none;border:2px dashed #cc0000;border-radius:10px;background:rgba(204,0,0,.08);margin-bottom:10px}
+  .exercises .reorder-placeholder{margin:2px 0;border-radius:8px;background:#fff4f4}
   body.plan-reordering{user-select:none;-webkit-user-select:none}
   .ex-row{display:grid;grid-template-columns:26px 1.6fr .55fr .55fr 28px;gap:6px;align-items:center;padding:6px 0;border-top:1px solid #f1f5f9}
   .ex-row:first-of-type{border-top:none}
@@ -655,14 +659,29 @@ function commitPlanReorder(state){
 function cleanupPlanReorder(cancelled){
   const state=activePlanReorder;
   if(!state) return;
-  state.handle.removeEventListener('pointermove',movePlanReorder);
-  state.handle.removeEventListener('pointerup',finishPlanReorder);
-  state.handle.removeEventListener('pointercancel',cancelPlanReorder);
-  try{ state.handle.releasePointerCapture(state.pointerId); }catch(e){}
+  window.removeEventListener('pointermove',movePlanReorder);
+  window.removeEventListener('pointerup',finishPlanReorder);
+  window.removeEventListener('pointercancel',cancelPlanReorder);
+  if(cancelled){
+    state.item.remove();
+    if(state.placeholder.parentNode) state.placeholder.remove();
+    document.body.classList.remove('plan-reordering');
+    activePlanReorder=null;
+    renderPlan();
+    return;
+  }
+  if(state.placeholder.parentNode){
+    state.container.insertBefore(state.item,state.placeholder);
+    state.placeholder.remove();
+  }
+  state.item.classList.remove('plan-drag-floating');
   state.item.classList.remove('is-reordering');
+  state.item.style.left='';
+  state.item.style.top='';
+  state.item.style.width='';
+  state.item.style.height='';
   document.body.classList.remove('plan-reordering');
   activePlanReorder=null;
-  if(cancelled){ renderPlan(); return; }
   const endIds=planOrderIds(state.container,state.selector,state.key);
   const changed=endIds.join('|')!==state.startIds.join('|');
   if(changed){ commitPlanReorder(state); toast(state.kind==='workout'?'Workout order saved':'Exercise order saved'); }
@@ -671,11 +690,12 @@ function movePlanReorder(e){
   const state=activePlanReorder;
   if(!state||e.pointerId!==state.pointerId) return;
   e.preventDefault();
+  state.item.style.top=(e.clientY-state.offsetY)+'px';
   const hit=document.elementFromPoint(e.clientX,e.clientY);
   const target=hit&&hit.closest?hit.closest(state.selector):null;
-  if(target&&target!==state.item&&target.parentElement===state.container){
+  if(target&&target.parentElement===state.container){
     const rect=target.getBoundingClientRect();
-    state.container.insertBefore(state.item,e.clientY<rect.top+rect.height/2?target:target.nextSibling);
+    state.container.insertBefore(state.placeholder,e.clientY<rect.top+rect.height/2?target:target.nextSibling);
   }
   if(e.clientY<80) window.scrollBy(0,-12);
   else if(e.clientY>window.innerHeight-90) window.scrollBy(0,12);
@@ -696,13 +716,24 @@ function startPlanReorder(e,handle){
   if(!item||!container) return;
   if(directPlanChildren(container,selector).length<2){ toast(kind==='workout'?'Add another workout before reordering':'Add another exercise before reordering'); return; }
   e.preventDefault();
-  activePlanReorder={kind,item,container,selector,key,pointerId:e.pointerId,handle,startIds:planOrderIds(container,selector,key),workoutId:handle.dataset.workoutId||''};
+  const rect=item.getBoundingClientRect();
+  const placeholder=document.createElement('div');
+  placeholder.className='reorder-placeholder';
+  placeholder.style.height=rect.height+'px';
+  const startIds=planOrderIds(container,selector,key);
+  container.insertBefore(placeholder,item);
+  document.body.appendChild(item);
+  item.style.left=rect.left+'px';
+  item.style.top=rect.top+'px';
+  item.style.width=rect.width+'px';
+  item.style.height=rect.height+'px';
+  activePlanReorder={kind,item,container,selector,key,pointerId:e.pointerId,handle,placeholder,startIds,offsetY:e.clientY-rect.top,workoutId:handle.dataset.workoutId||''};
   item.classList.add('is-reordering');
+  item.classList.add('plan-drag-floating');
   document.body.classList.add('plan-reordering');
-  try{ handle.setPointerCapture(e.pointerId); }catch(_){ }
-  handle.addEventListener('pointermove',movePlanReorder);
-  handle.addEventListener('pointerup',finishPlanReorder);
-  handle.addEventListener('pointercancel',cancelPlanReorder);
+  window.addEventListener('pointermove',movePlanReorder,{passive:false});
+  window.addEventListener('pointerup',finishPlanReorder);
+  window.addEventListener('pointercancel',cancelPlanReorder);
 }
 function keyboardPlanReorder(handle,delta){
   const kind=handle.dataset.reorderKind;

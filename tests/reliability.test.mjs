@@ -211,7 +211,7 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
   assert.match(settings, /<div class="title">Install DevFit App<\/div>/);
   assert.match(settings, /if\(!deferredInstallPrompt\)\{\s*showIosHint\(\)/);
   assert.equal(manifest.display, 'standalone');
-  assert.match(worker, /devfit-v4\.78\.0/);
+  assert.match(worker, /devfit-v4\.79\.0/);
   assert.doesNotMatch(worker, /\.then\(\(\) => self\.skipWaiting\(\)\)/);
 
   for (const html of [index, settings]) {
@@ -308,6 +308,13 @@ test('paid reports use the adaptive premium renderer and never plot missing valu
   assert.match(reportPdf, /if\(A\.nutrition\.daysLogged>0\)/);
   assert.match(reportPdf, /if\(A\.score\.weeksScored>=2\)/);
   assert.match(reportPdf, /A\.meta\.single/);
+  assert.match(settings, /A\.history=DevFitReport\.analyze\(0,range\.endW/);
+  assert.match(settings, /A\.meta\.single&&A\.history&&A\.history\.rows/);
+  assert.match(reportPdf, /function weeklyArchive\(\)/);
+  assert.match(reportPdf, /function scoreBreakdown\(row\)/);
+  assert.match(reportPdf, /function detailedSessions\(sessions\)/);
+  assert.match(reportPdf, /Every exercise and completed set/);
+  assert.match(reportPdf, /Daily macros from the food diary/);
   assert.doesNotMatch(settings, /r=>r\.score==null\?0:r\.score/);
   assert.doesNotMatch(settings, /p=>p\.cal==null\?0:p\.cal/);
   assert.doesNotMatch(settings, /r=>r\.stepsAvg==null\?0/);

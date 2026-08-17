@@ -125,6 +125,161 @@
       );
     }
 
+    function weeklyDailyTable(row){
+      R.table(
+        [{h:'Day',w:54},{h:'Weight (kg)',w:43,align:'right'},
+         {h:'Steps',w:45,align:'right'},{h:'Sleep (hrs)',w:40,align:'right'}],
+        row.days.map(d=>[
+          {t:d.date?DevFitReport.fmtDay(d.date):d.label,bold:true},
+          d.bw==null?null:f1(d.bw),d.steps==null?null:nf(d.steps),d.sleep==null?null:f1(d.sleep)
+        ]),{rowH:6.2,size:7.5}
+      );
+    }
+
+    function scoreBreakdown(row){
+      const order=['bw','bf','ol','diet','sleep','steps','stress'];
+      const scores=row.scores||{};
+      const items=order.map(key=>scores[key]).filter(Boolean);
+      const loggedWeight=items.reduce((sum,s)=>sum+(s.val==null?0:s.weight),0);
+      R.need(82);
+      R.font('bold',6.5); R.setText(R.MUTE);
+      pdf.text('SIGNAL',M,S.y+3.5); pdf.text('SCORE',M+105,S.y+3.5);
+      pdf.text('WEIGHT',M+132,S.y+3.5); pdf.text('CONTRIBUTION',PW-M,S.y+3.5,{align:'right'});
+      S.y+=6;
+      items.forEach((sig,i)=>{
+        const h=9,y=S.y;
+        if(i%2===0){R.setFill([249,249,251]);pdf.rect(M,y,CW,h,'F');}
+        const active=sig.val!=null,c=active?R.scoreColor(sig.val):[174,176,184];
+        R.font(active?'bold':'normal',8); R.setText(active?R.INK:[164,166,174]);
+        pdf.text(sig.label,M+2,y+5.8);
+        const bx=M+40,bw=55;
+        R.setFill([229,230,235]); pdf.roundedRect(bx,y+3,bw,3.2,1.1,1.1,'F');
+        if(active){R.setFill(c);pdf.roundedRect(bx,y+3,Math.max(1.5,bw*sig.val/100),3.2,1.1,1.1,'F');}
+        R.font(active?'bold':'normal',8); R.setText(c);
+        pdf.text(active?sig.val+'%':'-',M+105,y+5.8);
+        R.font('normal',7.7); R.setText(active?R.BODY:[174,176,184]); pdf.text(sig.weight+'%',M+132,y+5.8);
+        R.font(active?'bold':'normal',7.7); R.setText(active?R.INK:[174,176,184]);
+        pdf.text(active?Math.round(sig.val*sig.weight/100)+' pts':'-',PW-M-2,y+5.8,{align:'right'});
+        R.setDraw(R.LINE);pdf.setLineWidth(.1);pdf.line(M,y+h,PW-M,y+h);
+        S.y+=h;
+      });
+      R.gap(2);
+      R.font('normal',7.2);R.setText(R.MUTE);
+      const note='Logged signal coverage: '+loggedWeight+'%. Unlogged signals are excluded and available weights are rebalanced.';
+      pdf.text(note,M,S.y+3.5);S.y+=7;
+    }
+
+    function sessionHeader(sess,continued){
+      R.need(10);
+      R.setFill([249,239,239]);pdf.roundedRect(M,S.y,CW,8,1.5,1.5,'F');
+      R.font('bold',8.5);R.setText([158,0,0]);
+      pdf.text(clean(sess.name)+(continued?' (continued)':''),M+4,S.y+5.3);
+      R.font('normal',7.3);R.setText(R.MUTE);
+      pdf.text(sess.date?DevFitReport.fmtDay(sess.date):'',PW-M-4,S.y+5.3,{align:'right'});
+      S.y+=10;
+    }
+
+    function detailedSessions(sessions){
+      if(!sessions.length){
+        R.block('No workouts recorded','No completed training session was saved during this week.',R.SLATE,SOFT);
+        return;
+      }
+      sessions.forEach(sess=>{
+        sessionHeader(sess,false);
+        if(!sess.exercises.length){R.para('Session saved without exercise details.',{size:8,color:R.MUTE,gap:2});return;}
+        sess.exercises.forEach(ex=>{
+          const setText=clean((ex.sets||[]).join('  |  '));
+          R.font('normal',8);
+          const lines=pdf.splitTextToSize(setText,CW-66);
+          const h=Math.max(7,lines.length*4.2+2.5);
+          if(S.y+h>R.BOT){R.newPage('Weekly Record');sessionHeader(sess,true);}
+          R.font('bold',8);R.setText(R.INK);pdf.text(clean(ex.name),M+5,S.y+4.6);
+          R.font('normal',7.8);R.setText([72,74,82]);
+          lines.forEach((line,k)=>pdf.text(line,M+66,S.y+4.6+k*4.2));
+          S.y+=h;
+        });
+        R.gap(2.5);
+      });
+    }
+
+    function weeklyNutrition(row){
+      const loggedDays=row.days.filter(d=>d.food).length;
+      if(!loggedDays){
+        R.need(28);
+        sectionLabel('Nutrition this week','Daily macros from the food diary');
+        R.block('No nutrition recorded','No food entries were saved during this week.',R.RED,SOFT);
+        return;
+      }
+      R.need(64);
+      sectionLabel('Nutrition this week','Daily macros from the food diary');
+      R.table(
+        [{h:'Day',w:46},{h:'Calories',w:34,align:'right'},{h:'Protein',w:34,align:'right'},
+         {h:'Carbs',w:34,align:'right'},{h:'Fat',w:34,align:'right'}],
+        row.days.map(d=>[
+          {t:d.date?DevFitReport.fmtDay(d.date):d.label,bold:true},
+          d.food?nf(d.food.cal):null,d.food?(nf(d.food.p)+' g'):null,
+          d.food?(nf(d.food.c)+' g'):null,d.food?(nf(d.food.f)+' g'):null
+        ]),{rowH:6.1,size:7.5}
+      );
+      R.statline(loggedDays+' / 7 days logged  |  '+nf(A.nutrition.avgCal)+' kcal average  |  '+A.nutrition.avgP+' g protein average');
+    }
+
+    function weeklyArchive(){
+      const row=A.rows[0],score=row.score;
+      R.setFill(R.RED);pdf.rect(0,0,PW,12,'F');
+      R.font('bolditalic',18);R.setText(R.INK);pdf.text('DEV',M,28);
+      const dw=pdf.getTextWidth('DEV');R.setText(R.RED);pdf.text('FIT',M+dw,28);
+      R.font('bold',15);R.setText([48,48,54]);pdf.text(' - Week '+row.n+' Report',M+dw+pdf.getTextWidth('FIT'),28);
+      if(window.pdfLogoImg){try{pdf.addImage(window.pdfLogoImg,'PNG',PW-M-13,18,13,13);}catch(e){}}
+      R.font('normal',10);R.setText(R.MUTE);pdf.text(String(A.meta.name).toUpperCase(),M,39);
+      R.font('normal',8.5);pdf.text(clean(A.meta.span)+'  |  Generated '+A.meta.generated,M,47);
+      R.setDraw(R.RED);pdf.setLineWidth(.7);pdf.line(M,52,PW-M,52);
+      S.y=58;S.section='Weekly Summary';
+
+      R.font('bold',7);R.setText(R.MUTE);pdf.text('TRUE PROGRESS SCORE',M,S.y+3);S.y+=7;
+      const color=score==null?[74,78,88]:R.scoreColor(score),h=28;
+      R.setFill(color);pdf.roundedRect(M,S.y,CW,h,3,3,'F');
+      R.font('bold',23);R.setText(WHITE);pdf.text(score==null?'--':score+'%',M+9,S.y+18);
+      R.font('normal',11);pdf.text(score==null?'More data needed':R.scoreGrade(score),M+42,S.y+17.5);
+      const total=A.meta.programDuration||A.meta.weeks;
+      R.font('normal',8.5);pdf.text('Week '+row.n+' / '+total,PW-M-7,S.y+17.5,{align:'right'});
+      S.y+=34;
+
+      sectionLabel('Weekly metrics','The numbers recorded during this week');
+      metricCards([
+        {label:'Average weight',value:row.bwAvg==null?'--':f1(row.bwAvg)+' kg',sub:row.bwDays+' weigh-ins'},
+        {label:'Average steps',value:row.stepsAvg==null?'--':nf(row.stepsAvg),sub:row.stepsDays+' days logged',accent:[45,122,88]},
+        {label:'Average sleep',value:row.sleepAvg==null?'--':f1(row.sleepAvg)+' h',sub:row.sleepDays+' nights logged',accent:[116,72,170]},
+        {label:'Training',value:A.training.sessions+' session'+(A.training.sessions===1?'':'s'),sub:A.training.tonnage?nf(A.training.tonnage)+' kg volume':'No volume recorded'},
+        {label:'Average calories',value:A.nutrition.avgCal==null?'--':nf(A.nutrition.avgCal),sub:A.nutrition.daysLogged+' days logged'},
+        {label:'Average protein',value:A.nutrition.avgP==null?'--':A.nutrition.avgP+' g',sub:A.nutrition.proteinPerKg?A.nutrition.proteinPerKg+' g/kg':'Daily average'}
+      ]);
+      sectionLabel('Signal breakdown','Every signal used in this week\'s score');
+      scoreBreakdown(row);
+
+      R.page('Weekly Record',clean(A.meta.span));
+      const history=A.history||A;
+      if(history.weight.daysLogged>=2){
+        trendPanel('Bodyweight history','Program trend through Week '+row.n,'exp-bw',L.weight,43);
+      }
+      sectionLabel('Daily log','Bodyweight, steps and sleep for all seven days');
+      weeklyDailyTable(row);
+      R.need(16);sectionLabel('Workouts this week','Every exercise and completed set');
+      detailedSessions(A.training.list);
+      weeklyNutrition(row);
+      if(A.checkin.notes.length){
+        R.need(25);sectionLabel('Weekly notes');
+        A.checkin.notes.forEach(note=>R.block('Week '+note.n,clean(note.text),R.SLATE,[244,245,247]));
+      }
+    }
+
+    function finish(){
+      R.footers();
+      const fname='DevFit_'+A.meta.fileBase+'_'+safeName(A.meta.name)+'.pdf';
+      savePdfNamed(pdf,fname);
+      toast(A.meta.title+' saved');
+    }
+
     function cover(){
       R.setFill(DARK); pdf.rect(0,0,PW,63,'F');
       R.setFill(R.RED); pdf.rect(0,0,5,63,'F');
@@ -156,6 +311,15 @@
       R.setFill([222,224,229]); pdf.roundedRect(rx+7,S.y+31.5,right-14,2.2,1,1,'F');
       R.setFill(R.RED); pdf.roundedRect(rx+7,S.y+31.5,(right-14)*(A.engagement.pct/100),2.2,1,1,'F');
       S.y+=42;
+    }
+
+    // Weekly exports are detailed archives by design: score maths, the complete
+    // seven-day log, every workout set and daily nutrition. Multi-week exports
+    // remain trend-led analytics reports.
+    if(A.meta.single){
+      weeklyArchive();
+      finish();
+      return pdf;
     }
 
     cover();
@@ -267,10 +431,7 @@
       A.checkin.notes.forEach(note=>R.block('Week '+note.n+(note.range?(' - '+clean(note.range)):''),clean(note.text),R.SLATE,[244,245,247]));
     }
 
-    R.footers();
-    const fname='DevFit_'+A.meta.fileBase+'_'+safeName(A.meta.name)+'.pdf';
-    savePdfNamed(pdf,fname);
-    toast(A.meta.title+' saved');
+    finish();
     return pdf;
   }
 

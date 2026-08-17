@@ -563,7 +563,7 @@ html.nosplash #devfit-splash{display:none!important}
 
   <div class="footer">
     DevFit · Dominance Through Discipline<br>
-    <a href="https://wa.me/60183679177">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.78.0
+    <a href="https://wa.me/60183679177">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.79.0
   </div>
 
 
@@ -1006,7 +1006,8 @@ function buildExportCharts(A){
 
   // ── Bodyweight: every logged day, labelled by date ──
   const bwLabels=[], bwData=[];
-  rows.forEach(r=>r.days.forEach(d=>{
+  const bwRows=(A.meta.single&&A.history&&A.history.rows)?A.history.rows:rows;
+  bwRows.forEach(r=>r.days.forEach(d=>{
     if(d.bw==null) return;
     bwLabels.push(d.date ? DevFitReport.fmtDay(d.date).replace(/^\w+, /,'') : ('W'+r.n+' '+d.label));
     bwData.push(d.bw);
@@ -1437,6 +1438,13 @@ function generateReport(range){
   try{
     A = DevFitReport.analyze(range.startW, range.endW,
         {kind:range.kind, title:range.title, fileBase:range.fileBase});
+    // A weekly report keeps the selected week's details but plots bodyweight
+    // from program start through that week, matching the original useful
+    // report: one PDF shows both this week's record and its real context.
+    if(A.meta.single){
+      A.history=DevFitReport.analyze(0,range.endW,
+        {kind:'history',title:range.title,fileBase:range.fileBase});
+    }
     N = DevFitReport.summarize(A);
   }catch(e){ console.error(e); toast('Could not read your data', true); return; }
 

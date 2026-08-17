@@ -340,6 +340,50 @@ test('owner backup encryption round-trips and detects tampering', async () => {
   await assert.rejects(() => context.decryptBackup(tampered, 'correct horse battery staple'));
 });
 
+test('permanent account deletion requires exact confirmation and verifies zero rows remain', async () => {
+  process.env.DEVFIT_JWT_SECRET = 'test-secret';
+  process.env.SUPABASE_SERVICE_KEY = 'test-service-key';
+  process.env.DEVFIT_ADMIN_PASSWORD = 'owner-test-password';
+  const { default: handler } = await import(new URL('../api/admin.js?account-deletion-test', import.meta.url));
+  const run = async (extra) => {
+    let status = 0, body;
+    const req = { method: 'POST', headers: { 'x-forwarded-for': '127.0.0.1' }, body: { password: 'owner-test-password', action: 'deleteAccount', email: 'person@gmail.com', ...extra } };
+    const res = { setHeader() {}, status(value) { status = value; return this; }, json(value) { body = value; } };
+    await handler(req, res);
+    return { status, body };
+  };
+
+  let rpcCalls = 0;
+  globalThis.fetch = async () => { throw new Error('mismatched confirmation must not reach storage'); };
+  const mismatch = await run({ confirmEmail: 'other@gmail.com', confirmation: 'DELETE DEVFIT ACCOUNT' });
+  assert.equal(mismatch.status, 400);
+  assert.equal(mismatch.body.error, 'deletion_confirmation_mismatch');
+
+  globalThis.fetch = async (url, options = {}) => {
+    const target = String(url), method = options.method || 'GET';
+    if (target.includes('/rest/v1/devfit_rate?') && method === 'GET') return { ok: true, json: async () => [] };
+    if (target.includes('/rest/v1/devfit_rate?on_conflict=') && method === 'POST') return { ok: true, json: async () => [{}] };
+    if (target.includes('/rest/v1/rpc/delete_devfit_account') && method === 'POST') {
+      rpcCalls++;
+      return { ok: true, json: async () => ({ email: 'person@gmail.com', subscribers: 1, currentData: 3, recoveryVersions: 5, devices: 2 }) };
+    }
+    if (/\/rest\/v1\/devfit_(subscribers|data|data_versions|logins)\?/.test(target) && method === 'GET') return { ok: true, json: async () => [] };
+    throw new Error('unexpected request ' + method + ' ' + target);
+  };
+  const deleted = await run({ confirmEmail: 'person@gmail.com', confirmation: 'DELETE DEVFIT ACCOUNT' });
+  assert.equal(deleted.status, 200);
+  assert.equal(deleted.body.ok, true);
+  assert.equal(rpcCalls, 1);
+  assert.deepEqual(deleted.body.remaining, { subscribers: 0, currentData: 0, recoveryVersions: 0, devices: 0 });
+
+  const migration = fs.readFileSync(new URL('../supabase/migrations/20260818_atomic_account_deletion.sql', import.meta.url), 'utf8');
+  assert.match(migration, /security definer/);
+  assert.match(migration, /delete from public\.devfit_data_versions where email = v_email/);
+  assert.match(migration, /delete from public\.devfit_subscribers where email = v_email/);
+  assert.match(migration, /revoke all on function public\.delete_devfit_account\(text\) from public, anon, authenticated/);
+  assert.match(migration, /grant execute on function public\.delete_devfit_account\(text\) to service_role/);
+});
+
 test('persistent session cannot access cloud data after account revocation', async () => {
   process.env.DEVFIT_JWT_SECRET = 'test-secret';
   process.env.SUPABASE_SERVICE_KEY = 'test-service-key';

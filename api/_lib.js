@@ -125,6 +125,18 @@ export async function sbUpsert(table, row, onConflict) {
   return r.json();
 }
 
+export async function sbRpc(name, args) {
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/rpc/${name}`, {
+      method: 'POST',
+      headers: sbHeaders(),
+      body: JSON.stringify(args || {})
+    });
+    if (!r.ok) return null;
+    return r.json();
+  } catch (e) { return null; }
+}
+
 // Durable production event reporting. Always write to Vercel logs and, when the
 // server database is available, retain the event in devfit_errors. This helper
 // never throws back into a user request.

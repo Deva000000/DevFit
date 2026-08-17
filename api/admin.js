@@ -11,10 +11,12 @@
 //   action 'deactivate' { email }                  → tier 'free' (data kept)
 //   action 'revoke'   { email }                    → approved:false (kicked out)
 //   action 'backupPage' { table, offset }          → bounded owner-backup page
+//   action 'deletePreview' { email }                → exact deletion counts
+//   action 'deleteAccount' { email, confirmEmail, confirmation } → permanent
 
 import crypto from 'crypto';
 import {
-  haveServerConfig, sbSelect, sbUpsert, getSubscriber,
+  haveServerConfig, sbSelect, sbUpsert, sbRpc, getSubscriber,
   rateLimit, clientIp, readJsonBody, listLogins
 } from './_lib.js';
 
@@ -41,6 +43,23 @@ function pwOk(given) {
 
 function ymd(d) { return d.toISOString().slice(0, 10); }
 function addDays(base, n) { const d = new Date(base); d.setDate(d.getDate() + n); return d; }
+
+async function deletionCounts(email) {
+  const encoded = encodeURIComponent(email);
+  const results = await Promise.all([
+    sbSelect('devfit_subscribers', 'email=eq.' + encoded + '&select=email'),
+    sbSelect('devfit_data', 'email=eq.' + encoded + '&select=data_type'),
+    sbSelect('devfit_data_versions', 'email=eq.' + encoded + '&select=id'),
+    sbSelect('devfit_logins', 'email=eq.' + encoded + '&select=device_id')
+  ]);
+  if (results.some((rows) => !Array.isArray(rows))) return null;
+  return {
+    subscribers: results[0].length,
+    currentData: results[1].length,
+    recoveryVersions: results[2].length,
+    devices: results[3].length
+  };
+}
 
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
@@ -109,6 +128,32 @@ export default async function handler(req, res) {
         nextOffset: offset + consumed,
         done: consumed === rows.length && rows.length < BACKUP_PAGE_ROWS
       });
+      return;
+    }
+
+    if (action === 'deletePreview') {
+      if (!email || !email.includes('@')) { res.status(400).json({ error: 'missing_email' }); return; }
+      const counts = await deletionCounts(email);
+      if (!counts) { res.status(503).json({ error: 'account_store_unavailable' }); return; }
+      res.status(200).json({ email, counts });
+      return;
+    }
+
+    if (action === 'deleteAccount') {
+      const confirmEmail = String(body.confirmEmail || '').trim().toLowerCase();
+      const confirmation = String(body.confirmation || '').trim();
+      if (!email || !email.includes('@') || confirmEmail !== email || confirmation !== 'DELETE DEVFIT ACCOUNT') {
+        res.status(400).json({ error: 'deletion_confirmation_mismatch' }); return;
+      }
+      const rl = await rateLimit('admin_delete:' + clientIp(req), 10, 24 * 60 * 60);
+      if (!rl.ok) { res.status(429).json({ error: 'rate_limited', retryAfter: rl.retryAfter }); return; }
+      const deleted = await sbRpc('delete_devfit_account', { p_email: email });
+      if (!deleted || deleted.email !== email) { res.status(500).json({ error: 'delete_failed' }); return; }
+      const remaining = await deletionCounts(email);
+      if (!remaining || Object.values(remaining).some((count) => count !== 0)) {
+        res.status(500).json({ error: 'delete_verification_failed', remaining }); return;
+      }
+      res.status(200).json({ ok: true, deleted, remaining });
       return;
     }
 

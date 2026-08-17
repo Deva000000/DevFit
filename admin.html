@@ -201,6 +201,23 @@
         <div class="msg" id="backup-verify-msg"></div>
         <div class="hint">Verification happens locally in this browser. It confirms the file can be decrypted and reports the row counts; it does not alter the live database.</div>
       </div>
+      <div class="card">
+        <h2 style="color:#fca5a5">Permanent account deletion</h2>
+        <div class="hint" style="margin-top:0;margin-bottom:12px">Use only after the account owner has requested deletion and their Gmail identity has been verified. Deactivate and Revoke above are safer when data should be kept.</div>
+        <label>Account Gmail</label>
+        <input type="email" id="delete-email" autocomplete="off" placeholder="client@gmail.com">
+        <button class="btn ghost" id="delete-preview">Preview exact deletion</button>
+        <div id="delete-confirm-box" class="hide">
+          <div class="dur" id="delete-summary" style="color:#fca5a5;background:#2a0a0a;border-color:#7f1d1d"></div>
+          <label>Retype the exact Gmail</label>
+          <input type="email" id="delete-confirm-email" autocomplete="off" placeholder="client@gmail.com">
+          <label>Type DELETE DEVFIT ACCOUNT</label>
+          <input type="text" id="delete-confirm-phrase" autocomplete="off" placeholder="DELETE DEVFIT ACCOUNT">
+          <button class="btn" id="delete-account" style="background:#7f1d1d">Permanently delete this account</button>
+        </div>
+        <div class="msg" id="delete-msg"></div>
+        <div class="hint"><b>Cannot be undone:</b> removes login approval, current app records, server recovery versions and device records. Previously downloaded owner backups must be managed according to the Privacy Policy.</div>
+      </div>
     </div>
 
     <button class="btn ghost" id="logout-btn">Lock panel</button>
@@ -341,6 +358,37 @@ async function verifyOwnerBackup(){
     msg($('backup-verify-msg'),'Verified ✓ '+new Date(payload.createdAt).toLocaleString()+' · '+BACKUP_TABLES.map(function(t){return t.replace('devfit_','')+': '+(counts[t]||payload.tables[t].length);}).join(' · '),true);
   }catch(e){ msg($('backup-verify-msg'),'Could not verify: wrong password, damaged file, or unsupported backup.',false); }
   finally{ btn.disabled=false; btn.textContent='Decrypt and verify'; $('backup-verify-pass').value=''; }
+}
+
+var deletionPreviewEmail='';
+async function previewAccountDeletion(){
+  var email=($('delete-email').value||'').trim().toLowerCase();
+  $('delete-confirm-box').classList.add('hide'); deletionPreviewEmail='';
+  if(!email||email.indexOf('@')<0){ msg($('delete-msg'),'Enter a valid account Gmail.',false); return; }
+  var r=await call('deletePreview',{email:email});
+  if(r.status!==200){ msg($('delete-msg'),'Could not preview deletion: '+(r.data.error||r.status),false); return; }
+  var c=r.data.counts||{};
+  deletionPreviewEmail=email;
+  $('delete-summary').textContent=email+' · subscriber '+(c.subscribers||0)+' · live records '+(c.currentData||0)+' · recovery versions '+(c.recoveryVersions||0)+' · devices '+(c.devices||0);
+  $('delete-confirm-email').value=''; $('delete-confirm-phrase').value='';
+  $('delete-confirm-box').classList.remove('hide');
+  msg($('delete-msg'),'Preview complete. Review the counts before confirming.',true);
+}
+async function deleteAccountPermanently(){
+  var confirmEmail=($('delete-confirm-email').value||'').trim().toLowerCase();
+  var phrase=($('delete-confirm-phrase').value||'').trim();
+  if(!deletionPreviewEmail||confirmEmail!==deletionPreviewEmail||phrase!=='DELETE DEVFIT ACCOUNT'){
+    msg($('delete-msg'),'Confirmation does not exactly match the previewed Gmail and deletion phrase.',false); return;
+  }
+  var btn=$('delete-account'); btn.disabled=true; btn.textContent='Deleting and verifying…';
+  try{
+    var r=await call('deleteAccount',{email:deletionPreviewEmail,confirmEmail:confirmEmail,confirmation:phrase});
+    if(r.status!==200||!r.data.ok){ msg($('delete-msg'),'Deletion did not complete: '+(r.data.error||r.status)+'. Retry or investigate before telling the user it is deleted.',false); return; }
+    msg($('delete-msg'),'Permanently deleted and verified ✓ '+deletionPreviewEmail,true);
+    deletionPreviewEmail=''; $('delete-email').value=''; $('delete-confirm-email').value=''; $('delete-confirm-phrase').value=''; $('delete-confirm-box').classList.add('hide');
+    refreshList();
+  }catch(e){ msg($('delete-msg'),'Deletion could not be verified. No success has been reported; retry or investigate first.',false); }
+  finally{ btn.disabled=false; btn.textContent='Permanently delete this account'; }
 }
 
 /* ---------- duration helpers ---------- */
@@ -820,6 +868,8 @@ $('refresh-logins').addEventListener('click', refreshLogins);
 $('refresh-errors').addEventListener('click', refreshErrors);
 $('backup-download').addEventListener('click', downloadOwnerBackup);
 $('backup-verify').addEventListener('click', verifyOwnerBackup);
+$('delete-preview').addEventListener('click', previewAccountDeletion);
+$('delete-account').addEventListener('click', deleteAccountPermanently);
 $('tab-manage').addEventListener('click', function(){ showTab('manage'); });
 $('tab-logins').addEventListener('click', function(){ showTab('logins'); });
 $('tab-errors').addEventListener('click', function(){ showTab('errors'); });

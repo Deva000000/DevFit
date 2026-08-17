@@ -208,7 +208,20 @@
   .score-bar-label{font-size:11px;color:#e2e8f0;width:90px;flex-shrink:0}
   .score-bar-track{flex:1;height:6px;background:#444444;border-radius:3px;overflow:hidden}
   .score-bar-fill{height:100%;border-radius:3px;transition:width .4s}
-  .score-bar-pct{font-size:11px;font-weight:600;color:#ffffff;width:32px;text-align:right}
+  .score-bar-pct{font-size:11px;font-weight:700;color:#ffffff;width:34px;text-align:right}
+  .score-influence{display:block;color:#8f96a3;font-size:8px;font-weight:600;line-height:1.2;margin-top:2px}
+  .score-status{font-size:10px;color:#a7adb8;line-height:1.35;margin:-4px 0 7px;padding-left:94px}
+  .score-read-guide{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:0 0 14px;padding:10px;border:1px solid #34343b;border-radius:10px;background:#17171a}
+  .score-read-guide div{font-size:9.5px;line-height:1.45;color:#aeb3bd}
+  .score-read-guide b{display:block;color:#fff;font-size:10px;margin-bottom:2px}
+  .score-method{margin-top:12px;border:1px solid #34343b;border-radius:10px;background:#17171a;overflow:hidden}
+  .score-method summary{padding:11px 12px;cursor:pointer;color:#f1f5f9;font-size:11px;font-weight:700;list-style:none}
+  .score-method summary::-webkit-details-marker{display:none}
+  .score-method summary::after{content:'+';float:right;color:#f87171;font-size:14px;line-height:1}
+  .score-method[open] summary::after{content:'-'}
+  .score-method-body{padding:0 12px 12px;font-size:10px;line-height:1.6;color:#b7bcc6}
+  .score-method-body b{color:#fff}
+  @media(max-width:520px){.score-read-guide{grid-template-columns:1fr}.score-bar-label{width:86px}}
 
   /* FEEDBACK */
   .feedback-box{background:#ffffff;border-left:3px solid var(--g);border-radius:var(--radius);padding:12px 16px;font-size:13px;line-height:1.7;color:#111111}
@@ -359,7 +372,8 @@
     .tip-cards{grid-template-columns:1fr}
     .stats-banner{grid-template-columns:1fr 1fr;padding:12px}
     .stat-val{font-size:15px}
-    .score-bar-label{width:70px;font-size:10px}
+    .score-bar-label{width:84px;font-size:10px}
+    .score-status{padding-left:92px}
     .week-tabs{justify-content:flex-start;gap:4px}
     .wtab,.wtab-action{font-size:11px;padding:5px 10px}
     .card{padding:14px}
@@ -617,6 +631,11 @@ html.nosplash #devfit-splash{display:none!important}
   <!-- TRUE PROGRESS SCORE (Pro) -->
   <div class="pro-gate card">
     <div class="section-label">True progress score — Week <span id="score-week-num">1</span></div>
+    <div class="score-read-guide" aria-label="How to read the weekly score">
+      <div><b>Score</b>The result for that signal this week.</div>
+      <div><b>Influence</b>Its fixed share in DevFit's overall score.</div>
+      <div><b>Baseline / wait</b>Saved correctly, but another week is needed for comparison.</div>
+    </div>
     <div class="score-big-wrap">
       <div class="score-big-ring">
         <canvas id="ring-overall" width="88" height="88"></canvas>
@@ -624,10 +643,16 @@ html.nosplash #devfit-splash{display:none!important}
       </div>
       <div class="score-breakdown" id="score-breakdown"></div>
     </div>
-    <div style="margin-top:12px;font-size:11px;color:#e2e8f0;line-height:1.6;" id="score-legend">
-      Weekly score combines 7 logged signals — Overload 22% · Diet 23% · Bodyweight 17% · Body fat 10% · Sleep 10% · Steps 10% · Stress 8%. A headline score appears only after at least 3 signals and 40% coverage; missing signals never pretend the week is fully measured.
-      <div style="margin-top:8px;opacity:.85;">Bodyweight uses the median of at least 3 weigh-ins per week and compares it with the previous sufficiently logged week. Suggested rates are guidance, not a diagnosis: <b>loss 0.5–1%/wk</b>, <b>lean gain 0.25–0.5%/wk</b>, <b>maintain ±0.5%/wk</b>. Steps are scored against your chosen goal; sleep guidance uses 7–9h.</div>
-    </div>
+    <details class="score-method" id="score-legend">
+      <summary>How DevFit calculates this score</summary>
+      <div class="score-method-body">
+        <b>Bodyweight:</b> median of at least 3 weigh-ins, compared with the previous sufficiently logged week. Week 1 sets the baseline rather than inventing progress. Guidance bands: loss 0.5–1%/week, lean gain 0.25–0.5%/week, maintain within ±0.5%/week.<br>
+        <b>Sleep:</b> the adult health consensus starts at 7 hours; DevFit awards full score at 7–9 hours, then reduces it outside that range. <b>Steps:</b> measured against your own saved daily goal because there is no universal daily step target: 100% of goal = 100 score, 85–99% = 85, 70–84% = 65, 50–69% = 40, below 50% = 20.<br>
+        <b>Weekly check-in:</b> DevFit's visible rubric converts the choice you make into a score. Overload: improved 100, better form 75, same 60, regressed 30. Diet: met 100, missed a few days 70, mostly missed 25. Stress: low 100, moderate 55, high 30. Body-fat direction: clear drop 100, slight drop 85, same 60, slight rise 35, clear rise 10.<br>
+        <b>Overall:</b> requires at least 3 signals and 40% coverage. Missing signals are excluded and the available influence weights are rebalanced proportionally.<br>
+        There is no single worldwide fitness-score standard. The percentages are DevFit's fixed, visible influence model—not medical percentages. Recognized reference ranges are used where they exist; personal goals are used where no universal standard exists. This is training guidance, not a medical assessment.
+      </div>
+    </details>
     <button class="wk-share-btn" id="wk-share-btn" type="button">Share Weekly Card</button>
   </div>
 
@@ -1822,17 +1847,19 @@ function renderScoreSection(){
   setTimeout(()=>drawRingBig('ring-overall',overall,null),50);
 
   let html='';
-  Object.values(scores).forEach(s=>{
-    const pct=s.val!==null?s.val:0;
-    const barColor=pct>=75?'#2f9e57':pct>=50?'#c6902f':'#cc0000';
+  Object.entries(scores).forEach(([key,s])=>{
+    const baseline=key==='bw'&&s.val===null&&String(s.status||'').startsWith('Baseline set:');
+    const waiting=s.val===null&&s.status&&s.status!=='Not logged'&&!baseline;
+    const pct=s.val!==null?s.val:(baseline?100:0);
+    const barColor=baseline?'#64748b':waiting?'#94a3b8':pct>=75?'#2f9e57':pct>=50?'#c6902f':'#cc0000';
     const zone=s.val===null?(s.status||'Not logged'):pct>=75?'Great':pct>=50?'Okay':'Low';
-    const display=s.val!==null?pct+'%':'—';
+    const display=s.val!==null?pct+'%':baseline?'SET':waiting?'WAIT':'—';
     html+='<div class="score-bar-row">'+
-      '<div class="score-bar-label">'+s.label+' <span style="color:#aaa;font-size:10px;">'+s.weight+'%</span></div>'+
+      '<div class="score-bar-label">'+s.label+'<span class="score-influence">Influence '+s.weight+'%</span></div>'+
       '<div class="score-bar-track"><div class="score-bar-fill" style="width:'+pct+'%;background:'+barColor+'"></div></div>'+
       '<div class="score-bar-pct" style="color:'+barColor+';">'+display+'</div>'+
       '</div>'+
-      '<div style="font-size:10px;color:#999;margin:-4px 0 6px 0;padding-left:94px;">'+zone+'</div>';
+      '<div class="score-status">'+zone+'</div>';
   });
   html+='<div style="margin-top:9px;padding:9px 11px;border-radius:9px;background:#17171a;border:1px solid #303036;font-size:10px;color:#aaa;display:flex;justify-content:space-between;gap:10px"><span>Data coverage · '+signalCount+'/7 signals</span><strong style="color:#fff">'+coverage+'% · '+confidence+'</strong></div>';
   document.getElementById('score-breakdown').innerHTML=html;

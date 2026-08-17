@@ -107,6 +107,11 @@ test('weekly score requires enough weight data and reports coverage', () => {
   const code=fs.readFileSync(new URL('../scoring.js',import.meta.url),'utf8');
   const context={console,Number,Object,Array,Math,appData:{goal:'65',goalType:'loss',targetSteps:'7000',bw:[[70,70.1,'','','','',''],[69.7,69.6,'','','','','']],steps:[[7000],[7000]],sleep:[[7],[7]],weeklyCheckin:[{},{}]},freshCheckin:()=>({})};
   vm.runInNewContext(code,context);
+  context.appData.bw[0]=[70,70.2,70.3,70.6,70.7,70.8,70.8];
+  const baseline=context.calcTrueScore(0);
+  assert.equal(baseline.scores.bw.val,null);
+  assert.match(baseline.scores.bw.status,/Baseline set: 70\.6 kg median \(7 logs\)/);
+  assert.match(baseline.scores.bw.status,/Week 2 will show progress/);
   const sparse=context.calcTrueScore(1);
   assert.equal(sparse.scores.bw.val,null);
   assert.equal(sparse.signalCount,2);
@@ -122,6 +127,12 @@ test('weekly score requires enough weight data and reports coverage', () => {
   const covered=context.calcTrueScore(1);
   assert.equal(covered.coverage,60);
   assert.notEqual(covered.overall,null);
+
+  const html=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
+  assert.match(html,/baseline\?'SET':waiting\?'WAIT'/);
+  assert.match(html,/Its fixed share in DevFit's overall score/);
+  assert.match(html,/There is no single worldwide fitness-score standard/);
+  assert.match(html,/The percentages are DevFit's fixed, visible influence model/);
 });
 
 test('data API rejects a stale whole-document write with the current row', async () => {
@@ -211,7 +222,7 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
   assert.match(settings, /<div class="title">Install DevFit App<\/div>/);
   assert.match(settings, /if\(!deferredInstallPrompt\)\{\s*showIosHint\(\)/);
   assert.equal(manifest.display, 'standalone');
-  assert.match(worker, /devfit-v4\.81\.0/);
+  assert.match(worker, /devfit-v4\.82\.0/);
   assert.doesNotMatch(worker, /\.then\(\(\) => self\.skipWaiting\(\)\)/);
 
   for (const html of [index, settings]) {

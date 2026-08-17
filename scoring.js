@@ -10,7 +10,8 @@
    Evidence base:
    • Steps — benefit plateaus ~8,000–10,000/day (Paluch 2022, Lancet Public
      Health; Saint-Maurice 2020, JAMA).
-   • Sleep — 7–9 h optimal (Hirshkowitz 2015, Sleep Health).
+   • Sleep — adults should regularly get at least 7 h (AASM/SRS consensus);
+     DevFit uses 7–9 h as its full-score training range.
    • Bodyweight rate — loss 0.5–1.0 %BW/wk spares lean mass (Helms 2014, JISSN;
      Garthe 2011); lean gain 0.25–0.5 %BW/wk (Aragon & Schoenfeld 2013); maintain ±0.5 %BW/wk.
 */
@@ -133,9 +134,9 @@ function calcTrueScore(w){
   let bwStatus='';
   if(bwVal===null){
     if(currentBw.length===0) bwStatus='Not logged';
-    else if(currentBw.length<3) bwStatus='Need 3 weigh-ins';
-    else if(w===0) bwStatus='Baseline week';
-    else if(previousCount<3) bwStatus='Need previous baseline';
+    else if(currentBw.length<3) bwStatus='Need 3 weigh-ins ('+currentBw.length+'/3 logged)';
+    else if(w===0) bwStatus='Baseline set: '+bwAvg.toFixed(1)+' kg median ('+currentBw.length+' logs) - Week 2 will show progress';
+    else if(previousCount<3) bwStatus='Waiting for a previous week with 3 weigh-ins';
   }
 
   // Recomp credit — scale stalled but body-fat dropping = working

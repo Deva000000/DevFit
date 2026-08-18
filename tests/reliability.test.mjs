@@ -452,7 +452,7 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
   assert.match(settings, /<div class="title">Install DevFit App<\/div>/);
   assert.match(settings, /if\(!deferredInstallPrompt\)\{\s*showIosHint\(\)/);
   assert.equal(manifest.display, 'standalone');
-  assert.match(worker, /devfit-v4\.86\.0/);
+  assert.match(worker, /devfit-v4\.86\.1/);
   assert.doesNotMatch(worker, /\.then\(\(\) => self\.skipWaiting\(\)\)/);
 
   for (const html of [index, settings]) {
@@ -532,6 +532,8 @@ test('public pages contain legal links and no retired sync or trainer claims', (
   assert.match(publicHtml, /privacy\.html/);
   assert.match(publicHtml, /terms\.html/);
   assert.doesNotMatch(publicHtml, /contact (your )?trainer|trainer \/ client sync|automatic cloud backup|multi-device sync|syncs automatically/i);
+  assert.doesNotMatch(publicHtml, /Coached by Deva|six-signal|across six signals/i);
+  assert.match(fs.readFileSync(new URL('../landing.html', import.meta.url), 'utf8'), /Trained by DevFit\?/);
   const privacy = fs.readFileSync(new URL('../privacy.html', import.meta.url), 'utf8');
   const terms = fs.readFileSync(new URL('../terms.html', import.meta.url), 'utf8');
   assert.match(privacy, /Retention and deletion/);

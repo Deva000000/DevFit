@@ -11,6 +11,13 @@ function b64(value) {
   return Buffer.from(typeof value === 'string' ? value : JSON.stringify(value)).toString('base64url');
 }
 
+function adminCookie(secret = 'test-secret') {
+  const header = b64({ alg: 'HS256', typ: 'JWT' });
+  const payload = b64({ kind: 'devfit_admin', iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 3600 });
+  const signature = crypto.createHmac('sha256', secret).update(header + '.' + payload).digest().toString('base64url');
+  return 'devfit_admin_session=' + header + '.' + payload + '.' + signature;
+}
+
 test('Google ID tokens require a valid signature, audience and lifetime', async () => {
   const pair = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
   const jwk = pair.publicKey.export({ format: 'jwk' });
@@ -54,6 +61,8 @@ test('DevFit sessions persist until logout and legacy expiring tokens upgrade sa
 
 test('workout merge keeps sessions recorded independently on two devices', () => {
   const code = fs.readFileSync(new URL('../devfit-db.js', import.meta.url), 'utf8');
+  assert.match(code, /latest = mergeDoc\(dataType, latest, readLocal\(dataType\)\)/,
+    'a stale/quota-limited localStorage copy must not replace the newest in-memory edit');
   const progressModel = fs.readFileSync(new URL('../progress-model.js', import.meta.url), 'utf8');
   const storage = new Map();
   const localStorage = { getItem: (k) => storage.has(k) ? storage.get(k) : null, setItem: (k, v) => storage.set(k, String(v)), removeItem: (k) => storage.delete(k) };
@@ -301,7 +310,7 @@ test('owner backup API only exposes fixed tables in bounded non-cacheable pages'
   const run = async (table) => {
     let status = 0, body;
     const headers = {};
-    const req = { method: 'POST', headers: {}, body: { password: 'owner-test-password', action: 'backupPage', table, offset: 0 } };
+    const req = { method: 'POST', headers: { host: 'devfit.test', origin: 'https://devfit.test', cookie: adminCookie() }, body: { action: 'backupPage', table, offset: 0 } };
     const res = { setHeader(name, value) { headers[name] = value; }, status(value) { status = value; return this; }, json(value) { body = value; } };
     await handler(req, res);
     return { status, body, headers };
@@ -318,6 +327,47 @@ test('owner backup API only exposes fixed tables in bounded non-cacheable pages'
   assert.equal(invalid.status, 400);
   assert.equal(invalid.body.error, 'bad_backup_table');
   assert.equal(selectedUrl, '');
+});
+
+test('admin password becomes an HttpOnly session and untrusted device text is escaped', async () => {
+  process.env.DEVFIT_JWT_SECRET = 'admin-session-secret';
+  const lib = await import(new URL('../api/_lib.js?admin-session-test', import.meta.url));
+  const token = lib.signAdminSession();
+  assert.equal(lib.verifyAdminSession(token).kind, 'devfit_admin');
+  assert.equal(lib.verifyAdminSession(lib.signToken({ kind: 'devfit_admin' })), null, 'non-expiring customer-style tokens cannot become admin sessions');
+
+  const html = fs.readFileSync(new URL('../admin.html', import.meta.url), 'utf8');
+  assert.doesNotMatch(html, /var\s+pw\s*=/);
+  assert.doesNotMatch(html, /Object\.assign\(\{\s*password:/);
+  assert.match(html, /call\('login',\{password:password\}\)/);
+  assert.match(html, /safeText\(\(d\.user_agent\|\|''\)\.slice\(0,90\)\)/);
+});
+
+test('database hardening uses private atomic RPCs and bounded recovery history', () => {
+  const migration = fs.readFileSync(new URL('../supabase/migrations/20260830191740_harden_rate_limits_and_history.sql', import.meta.url), 'utf8');
+  assert.match(migration, /create or replace function public\.consume_devfit_rate_limit/);
+  assert.match(migration, /on conflict \(id\) do update/);
+  assert.match(migration, /create or replace function public\.archive_devfit_data_version/);
+  assert.match(migration, /offset 8/);
+  assert.match(migration, /revoke all on function public\.archive_devfit_data_version[\s\S]*from anon/);
+  assert.match(migration, /grant execute on function public\.record_devfit_error[\s\S]*to service_role/);
+
+  const dataApi = fs.readFileSync(new URL('../api/data.js', import.meta.url), 'utf8');
+  assert.match(dataApi, /sbRpc\('archive_devfit_data_version'/);
+  assert.match(dataApi, /sbInsertIgnore\('devfit_data_versions'/);
+});
+
+test('release infrastructure enforces security headers and monitors production health', () => {
+  const vercel = JSON.parse(fs.readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'));
+  const globalHeaders = vercel.headers.find((entry) => entry.source === '/(.*)').headers;
+  assert.ok(globalHeaders.some((header) => header.key === 'Content-Security-Policy'));
+  assert.ok(!globalHeaders.some((header) => header.key === 'Content-Security-Policy-Report-Only'));
+  const workflow = fs.readFileSync(new URL('../.github/workflows/devfit-ci.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /node --test tests\/reliability\.test\.mjs/);
+  assert.match(workflow, /\/api\/health/);
+  const health = fs.readFileSync(new URL('../api/health.js', import.meta.url), 'utf8');
+  assert.match(health, /database: 'unavailable'/);
+  assert.match(health, /Cache-Control', 'no-store'/);
 });
 
 test('owner backup encryption round-trips and detects tampering', async () => {
@@ -347,7 +397,7 @@ test('permanent account deletion requires exact confirmation and verifies zero r
   const { default: handler } = await import(new URL('../api/admin.js?account-deletion-test', import.meta.url));
   const run = async (extra) => {
     let status = 0, body;
-    const req = { method: 'POST', headers: { 'x-forwarded-for': '127.0.0.1' }, body: { password: 'owner-test-password', action: 'deleteAccount', email: 'person@gmail.com', ...extra } };
+    const req = { method: 'POST', headers: { host: 'devfit.test', origin: 'https://devfit.test', cookie: adminCookie(), 'x-forwarded-for': '127.0.0.1' }, body: { action: 'deleteAccount', email: 'person@gmail.com', ...extra } };
     const res = { setHeader() {}, status(value) { status = value; return this; }, json(value) { body = value; } };
     await handler(req, res);
     return { status, body };
@@ -361,8 +411,7 @@ test('permanent account deletion requires exact confirmation and verifies zero r
 
   globalThis.fetch = async (url, options = {}) => {
     const target = String(url), method = options.method || 'GET';
-    if (target.includes('/rest/v1/devfit_rate?') && method === 'GET') return { ok: true, json: async () => [] };
-    if (target.includes('/rest/v1/devfit_rate?on_conflict=') && method === 'POST') return { ok: true, json: async () => [{}] };
+    if (target.includes('/rest/v1/rpc/consume_devfit_rate_limit') && method === 'POST') return { ok: true, json: async () => ({ allowed: true, retry_after: 86400, current_hits: 1 }) };
     if (target.includes('/rest/v1/rpc/delete_devfit_account') && method === 'POST') {
       rpcCalls++;
       return { ok: true, json: async () => ({ email: 'person@gmail.com', subscribers: 1, currentData: 3, recoveryVersions: 5, devices: 2 }) };
@@ -376,7 +425,7 @@ test('permanent account deletion requires exact confirmation and verifies zero r
   assert.equal(rpcCalls, 1);
   assert.deepEqual(deleted.body.remaining, { subscribers: 0, currentData: 0, recoveryVersions: 0, devices: 0 });
 
-  const migration = fs.readFileSync(new URL('../supabase/migrations/20260818_atomic_account_deletion.sql', import.meta.url), 'utf8');
+  const migration = fs.readFileSync(new URL('../supabase/migrations/20260817163640_atomic_account_deletion.sql', import.meta.url), 'utf8');
   assert.match(migration, /security definer/);
   assert.match(migration, /delete from public\.devfit_data_versions where email = v_email/);
   assert.match(migration, /delete from public\.devfit_subscribers where email = v_email/);
@@ -452,7 +501,7 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
   assert.match(settings, /<div class="title">Install DevFit App<\/div>/);
   assert.match(settings, /if\(!deferredInstallPrompt\)\{\s*showIosHint\(\)/);
   assert.equal(manifest.display, 'standalone');
-  assert.match(worker, /devfit-v4\.86\.1/);
+  assert.match(worker, /devfit-v4\.87\.0/);
   assert.doesNotMatch(worker, /\.then\(\(\) => self\.skipWaiting\(\)\)/);
 
   for (const html of [index, settings]) {

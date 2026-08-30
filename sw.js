@@ -1,4 +1,4 @@
-/* DevFit Service Worker — v4.86.1
+/* DevFit Service Worker — v4.87.0
    Strategy (atomic updates — no stale code can ever mix with fresh HTML):
    - HTML pages + app logic (.js/.css): NETWORK-FIRST with cache fallback, so every
      online load gets a consistent, up-to-date set. This is what prevents the
@@ -7,10 +7,10 @@
      save mobile data. Offline, ignoreSearch resolves ?v= URLs to the precached file.
    - Icons / manifest / images: cache-first.
    - CDN assets (Chart.js, jsPDF, fonts): stale-while-revalidate.
-   - Apps Script / /api/*: network-only (never cached).
+   - /api/*: network-only (never cached).
 */
 
-const VERSION = 'devfit-v4.86.1';
+const VERSION = 'devfit-v4.87.0';
 const APP_SHELL = 'devfit-shell-' + VERSION;
 const RUNTIME = 'devfit-runtime-' + VERSION;
 
@@ -51,8 +51,7 @@ const SHELL_FILES = [
   './theme.js'
 ];
 
-const CDN_HOSTS = ['cdnjs.cloudflare.com','fonts.googleapis.com','fonts.gstatic.com','cdn.jsdelivr.net','zngberygrzpkhiqrrzwj.supabase.co'];
-const APPS_SCRIPT_HOST = 'script.google.com';
+const CDN_HOSTS = ['cdnjs.cloudflare.com','fonts.googleapis.com','fonts.gstatic.com','cdn.jsdelivr.net'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -84,9 +83,6 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-
-  // Apps Script — never cache
-  if (url.hostname.includes(APPS_SCRIPT_HOST)) return;
 
   // Serverless API routes (e.g. /api/usda) — always network, never cache
   if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) return;

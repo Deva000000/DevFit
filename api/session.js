@@ -1,17 +1,17 @@
 // DevFit — POST /api/session
 // Called right after login. Verifies the caller actually owns the email (via the
-// Supabase email-code token or a Google ID token), looks up their subscriber
+// a signed Google ID token), looks up their subscriber
 // record, and — only if approved — returns a SERVER-SIGNED session token.
 //
 // The signed token is what the app stores instead of a plain "approved:true"
 // flag: it cannot be forged in the browser without DEVFIT_JWT_SECRET.
 //
-// Body: { provider: 'supabase' | 'google_id', token: <providerToken> }
+// Body: { provider: 'google_id', token: <Google ID credential> }
 // 200:  { approved:true, token, email, name, tier, expiry, startDate, plan }
 //       { approved:false, status:'pending'|'denied' }
 
 import {
-  haveServerConfig, emailFromSupabaseToken, emailFromGoogleToken, identityFromGoogleIdToken,
+  haveServerConfig, identityFromGoogleIdToken,
   getSubscriber, computeTier, signToken, rateLimit, clientIp, readJsonBody, recordLogin, sbUpsert,
   recordServerEvent
 } from './_lib.js';
@@ -35,17 +35,10 @@ export default async function handler(req, res) {
 
   let email = null;
   let verifiedName = '';
-  if (provider === 'google_id') {
-    const identity = await identityFromGoogleIdToken(token);
-    email = identity && identity.email;
-    verifiedName = identity && identity.name;
-  } else if (provider === 'google') {
-    // Temporary compatibility for a rolling deploy: old cached login pages still
-    // send an OAuth access token. New clients always use google_id.
-    email = await emailFromGoogleToken(token);
-  } else if (provider === 'supabase') {
-    email = await emailFromSupabaseToken(token);
-  }
+  if (provider !== 'google_id') { res.status(400).json({ error: 'unsupported_provider' }); return; }
+  const identity = await identityFromGoogleIdToken(token);
+  email = identity && identity.email;
+  verifiedName = identity && identity.name;
   if (!email) {
     await recordServerEvent('login_failure', 'Google identity verification failed', { page: '/api/session', status: 401, ua: req.headers['user-agent'] });
     res.status(401).json({ error: 'invalid_identity' }); return;

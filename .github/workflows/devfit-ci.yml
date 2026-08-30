@@ -1,0 +1,47 @@
+name: DevFit reliability
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check server functions
+        run: |
+          for file in api/*.js; do node --check "$file"; done
+      - name: Reliability regression suite
+        run: node --test tests/reliability.test.mjs
+
+  production-smoke:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify canonical production pages and database
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://devfitportal.vercel.app'
+          for path in / /login.html /api/config /api/health; do
+            final_url="$(curl --fail --silent --show-error --location --max-time 20 --output /tmp/devfit-response --write-out '%{url_effective}' "$base$path")"
+            case "$final_url" in
+              "$base"*) ;;
+              *) echo "Unexpected redirect: $path -> $final_url" >&2; exit 1 ;;
+            esac
+          done
+          grep -q '"ok":true' /tmp/devfit-response

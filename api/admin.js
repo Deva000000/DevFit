@@ -1,9 +1,8 @@
 // DevFit — POST /api/admin
-// The trainer's backend for admin.html. Password-gated (DEVFIT_ADMIN_PASSWORD)
-// and rate-limited so the password can't be brute-forced. Replaces editing the
-// Google Sheet by hand.
+// Owner backend for admin.html. The password is exchanged once for a short-lived
+// HttpOnly cookie; normal admin actions never resend or expose the password to JS.
 //
-// Body: { password, action, ...args }
+// Body: { action, ...args }
 //   action 'list'                                  → { subscribers:[...] }
 //   action 'get'      { email }                    → { subscriber }
 //   action 'activate' { email, days=30, name, plan } → sets pro, expiry today+days
@@ -17,7 +16,8 @@
 import crypto from 'crypto';
 import {
   haveServerConfig, sbSelect, sbUpsert, sbRpc, getSubscriber,
-  rateLimit, clientIp, readJsonBody, listLogins
+  rateLimit, clientIp, readJsonBody, listLogins, sameSiteOnly,
+  signAdminSession, verifyAdminSession, cookieValue
 } from './_lib.js';
 
 const ADMIN_PW = process.env.DEVFIT_ADMIN_PASSWORD || '';
@@ -67,20 +67,42 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'method' }); return; }
   if (!haveServerConfig() || !ADMIN_PW) { res.status(501).json({ error: 'not_configured' }); return; }
 
-  const body = await readJsonBody(req);
+  // Admin requests are browser-only and same-origin. This is a second barrier
+  // against cross-site requests in addition to SameSite=Strict on the cookie.
+  if (!sameSiteOnly(req)) { res.status(403).json({ error: 'origin' }); return; }
 
-  // Throttle ONLY failed password guesses (10 wrong tries / 15 min per IP). A
-  // correct password sails straight through, so a trainer doing normal work —
-  // list, get, activate, tab-switching — is never rate-limited. (The old code
-  // counted every authenticated action too, which locked the panel mid-use.)
-  if (!pwOk(body.password)) {
-    const rl = await rateLimit('admin_fail:' + clientIp(req), 10, 15 * 60);
-    if (!rl.ok) { res.status(429).json({ error: 'rate_limited', retryAfter: rl.retryAfter }); return; }
-    res.status(401).json({ error: 'bad_password' });
+  const body = await readJsonBody(req);
+  const action = String(body.action || '');
+
+  if (action === 'login') {
+    if (!pwOk(body.password)) {
+      const rl = await rateLimit('admin_fail:' + clientIp(req), 10, 15 * 60);
+      // Owner login fails closed if the shared limiter is unavailable. Customer
+      // login/data routes remain independent of this admin-only safeguard.
+      if (rl.unavailable) { res.status(503).json({ error: 'security_store_unavailable' }); return; }
+      if (!rl.ok) {
+        res.setHeader('Retry-After', String(Math.max(1, rl.retryAfter || 1)));
+        res.status(429).json({ error: 'rate_limited', retryAfter: rl.retryAfter }); return;
+      }
+      res.status(401).json({ error: 'bad_password' });
+      return;
+    }
+    const token = signAdminSession();
+    res.setHeader('Set-Cookie', 'devfit_admin_session=' + encodeURIComponent(token) +
+      '; Path=/api/admin; Max-Age=43200; HttpOnly; Secure; SameSite=Strict');
+    res.status(200).json({ ok: true });
     return;
   }
 
-  const action = String(body.action || '');
+  if (action === 'logout') {
+    res.setHeader('Set-Cookie', 'devfit_admin_session=; Path=/api/admin; Max-Age=0; HttpOnly; Secure; SameSite=Strict');
+    res.status(200).json({ ok: true });
+    return;
+  }
+
+  const adminSession = verifyAdminSession(cookieValue(req, 'devfit_admin_session'));
+  if (!adminSession) { res.status(401).json({ error: 'admin_session_required' }); return; }
+
   const email = String(body.email || '').trim().toLowerCase();
 
   try {

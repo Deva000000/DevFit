@@ -5,3 +5,6 @@ WhatsApp Image*.jpeg
 memory/
 
 _imgtmp/
+
+# Supabase CLI connection metadata (local machine only)
+supabase/.temp/

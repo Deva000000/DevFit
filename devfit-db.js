@@ -497,7 +497,13 @@
         while (pendingSave[dataType]) {
           let latest = pendingSave[dataType];
           pendingSave[dataType] = null;
-          if (LOCAL_KEY[dataType]) latest = readLocal(dataType) || latest;
+          if (LOCAL_KEY[dataType]) {
+            // The caller's in-memory value is the newest edit. Merge in the
+            // reconciled local copy instead of replacing the edit with it. This
+            // also protects the latest entry if localStorage has just reached
+            // quota and still contains the previous document.
+            latest = mergeDoc(dataType, latest, readLocal(dataType));
+          }
           await push(dataType, latest);
         }
       })();

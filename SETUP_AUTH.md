@@ -23,7 +23,7 @@ on your existing Vercel project.
 | `devfit-auth.js` | Shared client gate used by all app pages |
 
 Wired into: `login.html`, `index.html`, `nutrition.html`, `workouts.html`,
-`settings.html`. Current service worker release is **v4.86.1**.
+`settings.html`. Current service worker release is **v4.87.0**.
 
 ---
 
@@ -123,7 +123,6 @@ Project → **Settings → Environment Variables** (Production + Preview):
 | `SUPABASE_SERVICE_KEY` | Supabase → Settings → API → **service_role** key (secret!) |
 | `DEVFIT_ADMIN_PASSWORD` | A strong password you'll type into `admin.html` |
 | `SUPABASE_URL` | *(optional)* defaults to your project URL already |
-| `SUPABASE_ANON_KEY` | *(optional)* defaults to the publishable key already in the app |
 | `GOOGLE_CLIENT_ID` | *(optional)* defaults to the public Google web client ID already used by DevFit |
 
 > The **service_role** key must never appear in client code — it only lives in
@@ -197,14 +196,6 @@ the documented Layer-1 limit.)
 > have a session, not a signed token. The moment you flip strict, each of them
 > is asked to log in once with Google, which mints their token.
 > Expected and harmless — just don't flip it in the middle of a busy day.
-
-## Step 6 (later) — retire the Google Sheet
-
-Once every client is in `devfit_subscribers` and strict mode is stable, you can
-delete the `SHEET_URL` fallback blocks. They're harmless until then (they only
-run if `devfit-auth.js` fails to load).
-
----
 
 ## Rollback
 

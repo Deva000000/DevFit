@@ -10,13 +10,11 @@
 //   SUPABASE_SERVICE_KEY   — Supabase service-role key (server-only, bypasses RLS)
 //   DEVFIT_ADMIN_PASSWORD  — trainer password for admin.html
 //   SUPABASE_URL           — optional; defaults to the known project URL
-//   SUPABASE_ANON_KEY      — optional; used to validate Supabase user tokens
 
 import crypto from 'crypto';
 
 export const SB_URL = process.env.SUPABASE_URL || 'https://zngberygrzpkhiqrrzwj.supabase.co';
 const SB_SERVICE = process.env.SUPABASE_SERVICE_KEY || '';
-const SB_ANON = process.env.SUPABASE_ANON_KEY || 'sb_publishable_oJSFEcVvsvbhPA_8mhUrGQ_JCrBddtn';
 const JWT_SECRET = process.env.DEVFIT_JWT_SECRET || '';
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '94871311791-ql8k9lo0q9e1uq3ri98ghnfr1m187chh.apps.googleusercontent.com';
 
@@ -137,6 +135,47 @@ export async function sbRpc(name, args) {
   } catch (e) { return null; }
 }
 
+// Insert a row once without turning a duplicate into a database error. Useful
+// for best-effort recovery snapshots, where the content hash is the identity.
+export async function sbInsertIgnore(table, row, onConflict) {
+  try {
+    const suffix = onConflict ? '?on_conflict=' + encodeURIComponent(onConflict) : '';
+    const r = await fetch(`${SB_URL}/rest/v1/${table}${suffix}`, {
+      method: 'POST',
+      headers: { ...sbHeaders(), Prefer: 'resolution=ignore-duplicates,return=minimal' },
+      body: JSON.stringify(row)
+    });
+    return r.ok ? true : null;
+  } catch (e) { return null; }
+}
+
+// Admin credentials are exchanged once for a short-lived, HttpOnly cookie.
+// Keeping the password out of page-level JavaScript prevents an unrelated UI
+// bug or browser extension from reading and replaying the owner password.
+export function signAdminSession() {
+  return signToken({ kind: 'devfit_admin' }, 12 * 60 * 60);
+}
+
+export function verifyAdminSession(token) {
+  const payload = verifyToken(token);
+  const now = Math.floor(Date.now() / 1000);
+  if (!payload || payload.kind !== 'devfit_admin') return null;
+  if (!Number.isFinite(payload.exp) || payload.exp <= now) return null;
+  return payload;
+}
+
+export function cookieValue(req, name) {
+  const raw = String((req && req.headers && req.headers.cookie) || '');
+  const prefix = String(name || '') + '=';
+  for (const part of raw.split(';')) {
+    const item = part.trim();
+    if (item.startsWith(prefix)) {
+      try { return decodeURIComponent(item.slice(prefix.length)); } catch (_) { return ''; }
+    }
+  }
+  return '';
+}
+
 // Durable production event reporting. Always write to Vercel logs and, when the
 // server database is available, retain the event in devfit_errors. This helper
 // never throws back into a user request.
@@ -152,35 +191,20 @@ export async function recordServerEvent(type, message, details = {}) {
     at: new Date().toISOString()
   };
   try { console.error('[DevFit monitor]', JSON.stringify(rec)); } catch (_) {}
-  try { if (haveServerConfig()) await sbInsert('devfit_errors', rec); } catch (_) {}
+  try {
+    if (haveServerConfig()) {
+      // This RPC inserts and bounds retained monitoring rows atomically. Fall
+      // back during a staggered deploy so monitoring cannot break a user call.
+      const stored = await sbRpc('record_devfit_error', {
+        p_type: rec.type, p_message: rec.message, p_stack: rec.stack,
+        p_src: rec.src, p_page: rec.page, p_ua: rec.ua, p_status: rec.status
+      });
+      if (stored === null) await sbInsert('devfit_errors', rec);
+    }
+  } catch (_) {}
 }
 
 // ── Identity verification (proves the caller owns the email) ─────────────────
-// Supabase magic-link session token → email.
-export async function emailFromSupabaseToken(accessToken) {
-  try {
-    const r = await fetch(`${SB_URL}/auth/v1/user`, {
-      headers: { apikey: SB_ANON, Authorization: 'Bearer ' + accessToken }
-    });
-    if (!r.ok) return null;
-    const u = await r.json();
-    return (u && u.email) ? String(u.email).toLowerCase() : null;
-  } catch (e) { return null; }
-}
-
-// Google OAuth access token → email (must be verified).
-export async function emailFromGoogleToken(accessToken) {
-  try {
-    const r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: { Authorization: 'Bearer ' + accessToken }
-    });
-    if (!r.ok) return null;
-    const u = await r.json();
-    if (!u || !u.email || u.email_verified === false) return null;
-    return String(u.email).toLowerCase();
-  } catch (e) { return null; }
-}
-
 // Google Identity Services ID credential -> verified identity. Unlike the old
 // access-token/userinfo flow, this verifies the signed JWT itself: signature,
 // issuer, audience and lifetime. Google's public signing keys rotate, so cache
@@ -305,22 +329,19 @@ export async function listLogins() {
 }
 
 // ── Rate limiter (Supabase-backed; reliable across serverless instances) ─────
-// Returns { ok:true } or { ok:false, retryAfter }. Fails OPEN if the store is
-// unreachable so a DB hiccup never locks out the trainer.
+// The database RPC increments atomically, so simultaneous serverless invocations
+// cannot all observe the same old hit count.
 export async function rateLimit(id, limit, windowSeconds) {
   try {
-    const now = Math.floor(Date.now() / 1000);
-    const rows = await sbSelect('devfit_rate', 'id=eq.' + encodeURIComponent(id) + '&select=*');
-    const row = (Array.isArray(rows) && rows[0]) ? rows[0] : null;
-    let hits = 1, resetAt = now + windowSeconds;
-    if (row && row.reset_at > now) {
-      hits = (row.hits || 0) + 1;
-      resetAt = row.reset_at;
-      if (hits > limit) return { ok: false, retryAfter: resetAt - now };
-    }
-    await sbUpsert('devfit_rate', { id, hits, reset_at: resetAt }, 'id');
-    return { ok: true };
-  } catch (e) { return { ok: true }; }
+    const result = await sbRpc('consume_devfit_rate_limit', {
+      p_id: String(id || '').slice(0, 180),
+      p_limit: Math.max(1, Math.floor(Number(limit) || 1)),
+      p_window_seconds: Math.max(1, Math.floor(Number(windowSeconds) || 1))
+    });
+    const row = Array.isArray(result) ? result[0] : result;
+    if (!row || typeof row.allowed !== 'boolean') return { ok: true, unavailable: true };
+    return { ok: row.allowed, retryAfter: Math.max(0, Number(row.retry_after) || 0) };
+  } catch (e) { return { ok: true, unavailable: true }; }
 }
 
 // ── Same-origin guard for the public food-search proxies ─────────────────────

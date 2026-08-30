@@ -13,8 +13,8 @@
 
 import crypto from 'crypto';
 import {
-  haveServerConfig, verifyToken, getSubscriber, sbSelect, sbInsert, sbInsertReturning, sbPatch, readJsonBody,
-  recordServerEvent, rateLimit, clientIp
+  haveServerConfig, verifyToken, getSubscriber, sbSelect, sbInsertIgnore, sbInsertReturning, sbPatch, sbRpc,
+  readJsonBody, recordServerEvent, rateLimit, clientIp
 } from './_lib.js';
 
 const TYPES = ['progress', 'nutrition', 'workouts', 'prefs'];
@@ -38,16 +38,26 @@ function contentHash(data) {
 }
 
 async function archiveVersion(email, dataType, data, deviceId) {
-  // Best effort during rollout: a missing history table must not stop the current
-  // row being saved. We archive only the state about to be replaced; the newly
-  // accepted state remains recoverable as the live devfit_data row.
-  await sbInsert('devfit_data_versions', {
+  const snapshot = {
     email,
     data_type: dataType,
     data,
     content_hash: contentHash(data),
     source_device: String(deviceId || 'unknown').slice(0, 80)
+  };
+  // The RPC de-duplicates, rate-spaces and retains the latest eight recovery
+  // snapshots per document. If code and schema deploy a few seconds apart, the
+  // conflict-safe insert remains a non-blocking fallback.
+  const archived = await sbRpc('archive_devfit_data_version', {
+    p_email: snapshot.email,
+    p_data_type: snapshot.data_type,
+    p_data: snapshot.data,
+    p_content_hash: snapshot.content_hash,
+    p_source_device: snapshot.source_device
   });
+  if (archived === null) {
+    await sbInsertIgnore('devfit_data_versions', snapshot, 'email,data_type,content_hash');
+  }
 }
 
 async function currentRow(email, dataType) {

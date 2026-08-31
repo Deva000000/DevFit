@@ -863,7 +863,7 @@ html.nosplash #devfit-splash{display:none!important}
 
   <!-- SETTINGS HANDOFF -->
   <div class="card">
-    <div style="font-size:11px;color:#aaa;line-height:1.5">Reports, Backup, Logout &amp; Reset are in the <a href="settings.html" style="color:#cc0000;text-decoration:none;font-weight:700">Settings tab</a>. Generate a full week report (habits + workouts + nutrition) there.</div>
+    <div style="font-size:11px;color:#aaa;line-height:1.5">Reports, account controls, Logout &amp; Reset are in the <a href="settings.html" style="color:#cc0000;text-decoration:none;font-weight:700">Settings tab</a>. Generate a full week report (habits + workouts + nutrition) there.</div>
   </div>
 
 </div>
@@ -1245,7 +1245,7 @@ function loadData(){
       catch(parseErr){
         try{ localStorage.setItem('progressLog2__unreadable',s); }catch(_){}
         loadFailed=true;
-        setTimeout(()=>{ try{ alert('DevFit could not read your saved progress data on this device.\n\nSaving is paused so nothing gets overwritten. Go to Settings → Export backup file and send it over to recover it.'); }catch(_){} },600);
+        setTimeout(()=>{ try{ alert('DevFit could not read your saved progress data on this device.\n\nSaving is paused so nothing gets overwritten. Close and reopen DevFit, then contact DevFit if the warning returns.'); }catch(_){} },600);
         return;
       }
       ensureShape();

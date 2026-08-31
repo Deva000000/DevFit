@@ -546,7 +546,7 @@ function load(){
       // Nothing readable anywhere. Come up empty but REFUSE to save over the
       // original, so whatever is still in storage stays recoverable.
       loadFailed=true;
-      setTimeout(()=>{ try{ alert('DevFit could not read your saved training data on this device.\n\nTo protect it, saving is paused — nothing will be overwritten. Go to Settings → Export backup file, then send it over so it can be recovered.'); }catch(_){} },600);
+      setTimeout(()=>{ try{ alert('DevFit could not read your saved training data on this device.\n\nTo protect it, saving is paused — nothing will be overwritten. Close and reopen DevFit, then contact DevFit if the warning returns.'); }catch(_){} },600);
     }
   }
   return {plan:{workouts:[]},sessions:[]};

@@ -119,7 +119,7 @@
       if (quotaWarned) return; quotaWarned = true;
       try {
         var b = document.createElement('div');
-        b.textContent = '⚠ Your device storage is almost full — recent changes may not save. Export a backup in Settings, then free up space.';
+        b.textContent = '⚠ Your device storage is almost full — recent changes may not save. Free up storage before continuing, then reopen DevFit.';
         b.style.cssText = 'position:fixed;left:12px;right:12px;bottom:12px;z-index:2147483000;background:#7f1d1d;color:#fff;padding:12px 14px;border-radius:10px;font:600 13px/1.45 system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.45);text-align:center';
         (document.body || document.documentElement).appendChild(b);
         setTimeout(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 9000);
@@ -152,7 +152,7 @@
 
   function currentEmail() { return (getUser().email || '').trim().toLowerCase(); }
 
-  // Wipe just the CURRENT account's data (used by reset/backup flows). The shim
+  // Wipe just the CURRENT account's data (used by reset and account flows). The shim
   // scopes these removes to the current email's namespace, so it never touches
   // any other account.
   function wipeLocalData() {

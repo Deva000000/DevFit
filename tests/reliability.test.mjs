@@ -501,7 +501,7 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
   assert.match(settings, /<div class="title">Install DevFit App<\/div>/);
   assert.match(settings, /if\(!deferredInstallPrompt\)\{\s*showIosHint\(\)/);
   assert.equal(manifest.display, 'standalone');
-  assert.match(worker, /devfit-v4\.87\.0/);
+  assert.match(worker, /devfit-v4\.87\.1/);
   assert.doesNotMatch(worker, /\.then\(\(\) => self\.skipWaiting\(\)\)/);
 
   for (const html of [index, settings]) {
@@ -548,16 +548,16 @@ test('iOS Google redirect handler rejects forged posts and accepts matching CSRF
   assert.equal(valid.headers['Cache-Control'], 'no-store, no-cache, must-revalidate');
 });
 
-test('backup restore is account-bound, merge-only and monitored', () => {
+test('customer backup file download and upload are fully removed', () => {
   const settings = fs.readFileSync(new URL('../settings.html', import.meta.url), 'utf8');
-  const errors = fs.readFileSync(new URL('../devfit-errorlog.js', import.meta.url), 'utf8');
-  assert.match(settings, /Save \/ Share Backup File/);
-  assert.match(settings, /navigator\.canShare\(\{files:\[file\]\}\)/);
-  assert.match(settings, /from!==owner/);
-  assert.match(settings, /DevFitDB\._merge\(type,current,incoming\)/);
-  assert.match(settings, /devfit_pre_import_backup::/);
-  assert.doesNotMatch(settings, /Import anyway\? It replaces/);
-  assert.match(errors, /window\.DevFitErrors/);
+  const pricing = fs.readFileSync(new URL('../pricing.html', import.meta.url), 'utf8');
+  const privacy = fs.readFileSync(new URL('../privacy.html', import.meta.url), 'utf8');
+  const terms = fs.readFileSync(new URL('../terms.html', import.meta.url), 'utf8');
+  const publicCopy = settings + pricing + privacy + terms;
+  assert.doesNotMatch(settings, /export-file-btn|import-file-btn|import-file-input|exportBackupFile|handleImportFile|BACKUP_KEYS/);
+  assert.doesNotMatch(publicCopy, /Save \/ Share Backup File|Restore from Backup File|personal backup file|portable backup/i);
+  assert.match(settings, /Your records follow your Gmail/);
+  assert.match(settings, /recover-btn/);
 });
 
 test('pricing is accurate and report periods never use future planned weeks', () => {

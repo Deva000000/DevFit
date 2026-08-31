@@ -618,7 +618,7 @@ function load(){
       catch(parseErr){
         try{ localStorage.setItem(KEY+'__unreadable',raw); }catch(_){}
         loadFailed=true;
-        setTimeout(()=>{ try{ alert('DevFit could not read your saved food diary on this device.\n\nSaving is paused so nothing gets overwritten. Go to Settings → Export backup file and send it over to recover it.'); }catch(_){} },600);
+        setTimeout(()=>{ try{ alert('DevFit could not read your saved food diary on this device.\n\nSaving is paused so nothing gets overwritten. Close and reopen DevFit, then contact DevFit if the warning returns.'); }catch(_){} },600);
         return {targets:{cal:'',p:'',c:'',f:''},days:{}};
       }
     }

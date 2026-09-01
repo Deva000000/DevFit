@@ -18,6 +18,7 @@
 <title>DevFit — Training</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:ital,wght@1,700;1,800&family=Lora:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600;1,700&family=Anton&family=Righteous&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>if(typeof Chart==='undefined'){document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"><\/script>')}</script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <!-- PWA -->
@@ -2179,6 +2180,11 @@ function drawProgressChart(){
     <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;height:230px"><canvas id="progChart"></canvas></div>
     <div style="font-size:11px;color:#666;margin-top:8px">Estimated 1-rep max per session (accounts for weight × reps).</div>`;
   if(progChart){progChart.destroy();progChart=null;}
+  if(typeof Chart==='undefined'){
+    const canvas=document.getElementById('progChart');
+    if(canvas&&canvas.parentElement) canvas.parentElement.innerHTML='<div class="empty-msg">Chart temporarily unavailable. Your sessions and personal records are still saved.</div>';
+    return;
+  }
   progChart=new Chart(document.getElementById('progChart'),{
     type:'line',
     data:{labels:points.map(p=>p.date.slice(5)),datasets:[{label:'Est. 1RM (kg)',data:points.map(p=>p.e),borderColor:'#cc0000',backgroundColor:'rgba(204,0,0,0.12)',fill:true,tension:0.25,pointRadius:4,pointBackgroundColor:'#cc0000'}]},

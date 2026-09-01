@@ -9,6 +9,7 @@ import { sameSiteOnly, recordServerEvent } from './_lib.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
+  if (req.method !== 'GET' && req.method !== 'HEAD') { res.status(405).json({ data: [], error: 'method' }); return; }
   if (!sameSiteOnly(req)) { res.status(200).json({ data: [] }); return; }
 
   const q = String((req.query && req.query.q) || '').slice(0, 100).trim();

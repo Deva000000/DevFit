@@ -501,7 +501,7 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
   assert.match(settings, /<div class="title">Install DevFit App<\/div>/);
   assert.match(settings, /if\(!deferredInstallPrompt\)\{\s*showIosHint\(\)/);
   assert.equal(manifest.display, 'standalone');
-  assert.match(worker, /devfit-v4\.87\.1/);
+  assert.match(worker, /devfit-v4\.87\.2/);
   assert.doesNotMatch(worker, /\.then\(\(\) => self\.skipWaiting\(\)\)/);
 
   for (const html of [index, settings]) {
@@ -509,6 +509,40 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
       if (match[1].trim()) new Function(match[1]);
     }
   }
+});
+
+test('analytics survive a Chart CDN failure and nutrition initializes in order', () => {
+  const pages = ['index.html', 'nutrition.html', 'workouts.html', 'settings.html']
+    .map((name) => fs.readFileSync(new URL('../' + name, import.meta.url), 'utf8'));
+  pages.forEach((html) => {
+    assert.match(html, /cdn\.jsdelivr\.net\/npm\/chart\.js@4\.4\.1\/dist\/chart\.umd\.min\.js/);
+    assert.match(html, /typeof Chart==='undefined'/);
+  });
+  const nutrition = pages[1];
+  assert.ok(nutrition.indexOf('let trendRange=7') < nutrition.indexOf('function renderTrend()'));
+  assert.match(nutrition, /if\(typeof Chart!==['"]undefined['"]\) Chart\.register/);
+  const usda = fs.readFileSync(new URL('../api/usda.js', import.meta.url), 'utf8');
+  assert.match(usda, /method: 'POST'/);
+  assert.match(usda, /dataType: \['Foundation', 'SR Legacy', 'Survey \(FNDDS\)'\]/);
+  assert.match(usda, /AbortSignal\.timeout\(6000\)/);
+  assert.doesNotMatch(usda, /&dataType=/);
+});
+
+test('sensitive APIs are never cached and public routes accept only intended methods', () => {
+  for (const name of ['session.js', 'verify.js', 'data.js']) {
+    const source = fs.readFileSync(new URL('../api/' + name, import.meta.url), 'utf8');
+    assert.match(source, /Cache-Control', 'no-store, no-cache, must-revalidate'/);
+  }
+  const config = fs.readFileSync(new URL('../api/config.js', import.meta.url), 'utf8');
+  assert.match(config, /s-maxage=300, stale-while-revalidate=3600/);
+  assert.match(config, /req\.method !== 'GET' && req\.method !== 'HEAD'/);
+  for (const name of ['usda.js', 'off.js', 'kalori.js']) {
+    const source = fs.readFileSync(new URL('../api/' + name, import.meta.url), 'utf8');
+    assert.match(source, /req\.method !== 'GET' && req\.method !== 'HEAD'/);
+  }
+  const admin = fs.readFileSync(new URL('../admin.html', import.meta.url), 'utf8');
+  assert.match(admin, /safeText\(invSub\.name\|\|invSub\.email\)/);
+  assert.match(admin, /inv-summary'\)\.textContent='Could not build invoice:/);
 });
 
 test('iOS Google redirect handler enforces CSRF and never caches credentials', () => {

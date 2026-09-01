@@ -18,6 +18,8 @@ import {
 
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
   if (req.method !== 'POST') { res.status(405).json({ error: 'method' }); return; }
 
   // Not configured yet → tell the client to fall back to its legacy path so the

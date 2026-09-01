@@ -72,6 +72,8 @@ async function currentRow(email, dataType) {
 
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
   if (req.method !== 'POST') { res.status(405).json({ error: 'method' }); return; }
 
   // Not configured yet → 501 so the client degrades gracefully (local-only) and

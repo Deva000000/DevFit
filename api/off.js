@@ -77,6 +77,7 @@ async function searchLegacy(q, pageSize) {
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
+  if (req.method !== 'GET' && req.method !== 'HEAD') { res.status(405).json({ products: [], error: 'method' }); return; }
   if (!sameSiteOnly(req)) { res.status(200).json({ products: [] }); return; }
 
   const q = String((req.query && req.query.query) || '').slice(0, 100).trim();

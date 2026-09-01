@@ -14,6 +14,7 @@ import { sameSiteOnly, recordServerEvent } from './_lib.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
+  if (req.method !== 'GET' && req.method !== 'HEAD') { res.status(405).json({ foods: [], error: 'method' }); return; }
 
   // Block off-site scripted abuse (in-app fetches are same-origin). Degrades to an
   // empty result set so a legit request with a stripped Referer still parses cleanly.
@@ -36,15 +37,21 @@ export default async function handler(req, res) {
   // and other US candy that isn't even sold here. Branded/supplement search is
   // OpenFoodFacts' job (api/off.js); USDA is here for lab-accurate whole foods.
   // requireAllWords tightens relevance so a single stray token can't drag in junk.
-  const url = 'https://api.nal.usda.gov/fdc/v1/foods/search'
-    + '?api_key=' + encodeURIComponent(key)
-    + '&query=' + encodeURIComponent(query)
-    + '&pageSize=' + pageSize
-    + '&requireAllWords=true'
-    + '&dataType=' + encodeURIComponent('Foundation,SR Legacy,Survey (FNDDS)');
+  const url = 'https://api.nal.usda.gov/fdc/v1/foods/search?api_key=' + encodeURIComponent(key);
 
   try {
-    const r = await fetch(url);
+    // USDA documents dataType as a JSON array. The former comma-delimited GET
+    // parameter now returns HTTP 400, silently removing every USDA result.
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        query,
+        pageSize,
+        dataType: ['Foundation', 'SR Legacy', 'Survey (FNDDS)']
+      }),
+      signal: AbortSignal.timeout(6000)
+    });
     if (!r.ok) {
       await recordServerEvent('food_timeout', 'USDA upstream returned ' + r.status, { page: '/api/usda', status: r.status });
       // Never 500 the client — just return no USDA results so OFF/local still serve.

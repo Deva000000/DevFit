@@ -18,6 +18,7 @@
 <title>DevFit — Progress</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@400;500;600;700;800&family=Inter:ital,wght@1,700;1,800&family=Lora:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600;1,700&family=Anton&family=Righteous&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>if(typeof Chart==='undefined'){document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"><\/script>')}</script>
 <script src="progress-model.js"></script><!-- versioned programs + safe legacy migration -->
 <script src="scoring.js"></script><!-- shared scoring engine (app score === report score) -->
 <style>
@@ -2030,6 +2031,18 @@ function populateRangeDropdowns(){
 
 function updateChart(){
   populateRangeDropdowns();
+  if(typeof Chart==='undefined'){
+    if(trendChart){trendChart.destroy();trendChart=null;}
+    if(progressChart){progressChart.destroy();progressChart=null;}
+    const message='Charts are temporarily unavailable. Your logged data is safe — check your connection and reopen DevFit.';
+    const bwWrap=document.getElementById('bw-canvas-wrap'), scoreWrap=document.getElementById('score-canvas-wrap');
+    const bwEmpty=document.getElementById('bw-empty'), scoreEmpty=document.getElementById('score-empty');
+    if(bwWrap) bwWrap.style.display='none';
+    if(scoreWrap) scoreWrap.style.display='none';
+    if(bwEmpty){bwEmpty.style.display='flex';bwEmpty.textContent=message;}
+    if(scoreEmpty){scoreEmpty.style.display='flex';scoreEmpty.textContent=message;}
+    return;
+  }
   const bwRange=document.getElementById('bw-chart-range')?document.getElementById('bw-chart-range').value:'all';
   const scRange=document.getElementById('score-chart-range')?document.getElementById('score-chart-range').value:'all';
   const gridColor='rgba(0,0,0,0.05)';

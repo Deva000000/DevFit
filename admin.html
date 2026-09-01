@@ -638,8 +638,8 @@ async function rebuildInvoice(){
     invBuilt = await buildInvoiceDoc(invSub, opts);
     var lines = [
       '<b style="color:#fff">'+invBuilt.invNo+'</b>',
-      (invSub.name||invSub.email)+' &middot; '+invSub.email,
-      'Period: '+(invSub.start_date||'?')+' → '+(invSub.expiry||'?')
+      safeText(invSub.name||invSub.email)+' &middot; '+safeText(invSub.email),
+      'Period: '+safeText(invSub.start_date||'?')+' → '+safeText(invSub.expiry||'?')
     ];
     if(opts.type==='coach'){
       lines.push('Coaching: <b style="color:#fff">'+rm(opts.coachAmount)+'</b>');
@@ -648,7 +648,7 @@ async function rebuildInvoice(){
       lines.push('DevFit Pro: <b style="color:#fff">'+invBuilt.total+'</b>');
     }
     $('inv-summary').innerHTML = lines.join('<br>');
-  }catch(e){ invBuilt=null; $('inv-summary').innerHTML='Could not build invoice: '+(e.message||e); }
+  }catch(e){ invBuilt=null; $('inv-summary').textContent='Could not build invoice: '+(e.message||e); }
 }
 
 function openInvoice(email){

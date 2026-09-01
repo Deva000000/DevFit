@@ -18,6 +18,7 @@
 <title>DevFit — Settings</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:ital,wght@1,700;1,800&family=Lora:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600;1,700&family=Anton&family=Righteous&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>if(typeof Chart==='undefined'){document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"><\/script>')}</script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="progress-model.js"></script><!-- versioned programs + safe account merge -->
 <script src="scoring.js"></script><!-- shared scoring engine (app score === report score) -->
@@ -543,7 +544,7 @@ html.nosplash #devfit-splash{display:none!important}
 
   <div class="footer">
     DevFit · Dominance Through Discipline<br>
-    <a href="https://wa.me/60183679177">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.87.1
+    <a href="https://wa.me/60183679177">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.87.2
   </div>
 
 
@@ -968,6 +969,7 @@ function resetAll(){
 // line they end up reading is not the one the words underneath are describing.
 // Labels carry real dates so the x-axis matches the tables.
 function buildExportCharts(A){
+  if(typeof Chart==='undefined') throw new Error('Report charts are temporarily unavailable. Check your connection and try again.');
   const rows = A.rows;
   const dot = (id) => document.getElementById(id).getContext('2d');
   const kill = (k) => { if(window[k]) { window[k].destroy(); window[k]=null; } };

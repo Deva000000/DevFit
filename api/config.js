@@ -9,7 +9,11 @@ import { haveServerConfig, sbSelect } from './_lib.js';
 
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 'public, max-age=30');
+  res.setHeader('Cache-Control', 'public, max-age=30, s-maxage=300, stale-while-revalidate=3600');
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    res.status(405).json({ error: 'method' });
+    return;
+  }
   if (!haveServerConfig()) { res.status(200).json({}); return; }
   try {
     const rows = await sbSelect('devfit_config', 'id=eq.1&select=whatsapp,price,qr,note');

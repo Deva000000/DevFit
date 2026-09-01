@@ -18,6 +18,7 @@
 <title>DevFit — Nutrition</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:ital,wght@1,700;1,800&family=Lora:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600;1,700&family=Anton&family=Righteous&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>if(typeof Chart==='undefined'){document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"><\/script>')}</script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="foods-local.js?v=4.57"></script>
 <script src="foods-bulk.js?v=4.57" defer></script>
@@ -716,9 +717,10 @@ let currentDate=todayStr();
 let trendChart=null;
 let _targetLineVal=null;
 let macroChart=null;
+let trendRange=7; // 7 or 30 — declared before the first render can read it
 
 // Registered once — reads _targetLineVal at draw time to avoid re-registering on each render
-Chart.register({
+if(typeof Chart!=='undefined') Chart.register({
   id:'devfit-target-line',
   afterDraw:function(chart){
     if(chart!==trendChart||!_targetLineVal) return;
@@ -1360,7 +1362,6 @@ function stdev(arr){
   return Math.sqrt(arr.reduce((a,b)=>a+(b-mean)**2,0)/arr.length);
 }
 
-let trendRange = 7; // 7 or 30 — controlled by Week/Month toggle
 function renderTrend(){
   const N = trendRange;
   const dates=lastNDates(N);
@@ -1415,6 +1416,12 @@ function renderTrend(){
 
   const ctx=document.getElementById('trendChart');
   if(!ctx) return;
+  if(typeof Chart==='undefined'){
+    ctx.parentElement.style.display='none';
+    note.textContent=(note.textContent?note.textContent+' ':'')+'Chart temporarily unavailable; your food log is still saved.';
+    return;
+  }
+  ctx.parentElement.style.display='block';
   if(trendChart) trendChart.destroy();
   trendChart=new Chart(ctx,{
     type:'bar',
@@ -1465,6 +1472,7 @@ function renderMacroChart(){
   const card=document.getElementById('macro-pie-card');
   if(!card) return;
   if(total===0){ card.style.display='none'; if(macroChart){macroChart.destroy();macroChart=null;} return; }
+  if(typeof Chart==='undefined'){ card.style.display='none'; return; }
   card.style.display='block';
   const ctx=document.getElementById('macroChart');
   if(!ctx) return;

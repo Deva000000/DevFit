@@ -362,6 +362,8 @@ test('release infrastructure enforces security headers and monitors production h
   const globalHeaders = vercel.headers.find((entry) => entry.source === '/(.*)').headers;
   assert.ok(globalHeaders.some((header) => header.key === 'Content-Security-Policy'));
   assert.ok(!globalHeaders.some((header) => header.key === 'Content-Security-Policy-Report-Only'));
+  const csp = globalHeaders.find((header) => header.key === 'Content-Security-Policy').value;
+  assert.doesNotMatch(csp, /'unsafe-eval'/);
   const workflow = fs.readFileSync(new URL('../.github/workflows/devfit-ci.yml', import.meta.url), 'utf8');
   assert.match(workflow, /node --test tests\/reliability\.test\.mjs/);
   assert.match(workflow, /\/api\/health/);

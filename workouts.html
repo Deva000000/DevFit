@@ -19,7 +19,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:ital,wght@1,700;1,800&family=Lora:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600;1,700&family=Anton&family=Righteous&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>if(typeof Chart==='undefined'){document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"><\/script>')}</script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="pdf-loader.js"></script>
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
@@ -977,10 +977,10 @@ document.getElementById('clear-plan-btn').addEventListener('click',clearCurrentP
 // ---------- SHARE PROGRAM PDF ----------
 document.getElementById('share-plan-btn').addEventListener('click',exportPlanPDF);
 
-function exportPlanPDF(){
+async function exportPlanPDF(){
   if(!isPro()){ window.location.href='pricing.html'; return; }   // PDF export is Pro
-  const jsPDFlib = window.jspdf && window.jspdf.jsPDF;
-  if(!jsPDFlib){ alert('PDF library not loaded. Check your connection and try again.'); return; }
+  const jsPDFlib = window.DevFitPDF ? await DevFitPDF.get() : (window.jspdf && window.jspdf.jsPDF);
+  if(!jsPDFlib){ alert('PDF tools could not load. Check your connection and try again.'); return; }
   const workouts=(data.plan.workouts||[]).filter(w=>w.name || (w.exercises&&w.exercises.length));
   if(!workouts.length){ toast('Add at least one workout first'); return; }
 

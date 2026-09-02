@@ -69,7 +69,7 @@
   .modal{background:#111;border:1px solid #333;border-top:3px solid #cc0000;border-radius:14px;padding:20px;max-width:420px;width:100%}
   .modal h2{margin-bottom:6px}
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="pdf-loader.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -520,7 +520,7 @@ function invNumber(sub, type){
 
 async function buildInvoiceDoc(sub, opts){
   opts = opts || { type:'app' };
-  var jsPDFctor = window.jspdf && window.jspdf.jsPDF;
+  var jsPDFctor = window.DevFitPDF ? await DevFitPDF.get() : (window.jspdf && window.jspdf.jsPDF);
   if(!jsPDFctor) throw new Error('PDF library not loaded — check your connection.');
   var doc = new jsPDFctor({ unit:'mm', format:'a4' });
   var M=18, RIGHT=210-M;

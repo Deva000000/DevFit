@@ -19,7 +19,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:ital,wght@1,700;1,800&family=Lora:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600;1,700&family=Anton&family=Righteous&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>if(typeof Chart==='undefined'){document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"><\/script>')}</script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="pdf-loader.js"></script>
 <script src="progress-model.js"></script><!-- versioned programs + safe account merge -->
 <script src="scoring.js"></script><!-- shared scoring engine (app score === report score) -->
 <script src="report-engine.js"></script><!-- shared report analysis + narrative (also owns the week/date helpers) -->
@@ -544,7 +544,7 @@ html.nosplash #devfit-splash{display:none!important}
 
   <div class="footer">
     DevFit · Dominance Through Discipline<br>
-    <a href="https://wa.me/60183679177">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.87.2
+    <a href="https://wa.me/60183679177">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.87.3
   </div>
 
 
@@ -1411,10 +1411,9 @@ function makeReportDoc(A){
 // essay under every chart and it was too long to be read. Everything a client
 // asked for — where the trend is going, what they logged, whether volume and
 // calories are moving — is on the first three pages.
-function generateReport(range){
-  if(!window.jspdf){ toast('PDF library still loading…', true); return; }
-  const { jsPDF } = window.jspdf;
-  if(!jsPDF){ toast('PDF library failed to load', true); return; }
+async function generateReport(range){
+  const jsPDF = window.DevFitPDF ? await DevFitPDF.get() : (window.jspdf && window.jspdf.jsPDF);
+  if(!jsPDF){ toast('PDF tools could not load. Check your connection and try again.', true); return; }
 
   let A, N;
   try{

@@ -503,7 +503,7 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
   assert.match(settings, /<div class="title">Install DevFit App<\/div>/);
   assert.match(settings, /if\(!deferredInstallPrompt\)\{\s*showIosHint\(\)/);
   assert.equal(manifest.display, 'standalone');
-  assert.match(worker, /devfit-v4\.87\.2/);
+  assert.match(worker, /devfit-v4\.87\.3/);
   assert.doesNotMatch(worker, /\.then\(\(\) => self\.skipWaiting\(\)\)/);
 
   for (const html of [index, settings]) {
@@ -528,6 +528,46 @@ test('analytics survive a Chart CDN failure and nutrition initializes in order',
   assert.match(usda, /dataType: \['Foundation', 'SR Legacy', 'Survey \(FNDDS\)'\]/);
   assert.match(usda, /AbortSignal\.timeout\(6000\)/);
   assert.doesNotMatch(usda, /&dataType=/);
+});
+
+test('all PDF exports share a two-CDN integrity-checked loader and wait for it', async () => {
+  const loader = fs.readFileSync(new URL('../pdf-loader.js', import.meta.url), 'utf8');
+  assert.match(loader, /cdn\.jsdelivr\.net\/npm\/jspdf@2\.5\.1/);
+  assert.match(loader, /cdnjs\.cloudflare\.com\/ajax\/libs\/jspdf\/2\.5\.1/);
+  assert.match(loader, /sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56/);
+
+  const requested = [];
+  const state = {};
+  const context = { Promise, setTimeout, clearTimeout, console };
+  context.window = context;
+  context.document = {
+    documentElement: { setAttribute: (name, value) => { state[name] = value; }, appendChild: () => {} },
+    createElement: () => ({ remove() {} }),
+    head: { appendChild(script) {
+      requested.push(script.src);
+      queueMicrotask(() => {
+        if (requested.length === 1) script.onerror();
+        else { context.jspdf = { jsPDF: function jsPDF() {} }; script.onload(); }
+      });
+    } }
+  };
+  vm.runInNewContext(loader, context);
+  const ctor = await context.DevFitPDF.get();
+  assert.equal(typeof ctor, 'function');
+  assert.equal(requested.length, 2);
+  assert.equal(state['data-devfit-pdf'], 'ready');
+
+  for (const name of ['admin.html', 'nutrition.html', 'workouts.html', 'settings.html']) {
+    const html = fs.readFileSync(new URL('../' + name, import.meta.url), 'utf8');
+    assert.match(html, /<script src="pdf-loader\.js"><\/script>/);
+    assert.doesNotMatch(html, /<script[^>]+src="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/jspdf/);
+  }
+  const nutrition = fs.readFileSync(new URL('../nutrition.html', import.meta.url), 'utf8');
+  const workouts = fs.readFileSync(new URL('../workouts.html', import.meta.url), 'utf8');
+  const settings = fs.readFileSync(new URL('../settings.html', import.meta.url), 'utf8');
+  assert.match(nutrition, /async function generateNutritionPDF\(\)[\s\S]*await DevFitPDF\.get\(\)/);
+  assert.match(workouts, /async function exportPlanPDF\(\)[\s\S]*await DevFitPDF\.get\(\)/);
+  assert.match(settings, /async function generateReport\(range\)[\s\S]*await DevFitPDF\.get\(\)/);
 });
 
 test('sensitive APIs are never cached and public routes accept only intended methods', () => {

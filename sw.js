@@ -1,4 +1,4 @@
-/* DevFit Service Worker — v4.87.2
+/* DevFit Service Worker — v4.87.3
    Strategy (atomic updates — no stale code can ever mix with fresh HTML):
    - HTML pages + app logic (.js/.css): NETWORK-FIRST with cache fallback, so every
      online load gets a consistent, up-to-date set. This is what prevents the
@@ -10,7 +10,7 @@
    - /api/*: network-only (never cached).
 */
 
-const VERSION = 'devfit-v4.87.2';
+const VERSION = 'devfit-v4.87.3';
 const APP_SHELL = 'devfit-shell-' + VERSION;
 const RUNTIME = 'devfit-runtime-' + VERSION;
 
@@ -47,6 +47,7 @@ const SHELL_FILES = [
   './report-engine.js',
   './report-pdf.js',
   './devfit-pdf.js',
+  './pdf-loader.js',
   './theme.css',
   './theme.js'
 ];

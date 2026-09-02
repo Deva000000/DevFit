@@ -364,6 +364,12 @@ test('release infrastructure enforces security headers and monitors production h
   assert.ok(!globalHeaders.some((header) => header.key === 'Content-Security-Policy-Report-Only'));
   const csp = globalHeaders.find((header) => header.key === 'Content-Security-Policy').value;
   assert.doesNotMatch(csp, /'unsafe-eval'/);
+  const worker = fs.readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
+  for (const host of ['cdnjs.cloudflare.com', 'cdn.jsdelivr.net', 'unpkg.com', 'fonts.googleapis.com', 'fonts.gstatic.com']) {
+    const escaped = host.replaceAll('.', '\\.');
+    assert.match(worker, new RegExp(escaped));
+    assert.match(csp, new RegExp('connect-src[^;]*' + escaped));
+  }
   const workflow = fs.readFileSync(new URL('../.github/workflows/devfit-ci.yml', import.meta.url), 'utf8');
   assert.match(workflow, /node --test tests\/reliability\.test\.mjs/);
   assert.match(workflow, /\/api\/health/);
@@ -530,8 +536,9 @@ test('analytics survive a Chart CDN failure and nutrition initializes in order',
   assert.doesNotMatch(usda, /&dataType=/);
 });
 
-test('all PDF exports share a two-CDN integrity-checked loader and wait for it', async () => {
+test('all PDF exports share a multi-CDN integrity-checked loader and wait for it', async () => {
   const loader = fs.readFileSync(new URL('../pdf-loader.js', import.meta.url), 'utf8');
+  assert.match(loader, /unpkg\.com\/jspdf@2\.5\.1/);
   assert.match(loader, /cdn\.jsdelivr\.net\/npm\/jspdf@2\.5\.1/);
   assert.match(loader, /cdnjs\.cloudflare\.com\/ajax\/libs\/jspdf\/2\.5\.1/);
   assert.match(loader, /sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56/);

@@ -52,7 +52,9 @@ const SHELL_FILES = [
   './theme.js'
 ];
 
-const CDN_HOSTS = ['cdnjs.cloudflare.com','fonts.googleapis.com','fonts.gstatic.com','cdn.jsdelivr.net'];
+// Keep this list aligned with CSP connect-src: intercepted CDN requests are
+// fetched by the worker, so script-src alone is not enough to let them through.
+const CDN_HOSTS = ['cdnjs.cloudflare.com','fonts.googleapis.com','fonts.gstatic.com','cdn.jsdelivr.net','unpkg.com'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

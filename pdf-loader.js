@@ -7,6 +7,9 @@
 
   var INTEGRITY = 'sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk';
   var URLS = [
+    // Older installed workers did not intercept unpkg, so this path also
+    // repairs PDF export before the user activates the v4.87.3 worker update.
+    'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js',
     'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'
   ];

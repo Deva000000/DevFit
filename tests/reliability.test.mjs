@@ -364,6 +364,7 @@ test('release infrastructure enforces security headers and monitors production h
   assert.ok(!globalHeaders.some((header) => header.key === 'Content-Security-Policy-Report-Only'));
   const csp = globalHeaders.find((header) => header.key === 'Content-Security-Policy').value;
   assert.doesNotMatch(csp, /'unsafe-eval'/);
+  assert.match(csp, /style-src[^;]*accounts\.google\.com/);
   const worker = fs.readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
   for (const host of ['cdnjs.cloudflare.com', 'cdn.jsdelivr.net', 'unpkg.com', 'fonts.googleapis.com', 'fonts.gstatic.com']) {
     const escaped = host.replaceAll('.', '\\.');
@@ -534,6 +535,37 @@ test('analytics survive a Chart CDN failure and nutrition initializes in order',
   assert.match(usda, /dataType: \['Foundation', 'SR Legacy', 'Survey \(FNDDS\)'\]/);
   assert.match(usda, /AbortSignal\.timeout\(6000\)/);
   assert.doesNotMatch(usda, /&dataType=/);
+});
+
+test('an unhealthy optional Kalori source enters cooldown without blocking every search', async () => {
+  let upstreamCalls = 0;
+  globalThis.fetch = async (url) => {
+    if (String(url).includes('kalori-api.my')) {
+      upstreamCalls++;
+      throw new Error('upstream timeout');
+    }
+    throw new Error('monitoring is best-effort in this isolated test');
+  };
+  const { default: handler } = await import(new URL('../api/kalori.js?cooldown-test', import.meta.url));
+  const run = async (q) => {
+    let status = 0, body, cache = '';
+    const req = { method: 'GET', query: { q }, headers: { host: 'devfit.test', referer: 'https://devfit.test/nutrition.html' } };
+    const res = {
+      setHeader(key, value) { if (String(key).toLowerCase() === 'cache-control') cache = value; },
+      status(value) { status = value; return this; },
+      json(value) { body = value; }
+    };
+    await handler(req, res);
+    return { status, body, cache };
+  };
+  const first = await run('nasi lemak');
+  const second = await run('chicken rice');
+  assert.equal(first.status, 200);
+  assert.equal(second.status, 200);
+  assert.deepEqual(first.body.data, []);
+  assert.equal(second.body.error, 'kalori temporarily unavailable');
+  assert.match(second.cache, /s-maxage=60/);
+  assert.equal(upstreamCalls, 1);
 });
 
 test('all PDF exports share a multi-CDN integrity-checked loader and wait for it', async () => {

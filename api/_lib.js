@@ -71,9 +71,13 @@ const sbHeaders = () => ({
 });
 
 export async function sbSelect(table, query) {
-  const r = await fetch(`${SB_URL}/rest/v1/${table}?${query}`, { headers: sbHeaders() });
-  if (!r.ok) return null;
-  return r.json();
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/${table}?${query}`, {
+      headers: sbHeaders(), signal: AbortSignal.timeout(8000)
+    });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (_) { return null; }
 }
 
 // Plain insert (no conflict key). Returns the inserted rows, or null on any error

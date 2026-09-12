@@ -112,6 +112,15 @@
       }
     } catch (e) {}
 
+    // Legacy recovery/recents keys had no reliable account owner. Keep the raw
+    // copies untouched, but never expose them to whichever person signs in next.
+    // New recovery copies and recents are scoped exactly like primary records.
+    ['devfitTrainingV1__safety', 'devfitTrainingV1__unreadable',
+     'devfitNutritionV2__unreadable', 'progressLog2__unreadable',
+     'devfit_recent_foods', 'devfit_logResume'].forEach(function (k) {
+      DATA_KEYS.push(k); DATA_KEY_SET[k] = true;
+    });
+
     // Friendly one-time warning when the device's localStorage is full, instead
     // of saves silently failing (most call sites swallow the error in try/catch).
     var quotaWarned = false;

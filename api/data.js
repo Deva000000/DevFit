@@ -67,7 +67,8 @@ async function currentRow(email, dataType) {
       '&data_type=eq.' + encodeURIComponent(dataType) +
       '&select=data_type,data,updated_at'
   );
-  return Array.isArray(rows) && rows[0] ? rows[0] : null;
+  if (!Array.isArray(rows)) throw new Error('account_data_unavailable');
+  return rows[0] || null;
 }
 
 export default async function handler(req, res) {
@@ -101,7 +102,12 @@ export default async function handler(req, res) {
         'devfit_data',
         'email=eq.' + encodeURIComponent(email) + '&select=data_type,data,updated_at'
       );
-      res.status(200).json({ rows: rows || [] });
+      if (!Array.isArray(rows)) {
+        await recordServerEvent('data_failure', 'Account records unavailable during restore', { page: '/api/data', status: 503 });
+        res.status(503).json({ error: 'account_data_unavailable' });
+        return;
+      }
+      res.status(200).json({ rows });
       return;
     }
 

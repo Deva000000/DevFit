@@ -25,7 +25,7 @@ jobs:
         run: |
           for file in api/*.js; do node --check "$file"; done
       - name: Reliability regression suite
-        run: node --test tests/reliability.test.mjs
+        run: node --test tests/reliability.test.mjs tests/release-safety.test.mjs
 
   production-smoke:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'

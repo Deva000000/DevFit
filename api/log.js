@@ -16,10 +16,11 @@
 //     at timestamptz default now()
 //   );
 
-import { readJsonBody, rateLimit, clientIp, sbInsert, haveServerConfig } from './_lib.js';
+import { readJsonBody, rateLimit, clientIp, recordServerEvent } from './_lib.js';
 
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') { res.status(405).json({ error: 'method' }); return; }
 
   const rl = await rateLimit('log:' + clientIp(req), 20, 300); // 20 errors / 5 min per IP
@@ -37,10 +38,8 @@ export default async function handler(req, res) {
   };
   if (!rec.message && !rec.stack) { res.status(200).json({ ok: true }); return; }
 
-  // Always land in Vercel's logs.
-  console.error('[DevFit client error]', JSON.stringify(rec));
-  // Durable, but optional.
-  try { if (haveServerConfig()) await sbInsert('devfit_errors', rec); } catch (e) { /* best-effort */ }
+  // Use the same bounded retention path as server events.
+  await recordServerEvent(rec.type, rec.message, rec);
 
   res.status(200).json({ ok: true });
 }

@@ -2625,16 +2625,25 @@ applyNutritionTierGates();
     // 2. PROGRESSIVE: merge each network source in as it arrives (whichever is fastest)
     let pool=instant.slice();
     let anyResolved=false;                         // a network source returned (even if empty)
+    let rateLimited=false, searchUnavailable=false;
     const sources=[usdaSearch(q),kaloriSearch(q),offSearch(q)];
     await Promise.all(sources.map(pr=>pr.then(res=>{
       if(token!==_searchToken) return;            // a newer search started — discard
       anyResolved=true;
       if(Array.isArray(res)&&res.length){ pool=pool.concat(res); renderResults(rankFoods(pool,q)); }
-    }).catch(()=>{})));
+    }).catch((error)=>{
+      const message=String(error&&error.message||'');
+      if(/\s429$/.test(message)) rateLimited=true;
+      else if(/\s(401|503)$/.test(message)||/sign in required/.test(message)) searchUnavailable=true;
+    })));
 
     if(token!==_searchToken) return;
     if(!pool.length){
-      el.innerHTML=anyResolved
+      el.innerHTML=rateLimited
+        ? '<div class="food-empty">Search is busy. Please wait a minute, then try again. You can still add food manually.</div>'
+        : searchUnavailable
+          ? '<div class="food-empty">Food search is temporarily unavailable. Please try again shortly, or add food manually.</div>'
+        : anyResolved
         ? '<div class="food-empty">No results found. Try different keywords.</div>'
         : '<div class="food-empty">Search timed out — check your connection and try again.</div>';
     }

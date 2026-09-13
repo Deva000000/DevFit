@@ -575,6 +575,13 @@ test('an unhealthy optional Kalori source enters cooldown without blocking every
   assert.equal(upstreamCalls, 1);
 });
 
+test('food-search protection communicates limits without hiding manual entry', () => {
+  const nutrition = fs.readFileSync(new URL('../nutrition.html', import.meta.url), 'utf8');
+  assert.match(nutrition, /Search is busy\. Please wait a minute/);
+  assert.match(nutrition, /add food manually/);
+  assert.match(nutrition, /Authorization:'Bearer '\+token/);
+});
+
 test('all PDF exports share a multi-CDN integrity-checked loader and wait for it', async () => {
   const loader = fs.readFileSync(new URL('../pdf-loader.js', import.meta.url), 'utf8');
   assert.match(loader, /unpkg\.com\/jspdf@2\.5\.1/);

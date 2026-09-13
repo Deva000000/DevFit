@@ -1155,7 +1155,7 @@ function deleteDietPlan(id){
 document.getElementById('save-diet-btn').addEventListener('click',saveDietPlan);
 
 async function generateNutritionPDF(){
-  if(!isPro()){ window.location.href='pricing.html'; return; }   // PDF export is Pro
+  if(!window.DevFitAuth || !(await DevFitAuth.requirePro())) return;   // PDF export is Pro
   const jsPDFlib=window.DevFitPDF?await DevFitPDF.get():(window.jspdf&&window.jspdf.jsPDF);
   if(!jsPDFlib){ alert('PDF tools could not load. Check your connection and try again.'); return; }
   const dm=getDayMacros(currentDate);
@@ -1526,9 +1526,10 @@ applyNutritionTierGates();
 // Wire Week/Month toggle for trend chart
 (function bindRangeToggle(){
   document.querySelectorAll('#range-toggle .rng-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const r = parseInt(btn.dataset.range,10);
       if(!r || r===trendRange) return;
+      if(r===30 && (!window.DevFitAuth || !(await DevFitAuth.requirePro()))) return;
       trendRange = r;
       document.querySelectorAll('#range-toggle .rng-btn').forEach(b => {
         const isActive = parseInt(b.dataset.range,10) === r;
@@ -1880,8 +1881,8 @@ applyNutritionTierGates();
       btn.style.opacity='0.5';
       if(!/🔒/.test(btn.textContent)) btn.textContent=btn.textContent.trim()+' 🔒';
     }
-    btn.addEventListener('click',()=>{
-      if(btn.dataset.theme!=='light' && !isPro()){ window.location.href='pricing.html'; return; }
+    btn.addEventListener('click',async()=>{
+      if(btn.dataset.theme!=='light' && (!window.DevFitAuth || !(await DevFitAuth.requirePro()))) return;
       dsTheme=btn.dataset.theme;
       document.querySelectorAll('.ds-tbtn').forEach(b=>b.classList.toggle('active',b===btn));
       rerender();

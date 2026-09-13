@@ -618,7 +618,8 @@ function fmtDate(s){const d=new Date(s);return d.toLocaleDateString('en-MY',{day
 // ---------- MODE SWITCH ----------
 let currentMode='log';
 document.querySelectorAll('.mode-btn').forEach(btn=>{
-  btn.addEventListener('click',()=>{
+  btn.addEventListener('click',async()=>{
+    if(btn.dataset.mode==='progress' && !(await renderProgressView())) return;
     currentMode=btn.dataset.mode;
     document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active',b===btn));
     document.getElementById('view-log').style.display     = currentMode==='log'?'':'none';
@@ -626,7 +627,7 @@ document.querySelectorAll('.mode-btn').forEach(btn=>{
     document.getElementById('view-progress').style.display= currentMode==='progress'?'':'none';
     if(currentMode==='log')      renderLog(true);
     if(currentMode==='plan')   { renderPlan(); loadPlanMeta(); renderPlanLibrary(); renderMesoCard(); }
-    if(currentMode==='progress') renderProgressView();
+    // Progress was prepared above only after authoritative server approval.
   });
 });
 
@@ -978,7 +979,7 @@ document.getElementById('clear-plan-btn').addEventListener('click',clearCurrentP
 document.getElementById('share-plan-btn').addEventListener('click',exportPlanPDF);
 
 async function exportPlanPDF(){
-  if(!isPro()){ window.location.href='pricing.html'; return; }   // PDF export is Pro
+  if(!window.DevFitAuth || !(await DevFitAuth.requirePro())) return;   // PDF export is Pro
   const jsPDFlib = window.DevFitPDF ? await DevFitPDF.get() : (window.jspdf && window.jspdf.jsPDF);
   if(!jsPDFlib){ alert('PDF tools could not load. Check your connection and try again.'); return; }
   const workouts=(data.plan.workouts||[]).filter(w=>w.name || (w.exercises&&w.exercises.length));
@@ -1529,7 +1530,13 @@ function sportStats(name){
 }
 
 document.getElementById('log-date').value=todayStr();
-document.getElementById('log-date').addEventListener('change',()=>renderLog(false));
+document.getElementById('log-date').addEventListener('change',async()=>{
+  const inp=document.getElementById('log-date');
+  if(inp.value!==todayStr() && (!window.DevFitAuth || !(await DevFitAuth.requirePro()))){
+    inp.value=todayStr(); return;
+  }
+  renderLog(false);
+});
 
 // ---------- FREE TIER: today only ----------
 // Browsing back through past sessions is Pro. On Free the log is pinned to today
@@ -2135,13 +2142,8 @@ function plateauPill(exId,log,last,tip){
 
 // ---------- PROGRESS VIEW ----------
 let progChart=null;
-function renderProgressView(){
-  // FREE TIER GATE
-  if(!isPro()){
-    document.getElementById('view-progress').querySelector('.card').innerHTML =
-      '<div class="section-label">Exercise progression</div>' + paywallHTML('Training Progress Charts');
-    return;
-  }
+async function renderProgressView(){
+  if(!window.DevFitAuth || !(await DevFitAuth.requirePro())) return false;
   const sel=document.getElementById('prog-ex');
   const prev=sel.value;
   const seen=new Map();
@@ -2151,6 +2153,7 @@ function renderProgressView(){
   if(prev && seen.has(prev)) sel.value=prev;
   sel.onchange=drawProgressChart;
   drawProgressChart();
+  return true;
 }
 function drawProgressChart(){
   const exId=document.getElementById('prog-ex').value;
@@ -2251,8 +2254,8 @@ function rerenderShareCard(){
 // later can't reliably pre-empt this one (during the at-target phase listeners
 // fire in registration order, capture flag or not), so the guard has to be here.
 document.querySelectorAll('.theme-btn').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    if(btn.dataset.theme !== 'light' && !isPro()){ window.location.href='pricing.html'; return; }
+  btn.addEventListener('click',async()=>{
+    if(btn.dataset.theme !== 'light' && (!window.DevFitAuth || !(await DevFitAuth.requirePro()))) return;
     currentShareTheme = btn.dataset.theme;
     document.querySelectorAll('.theme-btn').forEach(b=>b.classList.toggle('active', b===btn));
     rerenderShareCard();

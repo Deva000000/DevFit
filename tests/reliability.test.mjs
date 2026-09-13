@@ -510,7 +510,7 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
   assert.match(settings, /<div class="title">Install DevFit App<\/div>/);
   assert.match(settings, /if\(!deferredInstallPrompt\)\{\s*showIosHint\(\)/);
   assert.equal(manifest.display, 'standalone');
-  assert.match(worker, /devfit-v4\.87\.5/);
+  assert.match(worker, /devfit-v4\.87\.6/);
   assert.doesNotMatch(worker, /\.then\(\(\) => self\.skipWaiting\(\)\)/);
 
   for (const html of [index, settings]) {
@@ -625,7 +625,7 @@ test('all PDF exports share a multi-CDN integrity-checked loader and wait for it
 });
 
 test('sensitive APIs are never cached and public routes accept only intended methods', () => {
-  for (const name of ['session.js', 'verify.js', 'data.js']) {
+  for (const name of ['session.js', 'verify.js', 'pro-access.js', 'data.js']) {
     const source = fs.readFileSync(new URL('../api/' + name, import.meta.url), 'utf8');
     assert.match(source, /Cache-Control', 'no-store, no-cache, must-revalidate'/);
   }

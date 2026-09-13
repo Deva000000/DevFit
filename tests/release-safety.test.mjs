@@ -10,6 +10,7 @@ process.env.SUPABASE_SERVICE_KEY = 'test-only';
 const { default: handler } = await import('../api/data.js');
 const { sbSelect, signToken, foodSearchIdentity } = await import('../api/_lib.js');
 const { default: offHandler } = await import('../api/off.js');
+const { default: proAccessHandler } = await import('../api/pro-access.js');
 function token(email) {
   const h = Buffer.from(JSON.stringify({ alg: 'HS256' })).toString('base64url');
   const p = Buffer.from(JSON.stringify({ email })).toString('base64url');
@@ -189,4 +190,105 @@ test('client food cache shares in-flight work and never stores errors or sends a
   await search('/api/usda?query=fail'); await search('/api/usda?query=fail'); assert.equal(requests, 3);
   await assert.rejects(search('https://other.test/api/usda?query=qa'), /invalid food endpoint/);
   assert.equal(requests, 3);
+});
+
+test('Pro authorization ignores claimed token tier and uses the current subscriber record', async () => {
+  const original = globalThis.fetch;
+  let subscriber = { approved: true, tier: 'free', expiry: '2099-12-31', name: 'QA User' };
+  globalThis.fetch = async (url) => {
+    if (String(url).includes('devfit_subscribers?')) return { ok: true, json: async () => [subscriber] };
+    throw new Error('unexpected request ' + url);
+  };
+  const runAccess = async (sessionToken) => {
+    const res = responseCapture();
+    await proAccessHandler({ method: 'POST', headers: { authorization: 'Bearer ' + sessionToken } }, res);
+    return res.out;
+  };
+  try {
+    // A browser/token claim of "pro" cannot upgrade a Free database account.
+    const claimedPro = signToken({ email: 'food@example.com', tier: 'pro' });
+    const free = await runAccess(claimedPro);
+    assert.equal(free.status, 403);
+    assert.equal(free.body.error, 'pro_required');
+    assert.equal(free.body.tier, 'free');
+    assert.equal(free.headers['Cache-Control'], 'no-store, no-cache, must-revalidate');
+
+    subscriber = { ...subscriber, tier: 'pro' };
+    const pro = await runAccess(claimedPro);
+    assert.equal(pro.status, 200);
+    assert.equal(pro.body.authorized, true);
+    assert.equal(pro.body.tier, 'pro');
+
+    subscriber = { ...subscriber, expiry: '2000-01-01' };
+    const expired = await runAccess(claimedPro);
+    assert.equal(expired.status, 403);
+    assert.equal(expired.body.tier, 'free');
+
+    const forged = await runAccess('not-a-signed-token');
+    assert.equal(forged.status, 401);
+  } finally { globalThis.fetch = original; }
+});
+
+test('client premium actions fail closed and coalesce double taps', async () => {
+  const authCode = fs.readFileSync(new URL('../devfit-auth.js', import.meta.url), 'utf8');
+  function clientContext(serverResult) {
+    const storage = new Map([
+      ['devfit_user', JSON.stringify({ email: 'person@gmail.com', approved: true, tier: 'pro' })],
+      ['devfit_token', 'signed-session-token'],
+      ['devfit_ns_migrated', '1']
+    ]);
+    let requests = 0;
+    const context = {
+      localStorage: {
+        getItem: (key) => storage.has(key) ? storage.get(key) : null,
+        setItem: (key, value) => storage.set(key, String(value)),
+        removeItem: (key) => storage.delete(key)
+      },
+      fetch: async (url, options) => {
+        requests++;
+        assert.equal(url, '/api/pro-access');
+        assert.equal(options.headers.Authorization, 'Bearer signed-session-token');
+        await Promise.resolve();
+        return { ok: serverResult.status === 200, status: serverResult.status, json: async () => serverResult.body };
+      },
+      crypto: { randomUUID: () => 'qa-device' }, self: { crypto: { randomUUID: () => 'qa-device' } },
+      alert() {}, console, setTimeout: () => 0,
+      document: { body: null, documentElement: { appendChild() {} }, createElement: () => ({ style: {}, parentNode: null }) },
+      location: { href: '', reload() {} }, Date, JSON, Object, Array, Number, String, Math
+    };
+    context.window = context;
+    vm.runInNewContext(authCode, context);
+    return { context, storage, requests: () => requests };
+  }
+
+  const allowed = clientContext({ status: 200, body: { authorized: true, tier: 'pro', token: 'fresh-token' } });
+  const trustedCheck = allowed.context.DevFitAuth.requirePro;
+  assert.equal(Reflect.set(allowed.context.DevFitAuth, 'requirePro', async () => true), false);
+  assert.equal(Reflect.set(allowed.context, 'DevFitAuth', { requirePro: async () => true }), false);
+  assert.equal(allowed.context.DevFitAuth.requirePro, trustedCheck);
+  // Replacing window.fetch after the auth script loaded cannot forge the result.
+  allowed.context.fetch = async () => ({ ok: false, status: 403, json: async () => ({ error: 'pro_required' }) });
+  assert.deepEqual(await Promise.all([allowed.context.DevFitAuth.requirePro(), allowed.context.DevFitAuth.requirePro()]), [true, true]);
+  assert.equal(allowed.requests(), 1);
+  assert.equal(allowed.storage.get('devfit_token'), 'fresh-token');
+
+  const denied = clientContext({ status: 403, body: { authorized: false, error: 'pro_required', tier: 'free', token: 'free-token' } });
+  assert.equal(await denied.context.DevFitAuth.requirePro(), false);
+  assert.equal(JSON.parse(denied.storage.get('devfit_user')).tier, 'free');
+  assert.equal(denied.context.location.href, 'pricing.html');
+});
+
+test('every premium entry point performs action-time server authorization', () => {
+  const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const nutrition = fs.readFileSync(new URL('../nutrition.html', import.meta.url), 'utf8');
+  const workouts = fs.readFileSync(new URL('../workouts.html', import.meta.url), 'utf8');
+  const settings = fs.readFileSync(new URL('../settings.html', import.meta.url), 'utf8');
+  assert.match(index, /async function showProgSection\(sec\)[\s\S]*await DevFitAuth\.requirePro\(\)/);
+  assert.match(index, /b\.onclick=async[\s\S]*await DevFitAuth\.requirePro\(\)/);
+  assert.match(nutrition, /async function generateNutritionPDF\(\)[\s\S]*await DevFitAuth\.requirePro\(\)/);
+  assert.match(nutrition, /r===30[\s\S]*await DevFitAuth\.requirePro\(\)/);
+  assert.match(workouts, /async function renderProgressView\(\)[\s\S]*await DevFitAuth\.requirePro\(\)/);
+  assert.match(workouts, /async function exportPlanPDF\(\)[\s\S]*await DevFitAuth\.requirePro\(\)/);
+  assert.match(workouts, /inp\.value!==todayStr\(\)[\s\S]*await DevFitAuth\.requirePro\(\)/);
+  assert.match(settings, /async function generateReport\(range\)[\s\S]*await DevFitAuth\.requirePro\(\)/);
 });

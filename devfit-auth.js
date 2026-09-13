@@ -6,9 +6,9 @@
  *    it to /api/verify, which checks the signature + re-reads the subscriber row
  *    and returns the authoritative tier. A hand-faked localStorage session has
  *    no valid token, so verify returns approved:false and we bounce to login.
- *  - Gating still runs in the browser (isPro), so a determined user can override
- *    it live in the console for ONE session. That resets on reload and is the
- *    Layer-3 tradeoff we deliberately skipped. Layer 1 stops persistent forgery.
+ *  - isPro() is only a presentation hint. Every premium action calls
+ *    requirePro(), which re-reads the subscriber row through /api/pro-access and
+ *    fails closed unless the server confirms a currently-active Pro account.
  *
  * Rollout safety:
  *  - MODE 'transition' (default): if /api/verify is missing (501) or the network
@@ -22,7 +22,12 @@
 
   var VERIFY_API = '/api/verify';
   var SESSION_API = '/api/session';
+  var PRO_API = '/api/pro-access';
   var STRICT = true; // backend live + verified — forged/absent tokens are now rejected
+  var proRequest = null;
+  // Capture the real browser fetch before page code or a later console command
+  // can replace window.fetch and forge a successful authorization response.
+  var requestFetch = typeof global.fetch === 'function' ? global.fetch.bind(global) : null;
 
   function getUser() {
     try { return JSON.parse(localStorage.getItem('devfit_user') || '{}'); } catch (e) { return {}; }
@@ -205,10 +210,77 @@
   }
   function isPro() { return getUserTier() === 'pro'; }
 
+  // Authoritative action-time Pro check. UI styling may use the cached tier for
+  // fast first paint, but premium calculations/exports/history must await this
+  // function. A backend outage pauses only the premium action; it never logs the
+  // user out or touches saved data.
+  async function requirePro() {
+    var u = getUser();
+    var token = getToken();
+    if (!u.email || !token) {
+      clearSession();
+      global.location.href = 'login.html';
+      return false;
+    }
+
+    try {
+      // Coalesce double taps without caching authorization beyond the request.
+      if (!proRequest) {
+        proRequest = (async function () {
+          if (!requestFetch) throw new Error('fetch_unavailable');
+          var response = await requestFetch(PRO_API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            cache: 'no-store',
+            body: JSON.stringify({ deviceId: deviceId() })
+          });
+          var payload = {};
+          try { payload = await response.json(); } catch (_) {}
+          return { response: response, payload: payload };
+        })();
+      }
+      var checked = await proRequest;
+      var res = checked.response;
+      var data = checked.payload;
+
+      if (res.ok && data && data.authorized === true && data.tier === 'pro') {
+        u.tier = 'pro';
+        if (data.expiry !== undefined) u.expiry = data.expiry;
+        if (data.startDate !== undefined) u.startDate = data.startDate;
+        if (data.plan !== undefined) u.plan = data.plan;
+        if (data.name) u.name = data.name;
+        setSession(u, data.token || token);
+        return true;
+      }
+
+      if (res.status === 401 || data.error === 'invalid_token' || data.error === 'revoked') {
+        clearSession();
+        global.location.href = 'login.html';
+        return false;
+      }
+      if (res.status === 403 || data.error === 'pro_required') {
+        u.tier = 'free';
+        if (data.expiry !== undefined) u.expiry = data.expiry;
+        setSession(u, data.token || token);
+        global.location.href = 'pricing.html';
+        return false;
+      }
+
+      try { global.alert('DevFit could not verify Pro access right now. Your saved data is safe. Check your connection and try again.'); } catch (_) {}
+      return false;
+    } catch (e) {
+      try { global.alert('DevFit could not verify Pro access right now. Your saved data is safe. Check your connection and try again.'); } catch (_) {}
+      return false;
+    } finally {
+      proRequest = null;
+    }
+  }
+
   // Exchange a verified identity token (Supabase/Google) for a signed session.
   // Returns { approved, ... } or throws on transport error.
   async function startSession(provider, providerToken, name) {
-    var res = await fetch(SESSION_API, {
+    if (!requestFetch) throw new Error('fetch_unavailable');
+    var res = await requestFetch(SESSION_API, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store',
       body: JSON.stringify({ provider: provider, token: providerToken, deviceId: deviceId() })
     });
@@ -230,7 +302,8 @@
     var u = getUser();
     if (!u.email) return 'kick';
     try {
-      var res = await fetch(VERIFY_API, {
+      if (!requestFetch) return 'skip';
+      var res = await requestFetch(VERIFY_API, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store',
         body: JSON.stringify({ token: getToken(), email: u.email, deviceId: deviceId() })
       });
@@ -274,10 +347,20 @@
     });
   }
 
-  global.DevFitAuth = {
+  var authApi = {
     getUser: getUser, getToken: getToken, setSession: setSession, clearSession: clearSession,
-    getUserTier: getUserTier, isPro: isPro, startSession: startSession, reverify: reverify, gate: gate,
+    getUserTier: getUserTier, isPro: isPro, requirePro: requirePro,
+    startSession: startSession, reverify: reverify, gate: gate,
     wipeLocalData: wipeLocalData, enforceDataOwner: enforceDataOwner, DATA_KEYS: DATA_KEYS,
     get strict() { return STRICT; }
   };
+  // Stop ordinary console overrides such as `DevFitAuth.requirePro=()=>true` or
+  // replacing the whole object. This is defence in depth; the server remains the
+  // authority and still rejects every Free, expired, revoked or unsigned call.
+  try {
+    Object.freeze(authApi);
+    Object.defineProperty(global, 'DevFitAuth', {
+      value: authApi, writable: false, configurable: false, enumerable: true
+    });
+  } catch (e) { global.DevFitAuth = authApi; }
 })(window);

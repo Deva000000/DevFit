@@ -1396,7 +1396,10 @@ function renderTabs(){
     const b=document.createElement('button');
     b.className='wtab'+(w===currentWeek?' active':'');
     b.textContent='Week '+(w+1);
-    b.onclick=()=>{currentWeek=w;renderTabs();render();};
+    b.onclick=async()=>{
+      if(w!==currentWeek && (!window.DevFitAuth || !(await DevFitAuth.requirePro()))) return;
+      currentWeek=w;renderTabs();render();
+    };
     c.appendChild(b);
   }
   // Keep the active week visible in the horizontal strip (it may be scrolled off).
@@ -1883,7 +1886,8 @@ function renderScoreSection(){
   document.getElementById('score-breakdown').innerHTML=html;
 }
 
-function showProgSection(sec){
+async function showProgSection(sec){
+  if(sec!=='daily' && (!window.DevFitAuth || !(await DevFitAuth.requirePro()))) return;
   document.querySelectorAll('.prog-section').forEach(s=>s.classList.remove('active'));
   const target=document.getElementById('sec-'+sec);
   if(target) target.classList.add('active');
@@ -2503,7 +2507,10 @@ loadData();
 renderTabs();
 render();
 applyTierGates();
-try{ showProgSection(localStorage.getItem('devfit_progSection')||'daily'); }catch(e){ showProgSection('daily'); }
+try{
+  const savedSection=localStorage.getItem('devfit_progSection')||'daily';
+  showProgSection(isPro()?savedSection:'daily');
+}catch(e){ showProgSection('daily'); }
 // Maps today's calendar date to a {w,d} week/day cell in the program grid.
 function reminderTodayCell(){
   try{
@@ -2780,8 +2787,8 @@ document.addEventListener('visibilitychange',function(){
       btn.style.opacity='0.5';
       if(!/🔒/.test(btn.textContent)) btn.textContent=btn.textContent.trim()+' 🔒';
     }
-    btn.addEventListener('click',()=>{
-      if(btn.dataset.theme!=='light' && !isPro()){ window.location.href='pricing.html'; return; }
+    btn.addEventListener('click',async()=>{
+      if(btn.dataset.theme!=='light' && (!window.DevFitAuth || !(await DevFitAuth.requirePro()))) return;
       wsTheme=btn.dataset.theme;
       document.querySelectorAll('.ws-tbtn').forEach(b=>b.classList.toggle('active',b===btn));
       rerender();

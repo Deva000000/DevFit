@@ -1412,6 +1412,7 @@ function makeReportDoc(A){
 // asked for — where the trend is going, what they logged, whether volume and
 // calories are moving — is on the first three pages.
 async function generateReport(range){
+  if(!window.DevFitAuth || !(await DevFitAuth.requirePro())) return;
   const jsPDF = window.DevFitPDF ? await DevFitPDF.get() : (window.jspdf && window.jspdf.jsPDF);
   if(!jsPDF){ toast('PDF tools could not load. Check your connection and try again.', true); return; }
 

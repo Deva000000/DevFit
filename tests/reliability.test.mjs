@@ -510,7 +510,7 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
   assert.match(settings, /<div class="title">Install DevFit App<\/div>/);
   assert.match(settings, /if\(!deferredInstallPrompt\)\{\s*showIosHint\(\)/);
   assert.equal(manifest.display, 'standalone');
-  assert.match(worker, /devfit-v4\.87\.4/);
+  assert.match(worker, /devfit-v4\.87\.5/);
   assert.doesNotMatch(worker, /\.then\(\(\) => self\.skipWaiting\(\)\)/);
 
   for (const html of [index, settings]) {
@@ -541,6 +541,7 @@ test('an unhealthy optional Kalori source enters cooldown without blocking every
   process.env.DEVFIT_JWT_SECRET = 'test-secret';
   let upstreamCalls = 0;
   globalThis.fetch = async (url) => {
+    if (String(url).includes('devfit_subscribers?')) return { ok: true, json: async () => [{ approved: true }] };
     if (String(url).includes('consume_devfit_rate_limit')) {
       return { ok: true, json: async () => [{ allowed: true, retry_after: 0 }] };
     }
@@ -571,7 +572,7 @@ test('an unhealthy optional Kalori source enters cooldown without blocking every
   assert.equal(second.status, 200);
   assert.deepEqual(first.body.data, []);
   assert.equal(second.body.error, 'kalori temporarily unavailable');
-  assert.match(second.cache, /s-maxage=60/);
+  assert.match(second.cache, /private, no-store/);
   assert.equal(upstreamCalls, 1);
 });
 
@@ -579,7 +580,7 @@ test('food-search protection communicates limits without hiding manual entry', (
   const nutrition = fs.readFileSync(new URL('../nutrition.html', import.meta.url), 'utf8');
   assert.match(nutrition, /Search is busy\. Please wait a minute/);
   assert.match(nutrition, /add food manually/);
-  assert.match(nutrition, /Authorization:'Bearer '\+token/);
+  assert.match(nutrition, /DevFitFoodSearch.search\(url\)/);
 });
 
 test('all PDF exports share a multi-CDN integrity-checked loader and wait for it', async () => {

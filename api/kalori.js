@@ -1,8 +1,8 @@
 // DevFit — Kalori API proxy (kalori-api.my) for Malaysian food data.
 //
 // Free public API, no key required. Proxied server-side to:
-//   1. Add CORS headers (API doesn't send them for all origins)
-//   2. Cache results at the edge so repeated searches are instant
+//   1. Keep browser requests same-origin
+//   2. Authenticate and rate-limit requests
 //   3. Allow graceful fallback if the API is down
 
 import { foodSearchIdentity, recordServerEvent } from './_lib.js';
@@ -16,13 +16,13 @@ const KALORI_COOLDOWN_MS = 10 * 60 * 1000;
 let kaloriUnavailableUntil = 0;
 
 function unavailable(res, error) {
-  // Short edge caching also protects cold instances and repeated searches while
-  // allowing the provider to recover without a deployment.
-  res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
+  // Never cache the authenticated HTTP response at the edge.
+  res.setHeader('Cache-Control', 'private, no-store');
   res.status(200).json({ data: [], error });
 }
 
 export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'private, no-store');
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.status(405).json({ data: [], error: 'method' }); return; }
   const identity = await foodSearchIdentity(req);
   if (!identity.ok) {
@@ -49,7 +49,6 @@ export default async function handler(req, res) {
     }
     const j = await r.json();
     kaloriUnavailableUntil = 0;
-    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
     // Normalise: API may return { data: [...] } or { foods: [...] } or bare array
     const items = Array.isArray(j) ? j : (j.data || j.foods || j.results || []);
     res.status(200).json({ data: items });

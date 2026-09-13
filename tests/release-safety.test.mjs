@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import { cachedFood } from '../api/_food-cache.js';
 
 process.env.DEVFIT_JWT_SECRET = 'release-test-only';
 process.env.SUPABASE_SERVICE_KEY = 'test-only';
@@ -99,6 +102,7 @@ test('food proxy never calls an upstream source for unsigned or rate-limited tra
 
     const valid = signToken({ email: 'food@example.com' });
     globalThis.fetch = async (url) => {
+      if (String(url).includes('devfit_subscribers?')) return { ok: true, json: async () => [{ approved: true }] };
       if (String(url).includes('consume_devfit_rate_limit')) return { ok: true, json: async () => [{ allowed: false, retry_after: 60 }] };
       upstreamCalls++; return { ok: true, json: async () => ({ hits: [] }) };
     };
@@ -108,4 +112,81 @@ test('food proxy never calls an upstream source for unsigned or rate-limited tra
     assert.equal(limited.out.headers['Retry-After'], '60');
     assert.equal(upstreamCalls, 0);
   } finally { globalThis.fetch = original; }
+});
+
+test('food access is equal for free and pro and blocks deleted or revoked accounts', async () => {
+  const original = globalThis.fetch;
+  const req = { headers: { authorization: 'Bearer ' + signToken({ email: 'food@example.com', tier: 'pro' }) } };
+  let sub = { approved: true, tier: 'free' }, quotaCalls = 0;
+  globalThis.fetch = async (url) => {
+    if (String(url).includes('devfit_subscribers?')) return { ok: true, json: async () => sub ? [sub] : [] };
+    quotaCalls++;
+    return { ok: true, json: async () => [{ allowed: true }] };
+  };
+  try {
+    assert.equal((await foodSearchIdentity(req)).ok, true);
+    sub.tier = 'pro';
+    assert.equal((await foodSearchIdentity(req)).ok, true);
+    sub.approved = false;
+    assert.equal((await foodSearchIdentity(req)).status, 403);
+    sub = null;
+    assert.equal((await foodSearchIdentity(req)).status, 403);
+    assert.equal(quotaCalls, 4);
+  } finally { globalThis.fetch = original; }
+});
+
+test('cached food results still require authorization and responses prohibit shared caching', async () => {
+  const original = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async (url) => {
+    if (String(url).includes('devfit_subscribers?')) return { ok: true, json: async () => [{ approved: true, tier: 'free' }] };
+    if (String(url).includes('consume_devfit_rate_limit')) return { ok: true, json: async () => [{ allowed: true }] };
+    calls++;
+    return { ok: true, json: async () => ({ hits: [{ product_name: 'QA food', nutriments: { 'energy-kcal_100g': 100 } }] }) };
+  };
+  try {
+    const req = { method: 'GET', query: { query: 'cache-auth-test' }, headers: { authorization: 'Bearer ' + signToken({ email: 'food@example.com' }) } };
+    for (let i = 0; i < 2; i++) {
+      const res = responseCapture(); await offHandler(req, res);
+      assert.equal(res.out.status, 200); assert.equal(res.out.body.products.length, 1);
+      assert.equal(res.out.headers['Cache-Control'], 'private, no-store');
+    }
+    assert.equal(calls, 1);
+    const res = responseCapture(); await offHandler({ ...req, headers: {} }, res);
+    assert.equal(res.out.status, 401); assert.equal(calls, 1);
+  } finally { globalThis.fetch = original; }
+});
+
+test('server food cache coalesces requests, serves known results on outage, and expires them', async () => {
+  const originalNow = Date.now;
+  let now = originalNow(), calls = 0;
+  Date.now = () => now;
+  try {
+    const fetcher = async () => { calls++; return [{ name: 'QA food' }]; };
+    const [a, b] = await Promise.all([cachedFood('qa-coalesce', fetcher), cachedFood('qa-coalesce', fetcher)]);
+    assert.deepEqual(a, b); assert.equal(calls, 1);
+    now += 16 * 60 * 1000;
+    const fail = async () => { throw new Error('upstream down'); };
+    assert.deepEqual(await cachedFood('qa-coalesce', fail), a);
+    now += 24 * 60 * 60 * 1000;
+    await assert.rejects(cachedFood('qa-coalesce', fail), /upstream down/);
+  } finally { Date.now = originalNow; }
+});
+
+test('client food cache shares in-flight work and never stores errors or sends a token to an external URL', async () => {
+  let requests = 0, fail = false;
+  const context = { window: {}, Map, Date, Response, AbortSignal, fetch: async () => {
+    requests++; return new Response(JSON.stringify(fail ? { error: 'provider down', foods: [] } : { foods: [{ name: 'QA food' }] }));
+  } };
+  context.window.DevFitAuth = { getToken: () => 'qa-token' };
+  vm.createContext(context);
+  vm.runInContext(fs.readFileSync(new URL('../food-search-client.js', import.meta.url), 'utf8'), context);
+  const search = context.window.DevFitFoodSearch.search;
+  const [a, b] = await Promise.all([search('/api/usda?query=qa'), search('/api/usda?query=qa')]);
+  assert.deepEqual(await a.json(), await b.json()); assert.equal(requests, 1);
+  await search('/api/usda?query=qa'); assert.equal(requests, 1);
+  fail = true;
+  await search('/api/usda?query=fail'); await search('/api/usda?query=fail'); assert.equal(requests, 3);
+  await assert.rejects(search('https://other.test/api/usda?query=qa'), /invalid food endpoint/);
+  assert.equal(requests, 3);
 });

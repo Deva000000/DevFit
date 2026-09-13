@@ -11,8 +11,10 @@
 // remains the primary source for branded/Malaysian products + barcodes.
 
 import { foodSearchIdentity, recordServerEvent } from './_lib.js';
+import { cachedFood } from './_food-cache.js';
 
 export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'private, no-store');
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.status(405).json({ foods: [], error: 'method' }); return; }
   const identity = await foodSearchIdentity(req);
   if (!identity.ok) {
@@ -42,6 +44,7 @@ export default async function handler(req, res) {
   try {
     // USDA documents dataType as a JSON array. The former comma-delimited GET
     // parameter now returns HTTP 400, silently removing every USDA result.
+    const foods = await cachedFood('usda:' + query.toLowerCase() + ':' + pageSize, async () => {
     const r = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
@@ -53,15 +56,13 @@ export default async function handler(req, res) {
       signal: AbortSignal.timeout(6000)
     });
     if (!r.ok) {
-      await recordServerEvent('food_timeout', 'USDA upstream returned ' + r.status, { page: '/api/usda', status: r.status });
-      // Never 500 the client — just return no USDA results so OFF/local still serve.
-      res.status(200).json({ foods: [], error: 'usda ' + r.status });
-      return;
+      throw new Error('usda ' + r.status);
     }
     const j = await r.json();
-    // Food data is effectively static — let Vercel's edge cache it for a day.
-    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800');
-    res.status(200).json({ foods: Array.isArray(j.foods) ? j.foods : [] });
+    if (!Array.isArray(j.foods)) throw new Error('invalid_food_response');
+    return j.foods;
+    });
+    res.status(200).json({ foods });
   } catch (e) {
     await recordServerEvent('food_timeout', String(e && e.message || e), { page: '/api/usda', status: 502 });
     res.status(200).json({ foods: [], error: String(e && e.message || e) });

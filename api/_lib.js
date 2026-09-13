@@ -70,10 +70,10 @@ const sbHeaders = () => ({
   'Content-Type': 'application/json'
 });
 
-export async function sbSelect(table, query) {
+export async function sbSelect(table, query, timeoutMs = 8000) {
   try {
     const r = await fetch(`${SB_URL}/rest/v1/${table}?${query}`, {
-      headers: sbHeaders(), signal: AbortSignal.timeout(8000)
+      headers: sbHeaders(), signal: AbortSignal.timeout(timeoutMs)
     });
     if (!r.ok) return null;
     return await r.json();
@@ -127,11 +127,12 @@ export async function sbUpsert(table, row, onConflict) {
   return r.json();
 }
 
-export async function sbRpc(name, args) {
+export async function sbRpc(name, args, timeoutMs = null) {
   try {
     const r = await fetch(`${SB_URL}/rest/v1/rpc/${name}`, {
       method: 'POST',
       headers: sbHeaders(),
+      ...(timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
       body: JSON.stringify(args || {})
     });
     if (!r.ok) return null;
@@ -269,8 +270,8 @@ export async function identityFromGoogleIdToken(idToken) {
 }
 
 // ── Subscriber lookup + tier computation ─────────────────────────────────────
-export async function getSubscriber(email) {
-  const rows = await sbSelect('devfit_subscribers', 'email=eq.' + encodeURIComponent(email) + '&select=*');
+export async function getSubscriber(email, timeoutMs = 8000) {
+  const rows = await sbSelect('devfit_subscribers', 'email=eq.' + encodeURIComponent(email) + '&select=*', timeoutMs);
   // undefined = backend unavailable; null = lookup succeeded with no account.
   // Callers must not confuse a temporary outage with a revoked account.
   if (rows === null) return undefined;
@@ -341,7 +342,7 @@ export async function rateLimit(id, limit, windowSeconds, options = {}) {
       p_id: String(id || '').slice(0, 180),
       p_limit: Math.max(1, Math.floor(Number(limit) || 1)),
       p_window_seconds: Math.max(1, Math.floor(Number(windowSeconds) || 1))
-    });
+    }, options.timeoutMs || 8000);
     const row = Array.isArray(result) ? result[0] : result;
     if (!row || typeof row.allowed !== 'boolean') return { ok: !options.failClosed, unavailable: true };
     return { ok: row.allowed, retryAfter: Math.max(0, Number(row.retry_after) || 0) };
@@ -351,7 +352,8 @@ export async function rateLimit(id, limit, windowSeconds, options = {}) {
 // Food search can invoke paid/quota-limited third-party services. Browser
 // headers such as Referer are forgeable, so every proxy request must instead
 // carry a DevFit server-signed session token. Limits are shared across the
-// three food providers: one search cannot multiply a person's allowance.
+// three food providers. Allow enough calls for normal search use; upstream
+// caching and client request coalescing reduce repeated provider traffic.
 export async function foodSearchIdentity(req) {
   if (!haveServerConfig()) return { ok: false, status: 503, error: 'service_unavailable' };
   const raw = String((req.headers && req.headers.authorization) || '');
@@ -359,11 +361,14 @@ export async function foodSearchIdentity(req) {
   const payload = verifyToken(match && match[1]);
   const email = payload && String(payload.email || '').trim().toLowerCase();
   if (!email || email.length > 254) return { ok: false, status: 401, error: 'sign_in_required' };
+  const subscriber = await getSubscriber(email, 3000);
+  if (subscriber === undefined) return { ok: false, status: 503, error: 'food_search_unavailable' };
+  if (!subscriber || !subscriber.approved) return { ok: false, status: 403, error: 'account_unavailable' };
 
-  const strict = { failClosed: true };
+  const strict = { failClosed: true, timeoutMs: 3000 };
   const [account, ip] = await Promise.all([
-    rateLimit('food_account:' + email, 24, 60, strict),
-    rateLimit('food_ip:' + clientIp(req), 72, 60, strict)
+    rateLimit('food_account:' + crypto.createHash('sha256').update(email).digest('hex'), 90, 60, strict),
+    rateLimit('food_ip:' + clientIp(req), 900, 60, strict)
   ]);
   if (account.unavailable || ip.unavailable) return { ok: false, status: 503, error: 'food_search_unavailable' };
   if (!account.ok || !ip.ok) return {

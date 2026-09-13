@@ -269,6 +269,7 @@ html.nosplash #devfit-splash{display:none!important}
 <script src="devfit-pdf.js"></script><!-- named PDF downloads -->
 <script defer src="theme.js"></script>
 <script src="devfit-auth.js"></script>
+<script src="food-search-client.js"></script>
 </head>
 <body>
 <div id="devfit-splash"><div class="si"><img src="icon-192.png" alt="DevFit"><div class="w">DEV<b>FIT</b></div><div class="t">DOMINANCE THROUGH DISCIPLINE</div><div class="bar"><i></i></div></div></div>
@@ -1967,7 +1968,7 @@ applyNutritionTierGates();
   .src-local{background:rgba(204,0,0,0.20);color:#ff6b6b}
   .src-kalori{background:rgba(255,165,0,0.20);color:#ffa500}
   .src-recent{background:rgba(168,85,247,0.20);color:#c084fc}
-  .food-loading,.food-empty{padding:28px 16px;text-align:center;font-family:'DM Sans',system-ui,sans-serif;font-size:13px;color:#555}
+  .food-loading,.food-empty{padding:28px 16px;text-align:center;font-family:'DM Sans',system-ui,sans-serif;font-size:13px;color:#aaa}
   .scanner-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.97);z-index:10100;display:none;align-items:center;justify-content:center;flex-direction:column;padding:1.2rem}
   .scanner-overlay.show{display:flex}
   .scanner-modal{width:100%;max-width:460px}
@@ -2182,9 +2183,7 @@ applyNutritionTierGates();
   // Food proxies accept only DevFit's server-signed session token. This prevents
   // an outside site or script from spending the app's food-provider quota.
   function tFetch(url,ms){
-    const token=(window.DevFitAuth&&DevFitAuth.getToken&&DevFitAuth.getToken())||'';
-    if(!token) return Promise.reject(new Error('sign in required'));
-    return fetch(url,{signal:AbortSignal.timeout(ms||7000),headers:{Authorization:'Bearer '+token}});
+    return DevFitFoodSearch.search(url);
   }
 
   async function offSearch(q){
@@ -2194,6 +2193,7 @@ applyNutritionTierGates();
     const r=await tFetch(OFF_PROXY+'?query='+encodeURIComponent(q)+'&pageSize=40',9000);
     if(!r.ok) throw new Error('off '+r.status);
     const j=await r.json();
+    if(j.error) throw new Error('off unavailable');
     return(j.products||[])
       .filter(p=>p.product_name&&p.nutriments&&(p.nutriments['energy-kcal_100g']||p.nutriments['energy-kcal']||p.nutriments['energy_100g']))
       .map(parseOFF);
@@ -2204,6 +2204,7 @@ applyNutritionTierGates();
     const r=await tFetch(url,7000);
     if(!r.ok) throw new Error('usda '+r.status);
     const j=await r.json();
+    if(j.error) throw new Error('usda unavailable');
     return(j.foods||[]).map(parseUSDA).filter(f=>f.cal100>0);
   }
 
@@ -2224,11 +2225,13 @@ applyNutritionTierGates();
     const r = await tFetch(url,7000);
     if(!r.ok) throw new Error('kalori ' + r.status);
     const j = await r.json();
+    if(j.error) throw new Error('kalori unavailable');
     return (j.data || []).filter(i => i && (i.calories || i.energy || i.cal)).map(parseKalori);
   }
 
   async function offBarcode(code){
-    const r=await fetch(OFF_PRODUCT+encodeURIComponent(code)+'.json?fields=code,product_name,brands,nutriments,serving_size,serving_quantity');
+    const r=await fetch(OFF_PRODUCT+encodeURIComponent(code)+'.json?fields=code,product_name,brands,nutriments,serving_size,serving_quantity',{signal:AbortSignal.timeout(8000)});
+    if(!r.ok) throw new Error('barcode unavailable');
     const j=await r.json();
     if(j.status===1&&j.product&&j.product.product_name) return parseOFF(j.product);
     return null;
@@ -2634,10 +2637,13 @@ applyNutritionTierGates();
     }).catch((error)=>{
       const message=String(error&&error.message||'');
       if(/\s429$/.test(message)) rateLimited=true;
-      else if(/\s(401|503)$/.test(message)||/sign in required/.test(message)) searchUnavailable=true;
+      else if(/\s(401|403|503)$/.test(message)||/sign in required|unavailable/.test(message)) searchUnavailable=true;
     })));
 
     if(token!==_searchToken) return;
+    if(pool.length && (rateLimited || searchUnavailable)){
+      el.insertAdjacentHTML('beforeend','<div class="food-empty" role="status">Showing available matches. Some online sources are temporarily unavailable.</div>');
+    }
     if(!pool.length){
       el.innerHTML=rateLimited
         ? '<div class="food-empty">Search is busy. Please wait a minute, then try again. You can still add food manually.</div>'
@@ -2651,19 +2657,20 @@ applyNutritionTierGates();
 
   // ── Search-as-you-type ───────────────────────────────────────────────
   // Two tiers: instant local/recent results render almost immediately (110ms),
-  // then the online DBs fill in once typing pauses (520ms) — so it feels
-  // instant without hammering the APIs on every keystroke.
+  // then Search/Enter queries online sources within their published limits.
   let _liveTimer=null,_netTimer=null;
   function onTypeSearch(){
     const el=document.getElementById('food-results');
     const q=(document.getElementById('food-search-input').value||'').trim();
     clearTimeout(_liveTimer); clearTimeout(_netTimer);
+    ++_searchToken;
     if(!q){ ++_searchToken; el.innerHTML=''; return; }
     _liveTimer=setTimeout(()=>{
       const instant=renderInstant(q,el);
       if(!instant.length) el.innerHTML='<div class="food-loading">Searching food databases…</div>';
     },110);
-    if(q.length>=2) _netTimer=setTimeout(doSearch,520);
+    // Local matches stay instant. Online providers are queried on Search/Enter;
+    // OFF explicitly disallows search-as-you-type on its public search API.
   }
   function runSearchNow(){ clearTimeout(_liveTimer); clearTimeout(_netTimer); doSearch(); }
   document.getElementById('food-search-btn').addEventListener('click',runSearchNow);

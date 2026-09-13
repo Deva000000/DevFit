@@ -5,7 +5,7 @@
 //   2. Cache results at the edge so repeated searches are instant
 //   3. Allow graceful fallback if the API is down
 
-import { sameSiteOnly, recordServerEvent } from './_lib.js';
+import { foodSearchIdentity, recordServerEvent } from './_lib.js';
 
 // kalori-api.my has had multi-hour timeout periods. Remember one failure in a
 // warm function instance and stop calling the unhealthy upstream for ten
@@ -23,11 +23,14 @@ function unavailable(res, error) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.status(405).json({ data: [], error: 'method' }); return; }
-  if (!sameSiteOnly(req)) { res.status(200).json({ data: [] }); return; }
+  const identity = await foodSearchIdentity(req);
+  if (!identity.ok) {
+    if (identity.retryAfter) res.setHeader('Retry-After', String(identity.retryAfter));
+    res.status(identity.status).json({ data: [], error: identity.error }); return;
+  }
 
-  const q = String((req.query && req.query.q) || '').slice(0, 100).trim();
+  const q = String((req.query && req.query.q) || '').replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').slice(0, 100).trim();
   if (!q) { res.status(200).json({ data: [] }); return; }
 
   if (Date.now() < kaloriUnavailableUntil) {

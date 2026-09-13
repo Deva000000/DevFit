@@ -335,7 +335,7 @@ export async function listLogins() {
 // ── Rate limiter (Supabase-backed; reliable across serverless instances) ─────
 // The database RPC increments atomically, so simultaneous serverless invocations
 // cannot all observe the same old hit count.
-export async function rateLimit(id, limit, windowSeconds) {
+export async function rateLimit(id, limit, windowSeconds, options = {}) {
   try {
     const result = await sbRpc('consume_devfit_rate_limit', {
       p_id: String(id || '').slice(0, 180),
@@ -343,9 +343,34 @@ export async function rateLimit(id, limit, windowSeconds) {
       p_window_seconds: Math.max(1, Math.floor(Number(windowSeconds) || 1))
     });
     const row = Array.isArray(result) ? result[0] : result;
-    if (!row || typeof row.allowed !== 'boolean') return { ok: true, unavailable: true };
+    if (!row || typeof row.allowed !== 'boolean') return { ok: !options.failClosed, unavailable: true };
     return { ok: row.allowed, retryAfter: Math.max(0, Number(row.retry_after) || 0) };
-  } catch (e) { return { ok: true, unavailable: true }; }
+  } catch (e) { return { ok: !options.failClosed, unavailable: true }; }
+}
+
+// Food search can invoke paid/quota-limited third-party services. Browser
+// headers such as Referer are forgeable, so every proxy request must instead
+// carry a DevFit server-signed session token. Limits are shared across the
+// three food providers: one search cannot multiply a person's allowance.
+export async function foodSearchIdentity(req) {
+  if (!haveServerConfig()) return { ok: false, status: 503, error: 'service_unavailable' };
+  const raw = String((req.headers && req.headers.authorization) || '');
+  const match = raw.match(/^Bearer\s+(.+)$/i);
+  const payload = verifyToken(match && match[1]);
+  const email = payload && String(payload.email || '').trim().toLowerCase();
+  if (!email || email.length > 254) return { ok: false, status: 401, error: 'sign_in_required' };
+
+  const strict = { failClosed: true };
+  const [account, ip] = await Promise.all([
+    rateLimit('food_account:' + email, 24, 60, strict),
+    rateLimit('food_ip:' + clientIp(req), 72, 60, strict)
+  ]);
+  if (account.unavailable || ip.unavailable) return { ok: false, status: 503, error: 'food_search_unavailable' };
+  if (!account.ok || !ip.ok) return {
+    ok: false, status: 429, error: 'search_rate_limited',
+    retryAfter: Math.max(account.retryAfter || 0, ip.retryAfter || 0)
+  };
+  return { ok: true, email };
 }
 
 // ── Same-origin guard for the public food-search proxies ─────────────────────

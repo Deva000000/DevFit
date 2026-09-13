@@ -15,7 +15,7 @@
 //
 // Edge-cached so popular queries are instant and OFF isn't hammered.
 
-import { sameSiteOnly, recordServerEvent } from './_lib.js';
+import { foodSearchIdentity, recordServerEvent } from './_lib.js';
 
 const UA = 'DevFit/1.0 (devfitportal.vercel.app)';
 
@@ -76,11 +76,14 @@ async function searchLegacy(q, pageSize) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.status(405).json({ products: [], error: 'method' }); return; }
-  if (!sameSiteOnly(req)) { res.status(200).json({ products: [] }); return; }
+  const identity = await foodSearchIdentity(req);
+  if (!identity.ok) {
+    if (identity.retryAfter) res.setHeader('Retry-After', String(identity.retryAfter));
+    res.status(identity.status).json({ products: [], error: identity.error }); return;
+  }
 
-  const q = String((req.query && req.query.query) || '').slice(0, 100).trim();
+  const q = String((req.query && req.query.query) || '').replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').slice(0, 100).trim();
   let pageSize = parseInt((req.query && req.query.pageSize) || '40', 10);
   if (!Number.isFinite(pageSize)) pageSize = 40;
   pageSize = Math.max(1, Math.min(pageSize, 50));

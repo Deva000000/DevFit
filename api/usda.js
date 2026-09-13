@@ -10,18 +10,18 @@
 // so food search keeps working from day one. OpenFoodFacts (client-side, no key)
 // remains the primary source for branded/Malaysian products + barcodes.
 
-import { sameSiteOnly, recordServerEvent } from './_lib.js';
+import { foodSearchIdentity, recordServerEvent } from './_lib.js';
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.status(405).json({ foods: [], error: 'method' }); return; }
-
-  // Block off-site scripted abuse (in-app fetches are same-origin). Degrades to an
-  // empty result set so a legit request with a stripped Referer still parses cleanly.
-  if (!sameSiteOnly(req)) { res.status(200).json({ foods: [] }); return; }
+  const identity = await foodSearchIdentity(req);
+  if (!identity.ok) {
+    if (identity.retryAfter) res.setHeader('Retry-After', String(identity.retryAfter));
+    res.status(identity.status).json({ foods: [], error: identity.error }); return;
+  }
 
   const key = process.env.USDA_KEY || 'DEMO_KEY';
-  const query = String((req.query && req.query.query) || '').slice(0, 100).trim();
+  const query = String((req.query && req.query.query) || '').replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').slice(0, 100).trim();
   let pageSize = parseInt((req.query && req.query.pageSize) || '25', 10);
   if (!Number.isFinite(pageSize)) pageSize = 25;
   pageSize = Math.max(1, Math.min(pageSize, 50));

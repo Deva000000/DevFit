@@ -2115,7 +2115,6 @@ applyNutritionTierGates();
 (function(){
   // ── FOOD DATABASES (both free, both safe to use) ──────────────────
   // Open Food Facts — branded/packaged products + barcodes (Open Database License)
-  const OFF_SEARCH='https://world.openfoodfacts.org/cgi/search.pl';
   const OFF_PRODUCT='https://world.openfoodfacts.org/api/v0/product/';
   // Search goes through our proxy (api/off.js → OFF's modern search engine) because
   // the legacy search.pl endpoint is chronically down. Barcode lookups still hit
@@ -2180,7 +2179,13 @@ applyNutritionTierGates();
   }
 
   // Network search with hard timeout — a slow/unreachable API can't hang the UI.
-  function tFetch(url,ms){ return fetch(url,{signal:AbortSignal.timeout(ms||7000)}); }
+  // Food proxies accept only DevFit's server-signed session token. This prevents
+  // an outside site or script from spending the app's food-provider quota.
+  function tFetch(url,ms){
+    const token=(window.DevFitAuth&&DevFitAuth.getToken&&DevFitAuth.getToken())||'';
+    if(!token) return Promise.reject(new Error('sign in required'));
+    return fetch(url,{signal:AbortSignal.timeout(ms||7000),headers:{Authorization:'Bearer '+token}});
+  }
 
   async function offSearch(q){
     // Proxied through api/off.js, which uses OFF's modern search engine
@@ -2796,8 +2801,8 @@ applyNutritionTierGates();
           let u2=[],o2=[];
           try{
             const [ur,or]=await Promise.allSettled([
-              fetch(USDA_PROXY+'?query='+encodeURIComponent(q)+'&pageSize=8').then(r=>r.json()),
-              fetch(OFF_SEARCH+'?search_terms='+encodeURIComponent(q)+'&search_simple=1&action=process&json=1&page_size=8').then(r=>r.json())
+              tFetch(USDA_PROXY+'?query='+encodeURIComponent(q)+'&pageSize=8',7000).then(r=>r.json()),
+              tFetch(OFF_PROXY+'?query='+encodeURIComponent(q)+'&pageSize=8',9000).then(r=>r.json())
             ]);
             if(ur.status==='fulfilled'&&ur.value.foods) u2=ur.value.foods.filter(f=>f.foodNutrients&&f.foodNutrients.length).map(parseUSDA);
             if(or.status==='fulfilled'&&or.value.products) o2=or.value.products.filter(f=>f.nutriments).map(parseOFF).filter(f=>f.cal100>0||f.p100>0);

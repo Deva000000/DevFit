@@ -538,8 +538,12 @@ test('analytics survive a Chart CDN failure and nutrition initializes in order',
 });
 
 test('an unhealthy optional Kalori source enters cooldown without blocking every search', async () => {
+  process.env.DEVFIT_JWT_SECRET = 'test-secret';
   let upstreamCalls = 0;
   globalThis.fetch = async (url) => {
+    if (String(url).includes('consume_devfit_rate_limit')) {
+      return { ok: true, json: async () => [{ allowed: true, retry_after: 0 }] };
+    }
     if (String(url).includes('kalori-api.my')) {
       upstreamCalls++;
       throw new Error('upstream timeout');
@@ -549,7 +553,10 @@ test('an unhealthy optional Kalori source enters cooldown without blocking every
   const { default: handler } = await import(new URL('../api/kalori.js?cooldown-test', import.meta.url));
   const run = async (q) => {
     let status = 0, body, cache = '';
-    const req = { method: 'GET', query: { q }, headers: { host: 'devfit.test', referer: 'https://devfit.test/nutrition.html' } };
+    const header = b64({ alg: 'HS256', typ: 'JWT' });
+    const payload = b64({ email: 'person@gmail.com' });
+    const signature = crypto.createHmac('sha256', 'test-secret').update(header + '.' + payload).digest().toString('base64url');
+    const req = { method: 'GET', query: { q }, headers: { authorization: 'Bearer ' + header + '.' + payload + '.' + signature, 'x-forwarded-for': '203.0.113.6' } };
     const res = {
       setHeader(key, value) { if (String(key).toLowerCase() === 'cache-control') cache = value; },
       status(value) { status = value; return this; },

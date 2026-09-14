@@ -1167,3 +1167,15 @@ details.setup-card,
    ink ramp safely — this is what re-establishes the top of the page hierarchy. */
 .app-sub{color:var(--df-ink-3) !important;}
 html[data-theme="light"] .app-sub{color:#6a6157 !important;}
+
+/* Mobile browsers, especially Safari and installed iOS PWAs, zoom the entire
+   page when a focused form control renders below 16px. Keep pinch-to-zoom and
+   other accessibility controls available; only normalize editable text on
+   phone-sized screens. */
+@media (max-width:768px){
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
+  select,
+  textarea{
+    font-size:16px !important;
+  }
+}

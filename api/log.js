@@ -16,14 +16,14 @@
 //     at timestamptz default now()
 //   );
 
-import { readJsonBody, rateLimit, clientIp, recordServerEvent } from './_lib.js';
+import { readJsonBody, rateLimit, clientIp, recordServerEvent, sameSiteOnly, setApiSecurityHeaders } from './_lib.js';
 
 export default async function handler(req, res) {
-  res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 'no-store');
+  setApiSecurityHeaders(res);
   if (req.method !== 'POST') { res.status(405).json({ error: 'method' }); return; }
+  if (!sameSiteOnly(req)) { res.status(403).json({ error: 'origin' }); return; }
 
-  const rl = await rateLimit('log:' + clientIp(req), 20, 300); // 20 errors / 5 min per IP
+  const rl = await rateLimit('log:' + clientIp(req), 60, 300); // shared networks, still bounded
   if (!rl.ok) { res.status(200).json({ ok: false }); return; }
 
   const body = await readJsonBody(req);

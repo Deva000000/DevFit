@@ -75,6 +75,7 @@
     'progressLog2', 'devfitNutritionV2', 'devfitNutritionV1', 'devfitTrainingV1',
     'devfit_cloud_ts_progress', 'devfit_cloud_ts_nutrition', 'devfit_cloud_ts_workouts',
     'devfit_local_ts_progress', 'devfit_local_ts_nutrition', 'devfit_local_ts_workouts',
+    'devfit_cloud_ts_prefs', 'devfit_local_ts_prefs', 'devfit_sync_dirty',
     'devfit_freeWeekKey', 'devfit_displayName',
     'devfit_cardioSessGoal', 'devfit_cardioGoalKm', 'devfit_trendRange', 'devfit_progSection'
   ];

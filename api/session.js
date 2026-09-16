@@ -10,17 +10,17 @@
 // 200:  { approved:true, token, email, name, tier, expiry, startDate, plan }
 //       { approved:false, status:'pending'|'denied' }
 
+import crypto from 'crypto';
 import {
   haveServerConfig, identityFromGoogleIdToken,
   getSubscriber, computeTier, signToken, rateLimit, clientIp, readJsonBody, recordLogin, sbUpsert,
-  recordServerEvent
+  recordServerEvent, setApiSecurityHeaders, sameOriginIfPresent
 } from './_lib.js';
 
 export default async function handler(req, res) {
-  res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
+  setApiSecurityHeaders(res);
   if (req.method !== 'POST') { res.status(405).json({ error: 'method' }); return; }
+  if (!sameOriginIfPresent(req)) { res.status(403).json({ error: 'origin' }); return; }
 
   // Not configured yet → tell the client to fall back to its legacy path so the
   // live app keeps working while env vars are being set up.
@@ -31,9 +31,15 @@ export default async function handler(req, res) {
   const token = String(body.token || '');
   if (!token) { res.status(400).json({ error: 'missing_token' }); return; }
 
-  // Throttle by IP so a stolen provider token can't be replayed at high volume.
-  const rl = await rateLimit('session:' + clientIp(req), 30, 15 * 60);
-  if (!rl.ok) { res.status(429).json({ error: 'rate_limited', retryAfter: rl.retryAfter }); return; }
+  // A shared IP is only an emergency ceiling. Thirty attempts blocked a whole
+  // gym/campus/mobile-carrier NAT; verified-account limits below are the primary
+  // anti-replay control.
+  const ipRate = await rateLimit('session_ip:' + clientIp(req), 300, 15 * 60, { failClosed: true, timeoutMs: 3000 });
+  if (ipRate.unavailable) { res.status(503).json({ error: 'login_temporarily_unavailable' }); return; }
+  if (!ipRate.ok) {
+    res.setHeader('Retry-After', String(Math.max(1, ipRate.retryAfter || 1)));
+    res.status(429).json({ error: 'rate_limited', retryAfter: ipRate.retryAfter }); return;
+  }
 
   let email = null;
   let verifiedName = '';
@@ -44,6 +50,14 @@ export default async function handler(req, res) {
   if (!email) {
     await recordServerEvent('login_failure', 'Google identity verification failed', { page: '/api/session', status: 401, ua: req.headers['user-agent'] });
     res.status(401).json({ error: 'invalid_identity' }); return;
+  }
+
+  const accountKey = crypto.createHash('sha256').update(email).digest('hex');
+  const accountRate = await rateLimit('session_account:' + accountKey, 20, 15 * 60, { failClosed: true, timeoutMs: 3000 });
+  if (accountRate.unavailable) { res.status(503).json({ error: 'login_temporarily_unavailable' }); return; }
+  if (!accountRate.ok) {
+    res.setHeader('Retry-After', String(Math.max(1, accountRate.retryAfter || 1)));
+    res.status(429).json({ error: 'rate_limited', retryAfter: accountRate.retryAfter }); return;
   }
 
   // Record the login for every verified identity — including people who aren't

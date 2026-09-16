@@ -5,20 +5,13 @@
 
 import {
   haveServerConfig, verifyToken, getSubscriber, computeTier, signToken,
-  recordServerEvent
+  recordServerEvent, bearerToken, setApiSecurityHeaders, sameOriginIfPresent
 } from './_lib.js';
 
-function bearerToken(req) {
-  const raw = String((req.headers && req.headers.authorization) || '');
-  const match = raw.match(/^Bearer\s+(.+)$/i);
-  return match ? match[1] : '';
-}
-
 export default async function handler(req, res) {
-  res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
+  setApiSecurityHeaders(res);
   if (req.method !== 'POST') { res.status(405).json({ error: 'method' }); return; }
+  if (!sameOriginIfPresent(req)) { res.status(403).json({ error: 'origin' }); return; }
   if (!haveServerConfig()) { res.status(503).json({ error: 'service_unavailable' }); return; }
 
   const payload = verifyToken(bearerToken(req));

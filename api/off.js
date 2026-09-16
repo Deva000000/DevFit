@@ -99,6 +99,6 @@ export default async function handler(req, res) {
     res.status(200).json({ products });
   } catch (e) {
     await recordServerEvent('food_timeout', String(e && e.message || e), { page: '/api/off', status: 502 });
-    res.status(200).json({ products: [], error: String(e && e.message || e) });
+    res.status(200).json({ products: [], error: 'food_provider_unavailable' });
   }
 }

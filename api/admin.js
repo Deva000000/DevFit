@@ -17,7 +17,7 @@ import crypto from 'crypto';
 import {
   haveServerConfig, sbSelect, sbUpsert, sbRpc, getSubscriber,
   rateLimit, clientIp, readJsonBody, listLogins, sameSiteOnly,
-  signAdminSession, verifyAdminSession, cookieValue
+  signAdminSession, verifyAdminSession, cookieValue, setApiSecurityHeaders
 } from './_lib.js';
 
 const ADMIN_PW = process.env.DEVFIT_ADMIN_PASSWORD || '';
@@ -62,8 +62,7 @@ async function deletionCounts(email) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  setApiSecurityHeaders(res);
   if (req.method !== 'POST') { res.status(405).json({ error: 'method' }); return; }
   if (!haveServerConfig() || !ADMIN_PW) { res.status(501).json({ error: 'not_configured' }); return; }
 
@@ -107,7 +106,7 @@ export default async function handler(req, res) {
 
   try {
     if (action === 'list') {
-      const rows = await sbSelect('devfit_subscribers', 'select=*&order=updated_at.desc');
+      const rows = await sbSelect('devfit_subscribers', 'select=email,name,tier,approved,expiry,start_date,plan,updated_at&order=updated_at.desc');
       res.status(200).json({ subscribers: rows || [] });
       return;
     }
@@ -188,8 +187,14 @@ export default async function handler(req, res) {
     if (action === 'setConfig') {
       const row = { id: 1, updated_at: new Date().toISOString() };
       if (typeof body.whatsapp === 'string') row.whatsapp = body.whatsapp.replace(/[^0-9]/g, '').slice(0, 20);
-      if (typeof body.price === 'string') row.price = body.price.slice(0, 20);
-      if (typeof body.qr === 'string') row.qr = body.qr.slice(0, 500000);   // cap ~500KB base64
+      if (typeof body.price === 'string') row.price = body.price.replace(/[^0-9.RM ]/gi, '').slice(0, 20);
+      if (typeof body.qr === 'string') {
+        const qr = body.qr.trim();
+        if (qr && !/^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(qr) && !/^\/(?!\/)[a-z0-9_./-]+$/i.test(qr)) {
+          res.status(400).json({ error: 'invalid_qr_image' }); return;
+        }
+        row.qr = qr.slice(0, 500000);
+      }
       if (typeof body.note === 'string') row.note = body.note.slice(0, 500);
       const saved = await sbUpsert('devfit_config', row, 'id');
       if (!saved) { res.status(500).json({ error: 'save_failed' }); return; }

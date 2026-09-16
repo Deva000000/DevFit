@@ -1386,7 +1386,7 @@ function renderProgramHistory(){
     const change=vals.length>1?+(vals[vals.length-1]-vals[0]).toFixed(1):null;
     const result=change===null?'Baseline':(change>0?'+':'')+change+' kg';
     const status=p.id===appData.activeProgramId?'Current':'Completed';
-    return '<div class="history-row"><div><div class="history-title">'+status+' · '+(p.duration||8)+' weeks</div><div class="history-sub">Started '+String(p.start||'').split('-').reverse().join('/')+' · '+(p.goalType||'loss')+'</div></div><div class="history-result">'+result+'</div></div>';
+    return '<div class="history-row"><div><div class="history-title">'+esc(status)+' · '+esc(p.duration||8)+' weeks</div><div class="history-sub">Started '+esc(String(p.start||'').split('-').reverse().join('/'))+' · '+esc(p.goalType||'loss')+'</div></div><div class="history-result">'+esc(result)+'</div></div>';
   }).join('');
 }
 

@@ -13,14 +13,13 @@
 
 import {
   haveServerConfig, verifyToken, getSubscriber, computeTier, signToken, readJsonBody, recordLogin,
-  recordServerEvent
+  recordServerEvent, bearerToken, setApiSecurityHeaders, sameOriginIfPresent
 } from './_lib.js';
 
 export default async function handler(req, res) {
-  res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
+  setApiSecurityHeaders(res);
   if (req.method !== 'POST') { res.status(405).json({ error: 'method' }); return; }
+  if (!sameOriginIfPresent(req)) { res.status(403).json({ error: 'origin' }); return; }
 
   // Not configured → 501 so the client falls back to trusting its cached session
   // (transition mode). No user is locked out before env vars are set.
@@ -28,7 +27,7 @@ export default async function handler(req, res) {
 
   const body = await readJsonBody(req);
 
-  const payload = verifyToken(body.token);
+  const payload = verifyToken(bearerToken(req) || body.token);
   if (!payload || !payload.email) {
     res.status(200).json({ approved: false, reason: 'invalid_token' });
     return;

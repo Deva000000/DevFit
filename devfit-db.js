@@ -37,6 +37,8 @@
   const CLOUD_SYNC_ENABLED = true;
 
   const DATA_API = '/api/data';
+  const SAVE_DEBOUNCE_MS = 850;
+  const DIRTY_KEY = 'devfit_sync_dirty';
 
   // dataType → the localStorage key holding that document.
   const LOCAL_KEY = {
@@ -74,9 +76,9 @@
     if (!token) return { skip: true, reason: 'no_token' };
     const res = await fetch(DATA_API, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       cache: 'no-store',
-      body: JSON.stringify(Object.assign({ token: token, op: op }, extra || {}))
+      body: JSON.stringify(Object.assign({ op: op }, extra || {}))
     });
     if (res.status === 501 || res.status === 401) return { skip: true, status: res.status };
     if (res.status === 409) {
@@ -84,7 +86,17 @@
       conflict.conflict = true;
       return conflict;
     }
-    if (!res.ok) throw new Error('data api ' + res.status);
+    if (res.status === 429) {
+      const limited = await res.json().catch(function () { return {}; });
+      const err = new Error('data api rate limited');
+      err.retryAfter = Math.max(1, Number(limited.retryAfter || res.headers.get('Retry-After')) || 1);
+      throw err;
+    }
+    if (!res.ok) {
+      const err = new Error('data api ' + res.status);
+      err.status = res.status;
+      throw err;
+    }
     return await res.json();
   }
 
@@ -367,8 +379,52 @@
     return w;
   }
 
-  // Account backup is deliberately invisible in the product UI.
-  function setIndicator() {}
+  // Small, non-blocking save state. It is created here so every page gets the
+  // same feedback without changing Claude's established layouts.
+  let indicatorTimer = null;
+  function setIndicator(state) {
+    try {
+      let el = document.getElementById('devfit-save-state');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'devfit-save-state';
+        el.setAttribute('role', 'status');
+        el.setAttribute('aria-live', 'polite');
+        el.style.cssText = 'position:fixed;right:12px;bottom:92px;z-index:2147482000;padding:7px 10px;border:1px solid rgba(255,255,255,.13);border-radius:999px;background:rgba(17,17,20,.94);color:#d8d8dd;box-shadow:0 5px 18px rgba(0,0,0,.3);font:600 11px/1.2 system-ui,sans-serif;opacity:0;transform:translateY(4px);transition:opacity .18s,transform .18s;pointer-events:none';
+        (document.body || document.documentElement).appendChild(el);
+      }
+      if (indicatorTimer) clearTimeout(indicatorTimer);
+      const labels = {
+        device: 'Saved on device', syncing: 'Saving to account…', ok: 'Saved to account',
+        offline: 'Saved on device · waiting for connection', err: 'Saved on device · sync pending'
+      };
+      el.textContent = labels[state] || '';
+      el.style.color = state === 'ok' ? '#71df9b' : (state === 'err' || state === 'offline' ? '#f0c36a' : '#d8d8dd');
+      el.style.opacity = labels[state] ? '1' : '0';
+      el.style.transform = labels[state] ? 'translateY(0)' : 'translateY(4px)';
+      if (state === 'ok' || state === 'device') {
+        indicatorTimer = setTimeout(function () { el.style.opacity = '0'; el.style.transform = 'translateY(4px)'; }, 1600);
+      }
+    } catch (_) {}
+  }
+
+  function readDirty() {
+    try { const v = JSON.parse(localStorage.getItem(DIRTY_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; }
+    catch (_) { return {}; }
+  }
+  function writeDirty(value) {
+    try { localStorage.setItem(DIRTY_KEY, JSON.stringify(value || {})); } catch (_) {}
+  }
+  function markDirty(dataType) {
+    const dirty = readDirty();
+    dirty[dataType] = { at: Date.now(), attempts: Number((dirty[dataType] && dirty[dataType].attempts) || 0) };
+    writeDirty(dirty);
+  }
+  function clearDirty(dataType) {
+    const dirty = readDirty();
+    delete dirty[dataType];
+    writeDirty(dirty);
+  }
 
   // ── Reconcile state ───────────────────────────────────────────────────────
   // pulled[type]   — the initial pull+merge for this type has completed.
@@ -380,6 +436,9 @@
   const cloudVersion = {};
   const pendingSave = {};
   const saveWorker = {};
+  const debounceTimer = {};
+  const retryTimer = {};
+  const saveWaiters = {};
 
   // Effective local timestamp = most recent of last cloud sync and last local edit.
   function localTsFor(dataType) {
@@ -438,7 +497,7 @@
       const localTs = localTsFor(dataType);
       let merged = readLocal(dataType);
       try {
-        const r = await apiCall('get');
+        const r = await apiCall('get', { dataType: dataType });
         if (r && r.skip) { setIndicator('offline'); return merged; }
         const rows = (r && r.rows) || [];
         const row = rows.filter(function (x) { return x.data_type === dataType; })[0];
@@ -484,32 +543,87 @@
    * @param {'progress'|'nutrition'|'workouts'} dataType
    * @param {object} data
    */
-  async function cloudSave(dataType, data) {
+  function resolveWaiters(dataType, value) {
+    const list = saveWaiters[dataType] || [];
+    saveWaiters[dataType] = [];
+    list.forEach(function (done) { try { done(value); } catch (_) {} });
+  }
+
+  function scheduleRetry(dataType, retryAfterSeconds) {
+    if (retryTimer[dataType]) return;
+    const dirty = readDirty();
+    const entry = dirty[dataType] || { at: Date.now(), attempts: 0 };
+    entry.attempts = Math.min(10, Number(entry.attempts || 0) + 1);
+    dirty[dataType] = entry;
+    writeDirty(dirty);
+    const backoff = Math.min(60000, Math.max(
+      Number(retryAfterSeconds || 0) * 1000,
+      2000 * Math.pow(2, Math.min(entry.attempts - 1, 5))
+    ));
+    const delay = backoff + Math.floor(Math.random() * Math.min(1000, backoff * 0.2));
+    retryTimer[dataType] = setTimeout(function () {
+      retryTimer[dataType] = null;
+      const latest = readLocal(dataType);
+      if (latest || dataType === 'prefs') {
+        pendingSave[dataType] = latest || pendingSave[dataType];
+        flushSave(dataType);
+      }
+    }, delay);
+  }
+
+  async function flushSave(dataType) {
+    if (saveWorker[dataType]) return saveWorker[dataType];
+    if (debounceTimer[dataType]) { clearTimeout(debounceTimer[dataType]); debounceTimer[dataType] = null; }
+    saveWorker[dataType] = (async function () {
+      if (!getToken()) { setIndicator('offline'); return false; }
+      if (!pulled[dataType] && LOCAL_KEY[dataType]) await reconcile(dataType);
+      let allSaved = true;
+      while (pendingSave[dataType]) {
+        let latest = pendingSave[dataType];
+        pendingSave[dataType] = null;
+        if (LOCAL_KEY[dataType]) latest = mergeDoc(dataType, latest, readLocal(dataType));
+        const ok = await push(dataType, latest);
+        if (!ok) { allSaved = false; pendingSave[dataType] = latest; break; }
+      }
+      if (allSaved) clearDirty(dataType);
+      else scheduleRetry(dataType);
+      return allSaved;
+    })();
+    let result = false;
+    try { result = await saveWorker[dataType]; }
+    finally {
+      saveWorker[dataType] = null;
+      resolveWaiters(dataType, result);
+      // An edit can arrive in the few milliseconds after the worker's final
+      // loop check. Never leave that value stranded until another user input.
+      if (pendingSave[dataType] && !debounceTimer[dataType] && !retryTimer[dataType]) {
+        debounceTimer[dataType] = setTimeout(function () {
+          debounceTimer[dataType] = null;
+          flushSave(dataType);
+        }, SAVE_DEBOUNCE_MS);
+      }
+    }
+    return result;
+  }
+
+  function cloudSave(dataType, data) {
     // Record the local-modified time synchronously, BEFORE any async work — the
     // source of truth for "local has unsynced edits newer than the cloud copy",
     // so an edit is never clobbered even if the user navigates away mid-upload.
     try { localStorage.setItem('devfit_local_ts_' + dataType, String(Date.now())); } catch (_) {}
-    if (!getToken()) return;
+    markDirty(dataType);
+    setIndicator('device');
     pendingSave[dataType] = data;
-    if (!saveWorker[dataType]) {
-      saveWorker[dataType] = (async function () {
-        if (!pulled[dataType] && LOCAL_KEY[dataType]) await reconcile(dataType);
-        while (pendingSave[dataType]) {
-          let latest = pendingSave[dataType];
-          pendingSave[dataType] = null;
-          if (LOCAL_KEY[dataType]) {
-            // The caller's in-memory value is the newest edit. Merge in the
-            // reconciled local copy instead of replacing the edit with it. This
-            // also protects the latest entry if localStorage has just reached
-            // quota and still contains the previous document.
-            latest = mergeDoc(dataType, latest, readLocal(dataType));
-          }
-          await push(dataType, latest);
-        }
-      })();
-    }
-    try { await saveWorker[dataType]; }
-    finally { saveWorker[dataType] = null; }
+    if (debounceTimer[dataType]) clearTimeout(debounceTimer[dataType]);
+    const promise = new Promise(function (resolve) {
+      if (!saveWaiters[dataType]) saveWaiters[dataType] = [];
+      saveWaiters[dataType].push(resolve);
+    });
+    debounceTimer[dataType] = setTimeout(function () {
+      debounceTimer[dataType] = null;
+      flushSave(dataType);
+    }, SAVE_DEBOUNCE_MS);
+    return promise;
   }
 
   // ── Startup sync (single data type) ───────────────────────────────────────
@@ -525,7 +639,7 @@
     const merged = await reconcile(dataType);
     // Local had edits the cloud has not seen (offline logging, or a first run) —
     // send the reconciled copy up so the other devices converge on it.
-    if (merged) await push(dataType, merged);
+    if (merged) await cloudSave(dataType, merged);
   }
 
   // Read the account once and restore every durable document without writing
@@ -595,7 +709,7 @@
         const merged = await reconcile(t);
         if (merged) {
           if (JSON.stringify(merged) !== before) updated++;
-          await push(t, merged);
+          await cloudSave(t, merged);
         }
       }
       setIndicator('ok');
@@ -639,7 +753,7 @@
   async function restorePrefs() {
     if (!getToken()) return;
     try {
-      const r = await apiCall('get');
+      const r = await apiCall('get', { dataType: 'prefs' });
       if (!r || r.skip) return;
       const row = ((r && r.rows) || []).filter(function (x) { return x.data_type === 'prefs'; })[0];
       if (!row || !row.data) return;
@@ -665,6 +779,30 @@
   }
   // Delay so the primary data sync goes first.
   setTimeout(initPrefsSync, 2500);
+
+  // Durable retry queue: the document itself is already the latest local source
+  // of truth, so only dirty metadata is persisted. Reopen/online events rebuild
+  // pending uploads from those canonical documents instead of duplicating large
+  // histories in localStorage.
+  function resumeDirtySaves() {
+    if (!getToken()) return;
+    const dirty = readDirty();
+    Object.keys(dirty).forEach(function (dataType) {
+      if (dataType === 'prefs') { backupPrefs(); return; }
+      const latest = readLocal(dataType);
+      if (!latest) { clearDirty(dataType); return; }
+      pendingSave[dataType] = latest;
+      if (!saveWorker[dataType] && !debounceTimer[dataType]) flushSave(dataType);
+    });
+  }
+  try {
+    global.addEventListener('online', resumeDirtySaves);
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) resumeDirtySaves();
+      else Object.keys(pendingSave).forEach(function (t) { if (pendingSave[t]) flushSave(t); });
+    });
+  } catch (_) {}
+  setTimeout(resumeDirtySaves, 3200);
 
   // ── Public API (unchanged surface) ────────────────────────────────────────
   global.DevFitDB = {

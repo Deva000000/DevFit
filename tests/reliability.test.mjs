@@ -212,9 +212,8 @@ test('data API rejects a stale whole-document write with the current row', async
   process.env.SUPABASE_SERVICE_KEY = 'test-service-key';
   const current = { data_type: 'workouts', data: { sessions: [{ date: '2026-08-08' }] }, updated_at: '2026-08-14T01:00:00.000Z' };
   globalThis.fetch = async (url) => {
-    if (String(url).includes('/rest/v1/devfit_subscribers?')) return { ok: true, json: async () => [{ email: 'person@gmail.com', approved: true }] };
-    if (String(url).includes('/rest/v1/devfit_data?')) return { ok: true, json: async () => [current] };
-    throw new Error('A stale write must not reach a mutation');
+    if (String(url).includes('/rpc/save_devfit_data_atomic')) return { ok: true, json: async () => ({ status: 'conflict', row: current }) };
+    throw new Error('A stale write must only reach the atomic RPC');
   };
   const { default: handler } = await import(new URL('../api/data.js?conflict-test', import.meta.url));
   const header = b64({ alg: 'HS256', typ: 'JWT' });
@@ -241,38 +240,34 @@ test('data API does not grow history for unchanged data and archives one previou
   const { default: handler } = await import(new URL('../api/data.js?history-growth-test', import.meta.url));
   const run = async (data) => {
     let status = 0, responseBody;
-    const archived = [];
+    const rpcBodies = [];
     globalThis.fetch = async (url, options = {}) => {
       const target = String(url);
       const method = options.method || 'GET';
-      if (target.includes('/rest/v1/devfit_subscribers?')) return { ok: true, json: async () => [{ email: 'person@gmail.com', approved: true }] };
-      if (target.includes('/rest/v1/devfit_rate?') && method === 'GET') return { ok: true, json: async () => [] };
-      if (target.includes('/rest/v1/devfit_rate?on_conflict=') && method === 'POST') return { ok: true, json: async () => [{}] };
-      if (target.includes('/rest/v1/devfit_data?') && method === 'GET') return { ok: true, json: async () => [current] };
-      if (target.includes('/rest/v1/devfit_data_versions') && method === 'POST') {
-        archived.push(JSON.parse(options.body));
-        return { ok: true, json: async () => ({}) };
-      }
-      if (target.includes('/rest/v1/devfit_data?') && method === 'PATCH') {
-        return { ok: true, json: async () => [{ updated_at: '2026-08-18T01:00:00.000Z' }] };
+      if (target.includes('/rpc/save_devfit_data_atomic') && method === 'POST') {
+        const request = JSON.parse(options.body); rpcBodies.push(request);
+        const unchanged = JSON.stringify(request.p_data) === JSON.stringify(oldData);
+        return { ok: true, json: async () => unchanged
+          ? ({ status: 'ok', unchanged: true, updated_at: current.updated_at })
+          : ({ status: 'ok', updated_at: '2026-08-18T01:00:00.000Z' }) };
       }
       throw new Error('unexpected request ' + method + ' ' + target);
     };
     const req = { method: 'POST', headers: { 'x-forwarded-for': '127.0.0.1' }, body: { token, op: 'set', dataType: 'workouts', data, baseUpdatedAt: current.updated_at, deviceId: 'test-device' } };
     const res = { setHeader() {}, status(value) { status = value; return this; }, json(value) { responseBody = value; } };
     await handler(req, res);
-    return { status, responseBody, archived };
+    return { status, responseBody, rpcBodies };
   };
 
   const unchanged = await run(structuredClone(oldData));
   assert.equal(unchanged.status, 200);
   assert.equal(unchanged.responseBody.unchanged, true);
-  assert.equal(unchanged.archived.length, 0);
+  assert.equal(unchanged.rpcBodies.length, 1);
 
   const changed = await run({ sessions: [...oldData.sessions, { date: '2026-08-15', logs: [] }] });
   assert.equal(changed.status, 200);
-  assert.equal(changed.archived.length, 1);
-  assert.deepEqual(changed.archived[0].data, oldData);
+  assert.equal(changed.rpcBodies.length, 1);
+  assert.equal(changed.rpcBodies[0].p_base_updated_at, current.updated_at);
 });
 
 test('data API rejects oversized account documents before any data mutation', async () => {
@@ -295,6 +290,63 @@ test('data API rejects oversized account documents before any data mutation', as
   assert.equal(status, 413);
   assert.equal(body.error, 'data_too_large');
   assert.equal(dataStoreTouched, false);
+});
+
+test('one thousand rapid inputs collapse into one durable cloud write', async () => {
+  const code = fs.readFileSync(new URL('../devfit-db.js', import.meta.url), 'utf8');
+  const storage = new Map([
+    ['devfit_token', 'signed-test-token'],
+    ['devfit_user', JSON.stringify({ email: 'load@example.com' })]
+  ]);
+  const localStorage = {
+    getItem: (k) => storage.has(k) ? storage.get(k) : null,
+    setItem: (k, v) => storage.set(k, String(v)),
+    removeItem: (k) => storage.delete(k)
+  };
+  let setCalls = 0;
+  const fetch = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    if (body.op === 'get') return { status: 200, ok: true, json: async () => ({ rows: [] }) };
+    setCalls++;
+    return { status: 200, ok: true, json: async () => ({ ok: true, updated_at: '2026-09-16T12:00:00.000Z' }) };
+  };
+  const nodes = new Map();
+  const document = {
+    hidden: false,
+    getElementById: (id) => nodes.get(id) || null,
+    createElement: () => ({ id: '', style: {}, setAttribute() {}, parentNode: null }),
+    body: { appendChild(el) { nodes.set(el.id, el); el.parentNode = this; } },
+    documentElement: { appendChild(el) { nodes.set(el.id, el); } },
+    addEventListener() {}
+  };
+  const context = { console, localStorage, fetch, document, setTimeout, clearTimeout, Date, JSON, Object, Array, Map, Math, Number, String, Promise };
+  context.window = context;
+  context.addEventListener = () => {};
+  vm.runInNewContext(code, context);
+  let finalPromise;
+  for (let i = 0; i < 1000; i++) {
+    const value = { sessions: [{ id: 's1', date: '2026-09-16', workoutId: 'w1', logs: [{ exId: 'e1', sets: [{ reps: i }] }] }] };
+    localStorage.setItem('devfitTrainingV1', JSON.stringify(value));
+    finalPromise = context.DevFitDB.cloudSave('workouts', value);
+  }
+  assert.equal(await finalPromise, true);
+  assert.equal(setCalls, 1);
+  assert.deepEqual(JSON.parse(localStorage.getItem('devfit_sync_dirty')), {});
+});
+
+test('security contracts stay closed and shared networks use account-first limits', () => {
+  const allApi = fs.readdirSync(new URL('../api/', import.meta.url))
+    .filter((name) => name.endsWith('.js'))
+    .map((name) => fs.readFileSync(new URL('../api/' + name, import.meta.url), 'utf8')).join('\n');
+  assert.doesNotMatch(allApi, /Access-Control-Allow-Origin[^\n]*\*/i);
+  assert.doesNotMatch(allApi, /SUPABASE_SERVICE_KEY\s*[:=]\s*['"][^'"]+['"]/);
+  const session = fs.readFileSync(new URL('../api/session.js', import.meta.url), 'utf8');
+  assert.match(session, /session_ip:[\s\S]*300, 15 \* 60/);
+  assert.match(session, /session_account:[\s\S]*20, 15 \* 60/);
+  const db = fs.readFileSync(new URL('../devfit-db.js', import.meta.url), 'utf8');
+  assert.match(db, /SAVE_DEBOUNCE_MS = 850/);
+  assert.match(db, /devfit_sync_dirty/);
+  assert.match(db, /Saved on device · waiting for connection/);
 });
 
 test('owner backup API only exposes fixed tables in bounded non-cacheable pages', async () => {
@@ -352,9 +404,15 @@ test('database hardening uses private atomic RPCs and bounded recovery history',
   assert.match(migration, /revoke all on function public\.archive_devfit_data_version[\s\S]*from anon/);
   assert.match(migration, /grant execute on function public\.record_devfit_error[\s\S]*to service_role/);
 
+  const atomic = fs.readFileSync(new URL('../supabase/migrations/20260916205450_atomic_data_sync_and_rls_hardening.sql', import.meta.url), 'utf8');
+  assert.match(atomic, /create or replace function public\.save_devfit_data_atomic/);
+  assert.match(atomic, /perform public\.archive_devfit_data_version/);
+  assert.match(atomic, /for update/);
+  assert.match(atomic, /create policy devfit_deny_browser_access/);
+  assert.match(atomic, /create table if not exists public\.devfit_records/);
+
   const dataApi = fs.readFileSync(new URL('../api/data.js', import.meta.url), 'utf8');
-  assert.match(dataApi, /sbRpc\('archive_devfit_data_version'/);
-  assert.match(dataApi, /sbInsertIgnore\('devfit_data_versions'/);
+  assert.match(dataApi, /sbRpc\('save_devfit_data_atomic'/);
 });
 
 test('release infrastructure enforces security headers and monitors production health', () => {
@@ -446,8 +504,8 @@ test('persistent session cannot access cloud data after account revocation', asy
   process.env.DEVFIT_JWT_SECRET = 'test-secret';
   process.env.SUPABASE_SERVICE_KEY = 'test-service-key';
   globalThis.fetch = async (url) => {
-    if (String(url).includes('/rest/v1/devfit_subscribers?')) return { ok: true, json: async () => [{ email: 'person@gmail.com', approved: false }] };
-    throw new Error('Revoked sessions must not reach account data');
+    if (String(url).includes('/rpc/load_devfit_account')) return { ok: true, json: async () => ({ status: 'revoked' }) };
+    throw new Error('Revoked sessions must only reach the authorization RPC');
   };
   const { default: handler } = await import(new URL('../api/data.js?revocation-test', import.meta.url));
   const header = b64({ alg: 'HS256', typ: 'JWT' });
@@ -625,9 +683,11 @@ test('all PDF exports share a multi-CDN integrity-checked loader and wait for it
 });
 
 test('sensitive APIs are never cached and public routes accept only intended methods', () => {
+  const lib = fs.readFileSync(new URL('../api/_lib.js', import.meta.url), 'utf8');
+  assert.match(lib, /Cache-Control', 'no-store, no-cache, must-revalidate'/);
   for (const name of ['session.js', 'verify.js', 'pro-access.js', 'data.js']) {
     const source = fs.readFileSync(new URL('../api/' + name, import.meta.url), 'utf8');
-    assert.match(source, /Cache-Control', 'no-store, no-cache, must-revalidate'/);
+    assert.match(source, /setApiSecurityHeaders\(res\)/);
   }
   const config = fs.readFileSync(new URL('../api/config.js', import.meta.url), 'utf8');
   assert.match(config, /s-maxage=300, stale-while-revalidate=3600/);
@@ -759,7 +819,7 @@ test('settings install guide is device-focused and exposes real platform actions
 
 test('verification records only the signed token email', () => {
   const source = fs.readFileSync(new URL('../api/verify.js', import.meta.url), 'utf8');
-  const verifiedAt = source.indexOf('const payload = verifyToken(body.token)');
+  const verifiedAt = source.indexOf('const payload = verifyToken(bearerToken(req) || body.token)');
   const recordedAt = source.indexOf('recordLogin(payload.email');
   assert.ok(verifiedAt >= 0 && recordedAt > verifiedAt);
   assert.doesNotMatch(source, /recordLogin\(body\.email/);

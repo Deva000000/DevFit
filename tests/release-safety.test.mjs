@@ -27,10 +27,8 @@ test('failed reads never masquerade as a new account or initiate an insert', asy
   const original = globalThis.fetch;
   let writes = 0;
   globalThis.fetch = async (url, options = {}) => {
-    if (String(url).includes('devfit_subscribers?')) return { ok: true, json: async () => [{ approved: true }] };
-    if (String(url).includes('consume_devfit_rate_limit')) return { ok: true, json: async () => ({ allowed: true }) };
-    if (String(url).includes('/devfit_data?')) return { ok: false, status: 503 };
-    if (String(url).endsWith('/devfit_data') && options.method === 'POST') writes++;
+    if (String(url).includes('/rpc/load_devfit_account')) return { ok: false, status: 503 };
+    if (String(url).includes('/rpc/save_devfit_data_atomic')) { writes++; return { ok: false, status: 503 }; }
     return { ok: true, json: async () => ({}) };
   };
   try {
@@ -38,23 +36,23 @@ test('failed reads never masquerade as a new account or initiate an insert', asy
     assert.equal(read.status, 503);
     assert.equal(read.result.rows, undefined);
     const write = await run({ op: 'set', dataType: 'progress', data: { startWeight: 70 } });
-    assert.equal(write.status, 500);
-    assert.equal(writes, 0);
+    assert.equal(write.status, 503);
+    assert.equal(writes, 1, 'the only write attempt is the single atomic RPC');
   } finally { globalThis.fetch = original; }
 });
 test('forged body email cannot select another account; successful empty reads remain valid', async () => {
   const original = globalThis.fetch;
-  const urls = [];
-  globalThis.fetch = async (url) => {
-    urls.push(String(url));
-    return { ok: true, json: async () => String(url).includes('devfit_subscribers?') ? [{ approved: true }] : [] };
+  const requests = [];
+  globalThis.fetch = async (url, options = {}) => {
+    requests.push({ url: String(url), body: JSON.parse(options.body || '{}') });
+    return { ok: true, json: async () => ({ status: 'ok', rows: [] }) };
   };
   try {
     const r = await run({ op: 'get', email: 'victim@example.com' });
     assert.equal(r.status, 200);
     assert.deepEqual(r.result.rows, []);
-    assert.ok(urls.every(u => !u.includes('victim')));
-    assert.ok(urls.some(u => u.includes('email=eq.owner%40example.com')));
+    assert.ok(requests.every(x => !JSON.stringify(x).includes('victim')));
+    assert.equal(requests[0].body.p_email, 'owner@example.com');
   } finally { globalThis.fetch = original; }
 });
 test('database transport and malformed JSON failures use the unavailable result', async () => {

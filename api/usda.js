@@ -65,6 +65,6 @@ export default async function handler(req, res) {
     res.status(200).json({ foods });
   } catch (e) {
     await recordServerEvent('food_timeout', String(e && e.message || e), { page: '/api/usda', status: 502 });
-    res.status(200).json({ foods: [], error: String(e && e.message || e) });
+    res.status(200).json({ foods: [], error: 'food_provider_unavailable' });
   }
 }

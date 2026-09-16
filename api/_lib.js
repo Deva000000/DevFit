@@ -22,6 +22,33 @@ export function haveServerConfig() {
   return Boolean(SB_SERVICE && JWT_SECRET);
 }
 
+export function bearerToken(req) {
+  const raw = String((req && req.headers && req.headers.authorization) || '');
+  const match = raw.match(/^Bearer\s+(.+)$/i);
+  return match ? match[1].trim() : '';
+}
+
+export function setApiSecurityHeaders(res) {
+  const requestId = crypto.randomUUID();
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
+  res.setHeader('X-Request-ID', requestId);
+  return requestId;
+}
+
+export function sameOriginIfPresent(req) {
+  try {
+    const headers = (req && req.headers) || {};
+    const source = String(headers.origin || headers.referer || '');
+    if (!source) return true;
+    const host = String(headers.host || '').toLowerCase();
+    return Boolean(host && new URL(source).host.toLowerCase() === host);
+  } catch (_) { return false; }
+}
+
 // ── Base64url ────────────────────────────────────────────────────────────────
 function b64url(buf) {
   return Buffer.from(buf).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -271,7 +298,7 @@ export async function identityFromGoogleIdToken(idToken) {
 
 // ── Subscriber lookup + tier computation ─────────────────────────────────────
 export async function getSubscriber(email, timeoutMs = 8000) {
-  const rows = await sbSelect('devfit_subscribers', 'email=eq.' + encodeURIComponent(email) + '&select=*', timeoutMs);
+  const rows = await sbSelect('devfit_subscribers', 'email=eq.' + encodeURIComponent(email) + '&select=email,name,tier,approved,expiry,start_date,plan,updated_at', timeoutMs);
   // undefined = backend unavailable; null = lookup succeeded with no account.
   // Callers must not confuse a temporary outage with a revoked account.
   if (rows === null) return undefined;
@@ -329,7 +356,7 @@ export async function recordLogin(email, deviceId, userAgent, isLogin = true) {
 }
 
 export async function listLogins() {
-  const rows = await sbSelect('devfit_logins', 'select=*&order=last_seen.desc');
+  const rows = await sbSelect('devfit_logins', 'select=email,device_id,user_agent,first_seen,last_seen,login_count&order=last_seen.desc');
   return rows || [];
 }
 
@@ -397,7 +424,7 @@ export function sameSiteOnly(req) {
 
 export function clientIp(req) {
   const headers = (req && req.headers) || {};
-  const xff = headers['x-forwarded-for'];
+  const xff = headers['x-vercel-forwarded-for'] || headers['x-forwarded-for'];
   if (xff) return String(xff).split(',')[0].trim();
   return req && req.socket && req.socket.remoteAddress || 'unknown';
 }

@@ -18,9 +18,5 @@ export default async function handler(req, res) {
     res.status(503).json({ ok: false, service: 'devfit', database: 'unavailable' });
     return;
   }
-  res.status(200).json({
-    ok: true, service: 'devfit', database: 'ok', latencyMs: Date.now() - started,
-    // Configuration presence only; never return the credential itself.
-    foodSearch: { usdaKeyConfigured: Boolean(process.env.USDA_KEY && process.env.USDA_KEY !== 'DEMO_KEY') }
-  });
+  res.status(200).json({ ok: true, service: 'devfit', database: 'ok', latencyMs: Date.now() - started });
 }

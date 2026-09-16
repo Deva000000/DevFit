@@ -45,7 +45,7 @@ export default async function handler(req, res) {
     if (!r.ok) {
       kaloriUnavailableUntil = Date.now() + KALORI_COOLDOWN_MS;
       await recordServerEvent('food_timeout', 'Kalori upstream returned ' + r.status, { page: '/api/kalori', status: r.status });
-      unavailable(res, 'kalori ' + r.status); return;
+      unavailable(res, 'food_provider_unavailable'); return;
     }
     const j = await r.json();
     kaloriUnavailableUntil = 0;
@@ -55,6 +55,6 @@ export default async function handler(req, res) {
   } catch (e) {
     kaloriUnavailableUntil = Date.now() + KALORI_COOLDOWN_MS;
     await recordServerEvent('food_timeout', String(e && e.message || e), { page: '/api/kalori', status: 502 });
-    unavailable(res, String(e && e.message || e));
+    unavailable(res, 'food_provider_unavailable');
   }
 }

@@ -37,12 +37,12 @@ export default async function handler(req, res) {
   const email = String(payload.email).trim().toLowerCase();
   const op = String(body.op || '');
 
-  if (op === 'paymentHistory' || op === 'submitPayment') {
-    await handlePaymentOperation(req, res, email, op, body);
-    return;
-  }
-
   try {
+    if (op === 'paymentHistory' || op === 'submitPayment') {
+      await handlePaymentOperation(req, res, email, op, body);
+      return;
+    }
+
     if (op === 'get') {
       const dataType = body.dataType == null || body.dataType === '' ? null : String(body.dataType);
       if (dataType !== null && TYPES.indexOf(dataType) < 0) {

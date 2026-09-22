@@ -1,10 +1,10 @@
-// Customer payment-proof API. Images are private and the signed DevFit session,
-// never a browser-supplied email, determines ownership.
+// Payment-proof operations shared by the authenticated account-data API.
+// Keeping this as an underscore-prefixed helper avoids consuming a separate
+// Vercel Hobby serverless-function slot.
 import crypto from 'crypto';
 import {
-  bearerToken, verifyToken, haveServerConfig, sameOriginIfPresent, setApiSecurityHeaders,
   getSubscriber, sbSelect, sbInsertReturning, sbStorageUpload, sbStorageDelete,
-  rateLimit, clientIp, readJsonBody, recordServerEvent
+  rateLimit, clientIp, recordServerEvent
 } from './_lib.js';
 
 const BUCKET = 'devfit-payment-proofs';
@@ -26,33 +26,26 @@ function paymentReference(email, when = new Date()) {
   return `DEVFIT_${month}_${gmailName}`;
 }
 
-async function signedInAccount(req) {
-  const payload = verifyToken(bearerToken(req));
-  const email = payload && String(payload.email || '').trim().toLowerCase();
-  if (!email || email.length > 254) return { status: 401, error: 'sign_in_required' };
+async function activeAccount(email) {
   const subscriber = await getSubscriber(email, 4000);
   if (subscriber === undefined) return { status: 503, error: 'account_service_unavailable' };
   if (!subscriber || !subscriber.approved) return { status: 403, error: 'account_unavailable' };
   return { email };
 }
 
-export default async function handler(req, res) {
-  setApiSecurityHeaders(res);
-  if (!['GET', 'POST'].includes(req.method)) { res.status(405).json({ error: 'method' }); return; }
-  if (!haveServerConfig()) { res.status(503).json({ error: 'service_unavailable' }); return; }
-  if (!sameOriginIfPresent(req)) { res.status(403).json({ error: 'origin' }); return; }
-
-  const account = await signedInAccount(req);
+export async function handlePaymentOperation(req, res, email, op, body) {
+  const account = await activeAccount(email);
   if (!account.email) { res.status(account.status).json({ error: account.error }); return; }
-  const email = account.email;
 
-  if (req.method === 'GET') {
+  if (op === 'paymentHistory') {
     const rows = await sbSelect('devfit_payments',
       'email=eq.' + encodeURIComponent(email) + '&select=id,reference,status,byte_size,uploaded_at,reviewed_at&order=uploaded_at.desc&limit=36');
     if (!Array.isArray(rows)) { res.status(503).json({ error: 'payment_history_unavailable' }); return; }
     res.status(200).json({ reference: paymentReference(email), payments: rows });
     return;
   }
+
+  if (op !== 'submitPayment') { res.status(400).json({ error: 'unknown_payment_op' }); return; }
 
   const strict = { failClosed: true, timeoutMs: 3000 };
   const accountKey = crypto.createHash('sha256').update(email).digest('hex');
@@ -63,7 +56,6 @@ export default async function handler(req, res) {
   if (perAccount.unavailable || perIp.unavailable) { res.status(503).json({ error: 'security_store_unavailable' }); return; }
   if (!perAccount.ok || !perIp.ok) { res.status(429).json({ error: 'upload_limit_reached' }); return; }
 
-  const body = await readJsonBody(req);
   const match = String(body.image || '').match(/^data:(image\/(?:jpeg|png|webp));base64,([a-z0-9+/=]+)$/i);
   if (!match) { res.status(400).json({ error: 'invalid_image' }); return; }
   let bytes;
@@ -83,7 +75,7 @@ export default async function handler(req, res) {
   const ownerFolder = accountKey.slice(0, 24);
   const path = ownerFolder + '/' + id + '.' + MIME_EXT[mime];
   if (!(await sbStorageUpload(BUCKET, path, bytes, mime))) {
-    await recordServerEvent('payment_upload', 'Receipt storage upload failed', { page: '/api/payments', status: 503 });
+    await recordServerEvent('payment_upload', 'Receipt storage upload failed', { page: '/api/data', status: 503 });
     res.status(503).json({ error: 'receipt_storage_unavailable' }); return;
   }
 
@@ -93,7 +85,7 @@ export default async function handler(req, res) {
   });
   if (!Array.isArray(inserted) || !inserted[0]) {
     await sbStorageDelete(BUCKET, path);
-    await recordServerEvent('payment_upload', 'Receipt metadata save failed', { page: '/api/payments', status: 503 });
+    await recordServerEvent('payment_upload', 'Receipt metadata save failed', { page: '/api/data', status: 503 });
     res.status(503).json({ error: 'payment_save_failed' }); return;
   }
   const row = inserted[0];

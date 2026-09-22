@@ -5,6 +5,13 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import { cachedFood } from '../api/_food-cache.js';
 
+test('production stays within the Vercel Hobby serverless-function limit', () => {
+  const apiDir = new URL('../api/', import.meta.url);
+  const entrypoints = fs.readdirSync(apiDir)
+    .filter((name) => name.endsWith('.js') && !name.startsWith('_'));
+  assert.ok(entrypoints.length <= 12, `found ${entrypoints.length} public API functions: ${entrypoints.join(', ')}`);
+});
+
 process.env.DEVFIT_JWT_SECRET = 'release-test-only';
 process.env.SUPABASE_SERVICE_KEY = 'test-only';
 const { default: handler } = await import('../api/data.js');

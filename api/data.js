@@ -7,6 +7,7 @@ import {
   haveServerConfig, verifyToken, sbRpc, readJsonBody, recordServerEvent,
   clientIp, bearerToken, setApiSecurityHeaders, sameOriginIfPresent
 } from './_lib.js';
+import { handlePaymentOperation } from './_payments.js';
 
 const TYPES = ['progress', 'nutrition', 'workouts', 'prefs'];
 const MAX_DATA_BYTES = {
@@ -35,6 +36,11 @@ export default async function handler(req, res) {
   if (!payload || !payload.email) { res.status(401).json({ error: 'invalid_token' }); return; }
   const email = String(payload.email).trim().toLowerCase();
   const op = String(body.op || '');
+
+  if (op === 'paymentHistory' || op === 'submitPayment') {
+    await handlePaymentOperation(req, res, email, op, body);
+    return;
+  }
 
   try {
     if (op === 'get') {

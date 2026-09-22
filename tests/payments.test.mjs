@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 
 process.env.DEVFIT_JWT_SECRET = 'payment-test-secret';
 process.env.SUPABASE_SERVICE_KEY = 'payment-test-service';
-const { default: handler } = await import('../api/payments.js?payment-tests');
+const { default: handler } = await import('../api/data.js?payment-tests');
 
 function token(email='payer@gmail.com') {
   const h=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');
@@ -13,15 +13,15 @@ function token(email='payer@gmail.com') {
   return h+'.'+p+'.'+s;
 }
 function capture(){const out={headers:{}};return {out,setHeader(k,v){out.headers[k]=v;},status(v){out.status=v;return this;},json(v){out.body=v;}};}
-async function run(method,body={},signed=true){
+async function run(body={},signed=true){
   const res=capture();
-  await handler({method,body,headers:{host:'devfitportal.vercel.app',origin:'https://devfitportal.vercel.app',...(signed?{authorization:'Bearer '+token()}: {})},socket:{remoteAddress:'127.0.0.1'}},res);
+  await handler({method:'POST',body,headers:{host:'devfitportal.vercel.app',origin:'https://devfitportal.vercel.app',...(signed?{authorization:'Bearer '+token()}: {})},socket:{remoteAddress:'127.0.0.1'}},res);
   return res.out;
 }
 
 test('payment history requires a signed account and never trusts a body email',async()=>{
   const original=globalThis.fetch;let calls=0;globalThis.fetch=async()=>{calls++;throw new Error('unsigned request reached storage');};
-  try{const r=await run('GET',{},false);assert.equal(r.status,401);assert.equal(calls,0);}finally{globalThis.fetch=original;}
+  try{const r=await run({op:'paymentHistory'},false);assert.equal(r.status,401);assert.equal(calls,0);}finally{globalThis.fetch=original;}
 });
 
 test('customer payment history exposes metadata but never receipt paths',async()=>{
@@ -32,7 +32,7 @@ test('customer payment history exposes metadata but never receipt paths',async()
     if(u.includes('/devfit_payments?'))return {ok:true,json:async()=>[{id:'1',reference:'DEVFIT_SEP26_PAYER',status:'pending',byte_size:120000,uploaded_at:'2026-09-22T01:00:00Z'}]};
     throw new Error('unexpected '+u);
   };
-  try{const r=await run('GET',{email:'victim@gmail.com'});assert.equal(r.status,200);assert.equal(r.body.reference,'DEVFIT_SEP26_PAYER');assert.equal(r.body.payments[0].storage_path,undefined);}finally{globalThis.fetch=original;}
+  try{const r=await run({op:'paymentHistory',email:'victim@gmail.com'});assert.equal(r.status,200);assert.equal(r.body.reference,'DEVFIT_SEP26_PAYER');assert.equal(r.body.payments[0].storage_path,undefined);}finally{globalThis.fetch=original;}
 });
 
 test('valid receipt is rate-limited, stored privately and linked to signed Gmail',async()=>{
@@ -51,7 +51,7 @@ test('valid receipt is rate-limited, stored privately and linked to signed Gmail
   };
   const jpeg=Buffer.from('ffd8ffdb0011223344','hex');
   try{
-    const r=await run('POST',{email:'victim@gmail.com',image:'data:image/jpeg;base64,'+jpeg.toString('base64')});
+    const r=await run({op:'submitPayment',email:'victim@gmail.com',image:'data:image/jpeg;base64,'+jpeg.toString('base64')});
     assert.equal(r.status,201);assert.equal(r.body.ok,true);assert.equal(r.body.payment.storage_path,undefined);
     assert.equal(requests.some(x=>x.u.includes('victim')),false);
   }finally{globalThis.fetch=original;}
@@ -66,5 +66,5 @@ test('non-image payloads are rejected before private storage',async()=>{
     if(u.includes('/storage/v1/object/'))storageWrites++;
     return {ok:true,json:async()=>({})};
   };
-  try{const r=await run('POST',{image:'data:image/jpeg;base64,'+Buffer.from('not-an-image').toString('base64')});assert.equal(r.status,400);assert.equal(storageWrites,0);}finally{globalThis.fetch=original;}
+  try{const r=await run({op:'submitPayment',image:'data:image/jpeg;base64,'+Buffer.from('not-an-image').toString('base64')});assert.equal(r.status,400);assert.equal(storageWrites,0);}finally{globalThis.fetch=original;}
 });

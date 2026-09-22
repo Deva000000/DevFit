@@ -862,9 +862,10 @@ function paintPaymentHistory(rows){
       '<div class="status '+status+'">'+label+'</div><div class="when">'+paymentEscape(paymentDate(p.uploaded_at))+' · '+Math.max(1,Math.round((p.byte_size||0)/1024))+' KB</div></div>';
   }).join('');
 }
-async function paymentRequest(options){
+async function paymentRequest(op,payload){
   var token=paymentToken(); if(!token)throw new Error('Sign in again to continue.');
-  var res=await fetch('/api/payments',Object.assign({cache:'no-store',headers:{'Authorization':'Bearer '+token}},options||{}));
+  var body=Object.assign({op:op},payload||{});
+  var res=await fetch('/api/data',{method:'POST',cache:'no-store',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(body)});
   var data=await res.json().catch(function(){return {};});
   if(!res.ok){
     var messages={invalid_image:'Choose a valid JPG, PNG or WebP screenshot.',image_too_large:'The compressed receipt is still too large.',upload_limit_reached:'Upload limit reached. Contact DevFit if you need help.',receipt_storage_unavailable:'Receipt storage is temporarily unavailable.',payment_save_failed:'The receipt could not be saved. Please retry.'};
@@ -874,7 +875,7 @@ async function paymentRequest(options){
 }
 async function loadPaymentHistory(){
   try{
-    var data=await paymentRequest({method:'GET'});
+    var data=await paymentRequest('paymentHistory');
     document.getElementById('payment-reference').textContent=data.reference||'—';
     paintPaymentHistory(data.payments||[]);
   }catch(e){
@@ -913,7 +914,7 @@ async function submitPaymentProof(){
   var btn=document.getElementById('submit-payment-proof'),status=document.getElementById('payment-proof-file-status');
   btn.disabled=true;btn.textContent='Submitting…';
   try{
-    var data=await paymentRequest({method:'POST',headers:{'Authorization':'Bearer '+paymentToken(),'Content-Type':'application/json'},body:JSON.stringify({image:pendingPaymentImage})});
+    var data=await paymentRequest('submitPayment',{image:pendingPaymentImage});
     pendingPaymentImage='';status.textContent=data.duplicate?'This receipt was already submitted.':'Receipt submitted securely. You can track its status below.';toast('Payment receipt submitted ✓');await loadPaymentHistory();
   }catch(e){btn.disabled=false;status.textContent=e.message;toast(e.message,true);}
   finally{btn.textContent='Submit receipt';}

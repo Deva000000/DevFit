@@ -1374,6 +1374,12 @@ function renderGoalBtns(){
   });
 }
 
+function esc(value){
+  return String(value==null?'':value).replace(/[&<>\"]/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c];
+  });
+}
+
 function renderProgramHistory(){
   const list=document.getElementById('program-history-list'); if(!list)return;
   const programs=(appData.programs||[]).slice().sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));

@@ -297,3 +297,11 @@ test('every premium entry point performs action-time server authorization', () =
   assert.match(workouts, /inp\.value!==todayStr\(\)[\s\S]*await DevFitAuth\.requirePro\(\)/);
   assert.match(settings, /async function generateReport\(range\)[\s\S]*await DevFitAuth\.requirePro\(\)/);
 });
+
+test('progress history escapes dynamic content with an available page-level helper', () => {
+  const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const helper = index.indexOf('function esc(value)');
+  const history = index.indexOf('function renderProgramHistory()');
+  assert.ok(helper >= 0 && helper < history);
+  assert.match(index.slice(history, history + 1800), /esc\(status\)[\s\S]*esc\(result\)/);
+});

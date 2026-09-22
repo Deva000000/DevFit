@@ -20,6 +20,7 @@ import {
   signAdminSession, verifyAdminSession, cookieValue, setApiSecurityHeaders,
   sbStorageSignedUrl, sbStorageDelete
 } from './_lib.js';
+import { getSupportRequest, sendSupportNotification } from './_support.js';
 
 const ADMIN_PW = process.env.DEVFIT_ADMIN_PASSWORD || '';
 const BACKUP_TABLES = {
@@ -28,6 +29,7 @@ const BACKUP_TABLES = {
   devfit_data_versions: 'id.asc',
   devfit_logins: 'email.asc,device_id.asc',
   devfit_payments: 'email.asc,uploaded_at.asc',
+  devfit_support_requests: 'email.asc,created_at.asc',
   devfit_config: 'id.asc'
 };
 const BACKUP_PAGE_ROWS = 50;
@@ -54,7 +56,8 @@ async function deletionCounts(email) {
     sbSelect('devfit_data_versions', 'email=eq.' + encoded + '&select=id'),
     sbSelect('devfit_logins', 'email=eq.' + encoded + '&select=device_id'),
     sbSelect('devfit_records', 'email=eq.' + encoded + '&select=record_key'),
-    sbSelect('devfit_payments', 'email=eq.' + encoded + '&select=id,storage_path')
+    sbSelect('devfit_payments', 'email=eq.' + encoded + '&select=id,storage_path'),
+    sbSelect('devfit_support_requests', 'email=eq.' + encoded + '&select=id')
   ]);
   if (results.some((rows) => !Array.isArray(rows))) return null;
   return {
@@ -64,6 +67,7 @@ async function deletionCounts(email) {
     devices: results[3].length,
     records: results[4].length,
     payments: results[5].length,
+    supportRequests: results[6].length,
     paymentPaths: results[5].map((row) => row.storage_path).filter(Boolean)
   };
 }
@@ -166,6 +170,46 @@ export default async function handler(req, res) {
       return;
     }
 
+    if (action === 'support') {
+      const rows = await sbSelect('devfit_support_requests',
+        'select=id,email,whatsapp,category,message,status,email_status,created_at,updated_at,notified_at&order=created_at.desc&limit=250');
+      if (!Array.isArray(rows)) { res.status(503).json({ error: 'support_history_unavailable' }); return; }
+      res.status(200).json({ requests: rows });
+      return;
+    }
+
+    if (action === 'reviewSupport') {
+      const id = String(body.id || '');
+      const status = String(body.status || '');
+      if (!/^[0-9a-f-]{36}$/i.test(id) || !['new', 'in_progress', 'resolved'].includes(status)) {
+        res.status(400).json({ error: 'invalid_support_review' }); return;
+      }
+      const saved = await sbPatch('devfit_support_requests', 'id=eq.' + encodeURIComponent(id), {
+        status, updated_at: new Date().toISOString()
+      });
+      if (!Array.isArray(saved) || !saved[0]) { res.status(404).json({ error: 'support_not_found' }); return; }
+      res.status(200).json({ ok: true, request: saved[0] });
+      return;
+    }
+
+    if (action === 'notifySupport') {
+      const id = String(body.id || '');
+      if (!/^[0-9a-f-]{36}$/i.test(id)) { res.status(400).json({ error: 'invalid_support_request' }); return; }
+      const ticket = await getSupportRequest(id);
+      if (!ticket) { res.status(404).json({ error: 'support_not_found' }); return; }
+      const delivery = await sendSupportNotification(ticket);
+      const emailStatus = delivery.ok ? 'sent' : delivery.configured ? 'failed' : 'pending';
+      await sbPatch('devfit_support_requests', 'id=eq.' + encodeURIComponent(id), {
+        email_status: emailStatus,
+        email_message_id: delivery.id || null,
+        email_error: delivery.ok ? null : delivery.error,
+        notified_at: delivery.ok ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString()
+      });
+      res.status(delivery.ok ? 200 : 503).json({ ok: delivery.ok, error: delivery.ok ? undefined : delivery.error });
+      return;
+    }
+
     // Password-gated, whitelisted and paged. The server never accepts an
     // arbitrary table name, and the admin page encrypts every page into one
     // off-site backup before it is downloaded.
@@ -220,7 +264,7 @@ export default async function handler(req, res) {
       const deleted = await sbRpc('delete_devfit_account', { p_email: email });
       if (!deleted || deleted.email !== email) { res.status(500).json({ error: 'delete_failed' }); return; }
       const remaining = await deletionCounts(email);
-      if (!remaining || ['subscribers','currentData','recoveryVersions','devices','records','payments']
+      if (!remaining || ['subscribers','currentData','recoveryVersions','devices','records','payments','supportRequests']
         .some((key) => remaining[key] !== 0)) {
         res.status(500).json({ error: 'delete_verification_failed', remaining }); return;
       }

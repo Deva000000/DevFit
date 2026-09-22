@@ -481,16 +481,16 @@ test('permanent account deletion requires exact confirmation and verifies zero r
     if (target.includes('/rest/v1/rpc/consume_devfit_rate_limit') && method === 'POST') return { ok: true, json: async () => ({ allowed: true, retry_after: 86400, current_hits: 1 }) };
     if (target.includes('/rest/v1/rpc/delete_devfit_account') && method === 'POST') {
       rpcCalls++;
-      return { ok: true, json: async () => ({ email: 'person@gmail.com', subscribers: 1, currentData: 3, recoveryVersions: 5, devices: 2 }) };
+      return { ok: true, json: async () => ({ email: 'person@gmail.com', subscribers: 1, currentData: 3, recoveryVersions: 5, devices: 2, payments: 1, supportRequests: 1 }) };
     }
-    if (/\/rest\/v1\/devfit_(subscribers|data|data_versions|logins|records|payments)\?/.test(target) && method === 'GET') return { ok: true, json: async () => [] };
+    if (/\/rest\/v1\/devfit_(subscribers|data|data_versions|logins|records|payments|support_requests)\?/.test(target) && method === 'GET') return { ok: true, json: async () => [] };
     throw new Error('unexpected request ' + method + ' ' + target);
   };
   const deleted = await run({ confirmEmail: 'person@gmail.com', confirmation: 'DELETE DEVFIT ACCOUNT' });
   assert.equal(deleted.status, 200);
   assert.equal(deleted.body.ok, true);
   assert.equal(rpcCalls, 1);
-  assert.deepEqual(deleted.body.remaining, { subscribers: 0, currentData: 0, recoveryVersions: 0, devices: 0, records: 0, payments: 0 });
+  assert.deepEqual(deleted.body.remaining, { subscribers: 0, currentData: 0, recoveryVersions: 0, devices: 0, records: 0, payments: 0, supportRequests: 0 });
 
   const migration = fs.readFileSync(new URL('../supabase/migrations/20260817163640_atomic_account_deletion.sql', import.meta.url), 'utf8');
   assert.match(migration, /security definer/);
@@ -501,6 +501,10 @@ test('permanent account deletion requires exact confirmation and verifies zero r
   const paymentMigration = fs.readFileSync(new URL('../supabase/migrations/20260922112558_add_private_payment_proofs.sql', import.meta.url), 'utf8');
   assert.match(paymentMigration, /delete from public\.devfit_payments where email = v_email/);
   assert.match(paymentMigration, /delete from public\.devfit_records where email = v_email/);
+  const supportMigration = fs.readFileSync(new URL('../supabase/migrations/20260922163443_add_customer_support_requests.sql', import.meta.url), 'utf8');
+  assert.match(supportMigration, /alter table public\.devfit_support_requests enable row level security/);
+  assert.match(supportMigration, /revoke all on table public\.devfit_support_requests from public, anon, authenticated/);
+  assert.match(supportMigration, /delete from public\.devfit_support_requests where email = v_email/);
 });
 
 test('persistent session cannot access cloud data after account revocation', async () => {
@@ -571,7 +575,7 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
   assert.match(settings, /<div class="title">Install DevFit App<\/div>/);
   assert.match(settings, /if\(!deferredInstallPrompt\)\{\s*showIosHint\(\)/);
   assert.equal(manifest.display, 'standalone');
-  assert.match(worker, /devfit-v4\.90\.0/);
+  assert.match(worker, /devfit-v4\.91\.0/);
   assert.doesNotMatch(worker, /\.then\(\(\) => self\.skipWaiting\(\)\)/);
 
   for (const html of [index, settings]) {

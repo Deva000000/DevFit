@@ -40,8 +40,8 @@
   .msg{margin-top:14px;padding:11px 13px;border-radius:9px;font-size:13px;line-height:1.5;display:none}
   .msg.ok{display:block;background:#052e16;border:1px solid #166534;color:#86efac}
   .msg.err{display:block;background:#2a0a0a;border:1px solid #7f1d1d;color:#fca5a5}
-  .tabs{display:flex;gap:6px;margin-bottom:16px}
-  .tabs button{flex:1;padding:11px;background:#141414;border:1px solid #262626;color:#999;font-size:13px}
+  .tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+  .tabs button{flex:1 1 100px;padding:11px;background:#141414;border:1px solid #262626;color:#999;font-size:13px}
   .tabs button.on{background:#1a1a1a;border-color:#cc0000;color:#fff}
   .list{margin-top:8px}
   .sub-row{display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid #262626;border-radius:10px;margin-bottom:7px;background:#151515;flex-wrap:wrap}
@@ -96,9 +96,19 @@
     <div class="tabs">
       <button id="tab-manage" class="on">Activate & Plans</button>
       <button id="tab-payments">Payments</button>
+      <button id="tab-support">Support</button>
       <button id="tab-logins">Logins & Devices</button>
       <button id="tab-errors">Production Alerts</button>
       <button id="tab-backups">Backups</button>
+    </div>
+
+    <!-- ===== SUPPORT VIEW ===== -->
+    <div id="view-support" class="hide">
+      <div class="card">
+        <h2>Customer support <span class="tap" id="refresh-support">refresh</span></h2>
+        <div class="hint" style="margin-top:0;margin-bottom:10px">Every request is retained here. Email delivery is an additional notification, so a provider outage cannot lose a customer message.</div>
+        <div class="list" id="support"><div class="hint">Open this tab to load support requests.</div></div>
+      </div>
     </div>
 
     <!-- ===== PAYMENTS VIEW ===== -->
@@ -296,7 +306,7 @@ async function call(action, extra){
 }
 
 /* ---------- encrypted owner backup ---------- */
-var BACKUP_TABLES=['devfit_subscribers','devfit_data','devfit_data_versions','devfit_logins','devfit_payments','devfit_config'];
+var BACKUP_TABLES=['devfit_subscribers','devfit_data','devfit_data_versions','devfit_logins','devfit_payments','devfit_support_requests','devfit_config'];
 var BACKUP_AAD='DevFit Owner Backup v1';
 function bytesToB64(bytes){
   var out='', chunk=0x8000;
@@ -849,13 +859,54 @@ async function refreshPayments(){
   });});
 }
 
+/* ---------- customer support ---------- */
+function supportStatus(status){
+  var s=String(status||'new');
+  var color=s==='resolved'?'#4ade80':s==='in_progress'?'#60a5fa':'#fbbf24';
+  return '<b style="color:'+color+'">'+safeText(s.replace('_',' ').toUpperCase())+'</b>';
+}
+async function refreshSupport(){
+  var box=$('support');box.innerHTML='<div class="hint">Loading support requests…</div>';
+  var r=await call('support');
+  if(r.status!==200){box.innerHTML='<div class="hint">Support requests could not load. Retry shortly.</div>';return;}
+  var rows=r.data.requests||[];
+  if(!rows.length){box.innerHTML='<div class="hint">No support requests yet.</div>';return;}
+  box.innerHTML=rows.map(function(x){
+    var wa=String(x.whatsapp||'').replace(/\D/g,'');
+    var emailState=x.email_status==='sent'?'Email sent':x.email_status==='failed'?'Email failed':'Email pending';
+    return '<div class="sub-row" style="display:grid;grid-template-columns:1fr auto;gap:7px 12px">'+
+      '<span style="display:block;color:#fff;font-size:13px;font-weight:700;min-width:0;overflow-wrap:anywhere">'+safeText(x.email)+'</span>'+supportStatus(x.status)+
+      '<span class="win" style="grid-column:1/-1">'+safeText(String(x.category||'feedback').replace(/_/g,' '))+' · '+safeText(paymentWhen(x.created_at))+' · '+safeText(emailState)+'</span>'+
+      '<span style="grid-column:1/-1;color:#ddd;font-size:12px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere">'+safeText(x.message)+'</span>'+
+      '<span class="payment-actions">'+
+        '<a href="https://wa.me/'+safeText(wa)+'" target="_blank" rel="noopener" style="padding:7px 10px;background:#14532d;border:1px solid #166534;border-radius:9px;color:#dcfce7;text-decoration:none;font-size:11px;font-weight:700">WhatsApp '+safeText(x.whatsapp)+'</a>'+
+        '<button data-support-review="'+safeText(x.id)+'" data-status="in_progress">In progress</button>'+
+        '<button class="verify" data-support-review="'+safeText(x.id)+'" data-status="resolved">Resolved</button>'+
+        '<button data-support-notify="'+safeText(x.id)+'">Send email again</button>'+
+        '<button data-support-manage="'+encodeURIComponent(x.email)+'">Manage account</button>'+
+      '</span></div>';
+  }).join('');
+  Array.prototype.forEach.call(box.querySelectorAll('[data-support-review]'),function(btn){btn.addEventListener('click',async function(){
+    btn.disabled=true;var r=await call('reviewSupport',{id:btn.getAttribute('data-support-review'),status:btn.getAttribute('data-status')});
+    if(r.status===200)refreshSupport();else{btn.disabled=false;alert('Support status could not be saved.');}
+  });});
+  Array.prototype.forEach.call(box.querySelectorAll('[data-support-notify]'),function(btn){btn.addEventListener('click',async function(){
+    btn.disabled=true;var r=await call('notifySupport',{id:btn.getAttribute('data-support-notify')});btn.disabled=false;
+    if(r.status===200){alert('Support email sent.');refreshSupport();}else alert('Email is not configured or could not be sent. The request remains saved here.');
+  });});
+  Array.prototype.forEach.call(box.querySelectorAll('[data-support-manage]'),function(btn){btn.addEventListener('click',function(){
+    $('email').value=decodeURIComponent(btn.getAttribute('data-support-manage'));showTab('manage');$('email').scrollIntoView({behavior:'smooth'});
+  });});
+}
+
 /* ---------- tabs ---------- */
 function showTab(which){
   var m=which==='manage';
-  var p=which==='payments', l=which==='logins', e=which==='errors', b=which==='backups';
-  $('tab-manage').classList.toggle('on',m); $('tab-payments').classList.toggle('on',p); $('tab-logins').classList.toggle('on',l); $('tab-errors').classList.toggle('on',e); $('tab-backups').classList.toggle('on',b);
-  $('view-manage').classList.toggle('hide',!m); $('view-payments').classList.toggle('hide',!p); $('view-logins').classList.toggle('hide',!l); $('view-errors').classList.toggle('hide',!e); $('view-backups').classList.toggle('hide',!b);
+  var p=which==='payments', s=which==='support', l=which==='logins', e=which==='errors', b=which==='backups';
+  $('tab-manage').classList.toggle('on',m); $('tab-payments').classList.toggle('on',p); $('tab-support').classList.toggle('on',s); $('tab-logins').classList.toggle('on',l); $('tab-errors').classList.toggle('on',e); $('tab-backups').classList.toggle('on',b);
+  $('view-manage').classList.toggle('hide',!m); $('view-payments').classList.toggle('hide',!p); $('view-support').classList.toggle('hide',!s); $('view-logins').classList.toggle('hide',!l); $('view-errors').classList.toggle('hide',!e); $('view-backups').classList.toggle('hide',!b);
   if(p) refreshPayments();
+  if(s) refreshSupport();
   if(l) refreshLogins();
   if(e) refreshErrors();
 }
@@ -932,6 +983,7 @@ $('refresh').addEventListener('click', refreshList);
 $('refresh-logins').addEventListener('click', refreshLogins);
 $('refresh-errors').addEventListener('click', refreshErrors);
 $('refresh-payments').addEventListener('click', refreshPayments);
+$('refresh-support').addEventListener('click', refreshSupport);
 $('payment-proof-close').addEventListener('click',function(){$('payment-proof-image').removeAttribute('src');$('payment-proof-panel').classList.add('hide');});
 $('backup-download').addEventListener('click', downloadOwnerBackup);
 $('backup-verify').addEventListener('click', verifyOwnerBackup);
@@ -939,6 +991,7 @@ $('delete-preview').addEventListener('click', previewAccountDeletion);
 $('delete-account').addEventListener('click', deleteAccountPermanently);
 $('tab-manage').addEventListener('click', function(){ showTab('manage'); });
 $('tab-payments').addEventListener('click', function(){ showTab('payments'); });
+$('tab-support').addEventListener('click', function(){ showTab('support'); });
 $('tab-logins').addEventListener('click', function(){ showTab('logins'); });
 $('tab-errors').addEventListener('click', function(){ showTab('errors'); });
 $('tab-backups').addEventListener('click', function(){ showTab('backups'); });

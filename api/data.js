@@ -8,6 +8,7 @@ import {
   clientIp, bearerToken, setApiSecurityHeaders, sameOriginIfPresent
 } from './_lib.js';
 import { handlePaymentOperation } from './_payments.js';
+import { handleSupportOperation } from './_support.js';
 
 const TYPES = ['progress', 'nutrition', 'workouts', 'prefs'];
 const MAX_DATA_BYTES = {
@@ -40,6 +41,11 @@ export default async function handler(req, res) {
   try {
     if (op === 'paymentHistory' || op === 'submitPayment') {
       await handlePaymentOperation(req, res, email, op, body);
+      return;
+    }
+
+    if (op === 'submitSupport') {
+      await handleSupportOperation(req, res, email, body);
       return;
     }
 

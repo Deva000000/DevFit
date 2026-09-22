@@ -240,6 +240,27 @@
   .payment-history-item .when{font-size:10.5px;color:#888}.payment-history-item .status{font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
   .payment-history-item .status.pending{color:#fbbf24}.payment-history-item .status.verified{color:#4ade80}.payment-history-item .status.rejected{color:#ff6b6b}
 
+  /* Customer support */
+  .support-intro{display:flex;gap:12px;align-items:flex-start;margin-bottom:16px}
+  .support-icon{width:38px;height:38px;flex:0 0 38px;border-radius:11px;background:rgba(204,0,0,.16);color:#ff6b6b;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800}
+  .support-title{font-size:15px;font-weight:800;color:#fff;line-height:1.25}
+  .support-sub{font-size:11.5px;color:#92929a;line-height:1.5;margin-top:3px}
+  .support-account{padding:11px 12px;border-radius:10px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.09);margin-bottom:14px}
+  .support-account span{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.08em;color:#888;font-weight:800;margin-bottom:4px}
+  .support-account strong{display:block;color:#fff;font-size:12.5px;overflow-wrap:anywhere}
+  .support-field{display:block;margin:0 0 13px}
+  .support-field>span{display:block;color:#bdbdc4;font-size:11px;font-weight:700;margin:0 0 6px}
+  .support-field input,.support-field select,.support-field textarea{display:block;width:100%;border:1px solid #35353c;border-radius:10px;background:#141417;color:#fff;padding:12px 13px;font:500 16px 'DM Sans',sans-serif;outline:none;transition:border-color .15s,box-shadow .15s}
+  .support-field textarea{resize:vertical;min-height:124px;line-height:1.5}
+  .support-field input:focus,.support-field select:focus,.support-field textarea:focus{border-color:#cc0000;box-shadow:0 0 0 3px rgba(204,0,0,.15)}
+  .support-count{text-align:right;margin-top:5px;color:#777;font-size:10px}
+  .support-send{display:block;width:100%;border:0;border-radius:10px;padding:13px;background:#cc0000;color:#fff;font:800 13px 'DM Sans',sans-serif;letter-spacing:.04em;cursor:pointer;box-shadow:0 5px 15px rgba(204,0,0,.28)}
+  .support-send:disabled{opacity:.55;cursor:wait}
+  .support-result{display:none;margin-top:12px;padding:11px 12px;border-radius:9px;font-size:11.5px;line-height:1.5}
+  .support-result.ok{display:block;background:rgba(47,158,87,.10);border:1px solid rgba(47,158,87,.28);color:#bfe3cd}
+  .support-result.err{display:block;background:rgba(204,0,0,.10);border:1px solid rgba(204,0,0,.28);color:#ffb3b3}
+  .support-safety{margin-top:12px;color:#777;font-size:10.5px;line-height:1.55}
+
   /* Usage */
   .usage-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
   .usage-cell{background:rgba(20,20,24,0.55);border:1px solid rgba(255,255,255,0.07);border-radius:11px;padding:13px 14px}
@@ -262,6 +283,12 @@
   html[data-theme="light"] .usage-val{color:#14110e}
   html[data-theme="light"] .cloud-note{background:rgba(47,158,87,0.09);color:#2f6b45;border-color:rgba(47,158,87,0.28)}
   html[data-theme="light"] .cloud-note svg{stroke:#2f9e57}
+  html[data-theme="light"] .support-title,html[data-theme="light"] .support-account strong{color:#17130f}
+  html[data-theme="light"] .support-sub,html[data-theme="light"] .support-field>span{color:#6a6157}
+  html[data-theme="light"] .support-account{background:#faf7f3;border-color:rgba(20,15,10,.1)}
+  html[data-theme="light"] .support-field input,html[data-theme="light"] .support-field select,html[data-theme="light"] .support-field textarea{background:#fff;color:#17130f;border-color:#d9d2ca}
+  html[data-theme="light"] .support-result.ok{color:#2f6b45}
+  html[data-theme="light"] .support-result.err{color:#9f2020}
   .ig-platform{padding:14px;border:1px solid #2a2a2f;border-radius:12px;background:#101013;margin-bottom:14px}
   .ig-platform-title{font-size:15px;font-weight:800;color:#fff;margin-bottom:5px}
   .ig-platform-sub{font-size:12px;line-height:1.55;color:#8f949e;margin-bottom:10px}
@@ -568,9 +595,38 @@ html.nosplash #devfit-splash{display:none!important}
     </button>
   </div>
 
+  <!-- ============================ CUSTOMER SUPPORT ============================ -->
+  <div class="group-title" id="support-group-title">Customer Support</div>
+  <div class="card" id="card-support">
+    <div class="support-intro">
+      <div class="support-icon" aria-hidden="true">?</div>
+      <div><div class="support-title">Help, feedback &amp; issue reports</div><div class="support-sub">Requests are accepted 24/7 and saved securely for DevFit to review.</div></div>
+    </div>
+    <div class="support-account"><span>Signed-in Gmail</span><strong id="support-email">Loading…</strong></div>
+    <label class="support-field" for="support-category"><span>What do you need help with?</span>
+      <select id="support-category">
+        <option value="feedback">Feedback or suggestion</option>
+        <option value="app_issue">App issue or bug</option>
+        <option value="account_login">Account or login</option>
+        <option value="payment">Payment or Pro access</option>
+        <option value="training_plan">Training-plan question</option>
+      </select>
+    </label>
+    <label class="support-field" for="support-whatsapp"><span>WhatsApp number</span>
+      <input id="support-whatsapp" type="tel" inputmode="tel" autocomplete="tel" maxlength="24" placeholder="Example: +60 18 367 9177">
+    </label>
+    <label class="support-field" for="support-message"><span>Tell us what happened</span>
+      <textarea id="support-message" rows="5" minlength="10" maxlength="2000" placeholder="Describe what you expected, what happened, and which page you were using."></textarea>
+      <div class="support-count" id="support-count">0 / 2000</div>
+    </label>
+    <button class="support-send" id="support-send" type="button">Send to DevFit</button>
+    <div class="support-result" id="support-result" role="status" aria-live="polite"></div>
+    <div class="support-safety">Never send passwords, bank/card details, identity documents, or urgent medical information here. This is not an emergency service.</div>
+  </div>
+
   <div class="footer">
     DevFit · Dominance Through Discipline<br>
-    <a href="https://wa.me/60183679177">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.87.3
+    <a href="#support-group-title" id="footer-support-link">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.91.0
   </div>
 
 
@@ -927,6 +983,43 @@ document.getElementById('copy-payment-reference').addEventListener('click',async
   try{await navigator.clipboard.writeText(value);toast('Payment reference copied ✓');}catch(e){prompt('Copy your payment reference:',value);}
 });
 loadPaymentHistory();
+
+// ---------- CUSTOMER SUPPORT ----------
+(function customerSupport(){
+  var emailEl=document.getElementById('support-email');
+  var messageEl=document.getElementById('support-message');
+  var countEl=document.getElementById('support-count');
+  var resultEl=document.getElementById('support-result');
+  var sendBtn=document.getElementById('support-send');
+  try{
+    var user=window.DevFitAuth&&DevFitAuth.getUser?DevFitAuth.getUser():JSON.parse(localStorage.getItem('devfit_user')||'{}');
+    emailEl.textContent=user&&user.email?user.email:'Sign in again to continue';
+  }catch(e){emailEl.textContent='Sign in again to continue';}
+  function showResult(message,type){resultEl.textContent=message;resultEl.className='support-result '+type;}
+  function updateCount(){countEl.textContent=String(messageEl.value.length)+' / 2000';}
+  messageEl.addEventListener('input',updateCount);updateCount();
+  sendBtn.addEventListener('click',async function(){
+    var whatsapp=document.getElementById('support-whatsapp').value.trim();
+    var message=messageEl.value.trim();
+    var category=document.getElementById('support-category').value;
+    if(whatsapp.replace(/\D/g,'').length<7){showResult('Enter a valid WhatsApp number, including the country code.','err');return;}
+    if(message.length<10){showResult('Please add a little more detail so DevFit can understand the issue.','err');return;}
+    sendBtn.disabled=true;sendBtn.textContent='Sending…';resultEl.className='support-result';
+    try{
+      var token=paymentToken();if(!token)throw new Error('Sign in again to send your request.');
+      var response=await fetch('/api/data',{method:'POST',cache:'no-store',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({op:'submitSupport',category:category,whatsapp:whatsapp,message:message})});
+      var data=await response.json().catch(function(){return {};});
+      if(!response.ok){
+        var errors={invalid_whatsapp:'Enter a valid WhatsApp number, including the country code.',invalid_support_message:'Your message must be between 10 and 2,000 characters.',support_limit_reached:'You have sent several requests recently. Please wait before trying again.',account_unavailable:'Your account could not be verified. Sign in again and retry.',support_save_failed:'Your request could not be saved. Please check your connection and retry.'};
+        throw new Error(errors[data.error]||'Support is temporarily unavailable. Please retry shortly.');
+      }
+      messageEl.value='';updateCount();
+      showResult(data.emailDelivered?'Sent to DevFit. Your request has been saved and emailed successfully.':'Received by DevFit. Your request is safely saved; the email notification is pending.','ok');
+      toast('Support request sent ✓');
+    }catch(error){showResult(error.message||'Support is temporarily unavailable.','err');}
+    finally{sendBtn.disabled=false;sendBtn.textContent='Send to DevFit';}
+  });
+})();
 
 // ---------- REPORT RANGE PICKER ----------
 // Report choices follow elapsed program time, not planned duration. A 12-week
@@ -2092,6 +2185,12 @@ paintThemeToggle();
         body.style.display = hidden ? '' : 'none';
         t.classList.toggle('collapsed', !hidden);
       });
+    });
+    var supportTitle=document.getElementById('support-group-title');
+    if(location.hash==='#support-group-title'&&supportTitle&&supportTitle.classList.contains('collapsed'))supportTitle.click();
+    var supportLink=document.getElementById('footer-support-link');
+    if(supportLink)supportLink.addEventListener('click',function(){
+      if(supportTitle&&supportTitle.classList.contains('collapsed'))supportTitle.click();
     });
   }catch(e){}
 })();

@@ -2854,7 +2854,7 @@ document.addEventListener('visibilitychange',function(){
     const b=installBar(); if(b) b.classList.remove('show');
   };
   const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
-  // Chrome/Firefox/Edge on iPhone CANNOT add to the home screen — only Safari can.
+  // Chrome supports Share > Add to Home Screen; offer Safari only as a fallback.
   const isIOSNonSafari=isIOS&&/CriOS|FxiOS|EdgiOS|OPT\//.test(navigator.userAgent);
   const isAndroid=/android/i.test(navigator.userAgent);
   const isStandalone=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone;
@@ -2876,9 +2876,9 @@ document.addEventListener('visibilitychange',function(){
     if(!guide||!steps||!action) return;
 
     if(isIOSNonSafari){
-      steps.innerHTML='<li><strong>Important:</strong> on iPhone this only works in <strong>Safari</strong> — not this browser.</li>'+
-        '<li>Open <strong>devfitportal.vercel.app</strong> in <strong>Safari</strong>.</li>'+
-        '<li>Tap <strong>Copy DevFit Link</strong> below, paste it in Safari, then tap <strong>Share</strong> → <strong>Add to Home Screen</strong>.</li>';
+      steps.innerHTML='<li>In Chrome, tap <strong>Share</strong> → <strong>Add to Home Screen</strong> → <strong>Add</strong> while on this DevFit page.</li>'+
+        '<li>If your browser has no such option, copy the link below and open it in <strong>Safari</strong>, then use <strong>Share → Add to Home Screen</strong>.</li>'+
+        '<li>Open the DevFit icon and sign in there. Do not add Google’s sign-in page to your home screen.</li>';
       action.textContent='Copy DevFit Link';
       action.dataset.installAction='copy';
     } else if(isIOS){

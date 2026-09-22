@@ -15,9 +15,10 @@
 
 import crypto from 'crypto';
 import {
-  haveServerConfig, sbSelect, sbUpsert, sbRpc, getSubscriber,
+  haveServerConfig, sbSelect, sbUpsert, sbPatch, sbRpc, getSubscriber,
   rateLimit, clientIp, readJsonBody, listLogins, sameSiteOnly,
-  signAdminSession, verifyAdminSession, cookieValue, setApiSecurityHeaders
+  signAdminSession, verifyAdminSession, cookieValue, setApiSecurityHeaders,
+  sbStorageSignedUrl, sbStorageDelete
 } from './_lib.js';
 
 const ADMIN_PW = process.env.DEVFIT_ADMIN_PASSWORD || '';
@@ -26,6 +27,7 @@ const BACKUP_TABLES = {
   devfit_data: 'email.asc,data_type.asc',
   devfit_data_versions: 'id.asc',
   devfit_logins: 'email.asc,device_id.asc',
+  devfit_payments: 'email.asc,uploaded_at.asc',
   devfit_config: 'id.asc'
 };
 const BACKUP_PAGE_ROWS = 50;
@@ -50,14 +52,19 @@ async function deletionCounts(email) {
     sbSelect('devfit_subscribers', 'email=eq.' + encoded + '&select=email'),
     sbSelect('devfit_data', 'email=eq.' + encoded + '&select=data_type'),
     sbSelect('devfit_data_versions', 'email=eq.' + encoded + '&select=id'),
-    sbSelect('devfit_logins', 'email=eq.' + encoded + '&select=device_id')
+    sbSelect('devfit_logins', 'email=eq.' + encoded + '&select=device_id'),
+    sbSelect('devfit_records', 'email=eq.' + encoded + '&select=record_key'),
+    sbSelect('devfit_payments', 'email=eq.' + encoded + '&select=id,storage_path')
   ]);
   if (results.some((rows) => !Array.isArray(rows))) return null;
   return {
     subscribers: results[0].length,
     currentData: results[1].length,
     recoveryVersions: results[2].length,
-    devices: results[3].length
+    devices: results[3].length,
+    records: results[4].length,
+    payments: results[5].length,
+    paymentPaths: results[5].map((row) => row.storage_path).filter(Boolean)
   };
 }
 
@@ -123,6 +130,42 @@ export default async function handler(req, res) {
       return;
     }
 
+    if (action === 'payments') {
+      const rows = await sbSelect('devfit_payments',
+        'select=id,email,reference,status,byte_size,uploaded_at,reviewed_at&order=uploaded_at.desc&limit=250');
+      if (!Array.isArray(rows)) { res.status(503).json({ error: 'payment_history_unavailable' }); return; }
+      res.status(200).json({ payments: rows });
+      return;
+    }
+
+    if (action === 'paymentProof') {
+      const id = String(body.id || '');
+      if (!/^[0-9a-f-]{36}$/i.test(id)) { res.status(400).json({ error: 'invalid_payment' }); return; }
+      const rows = await sbSelect('devfit_payments', 'id=eq.' + encodeURIComponent(id) + '&select=storage_path&limit=1');
+      const path = Array.isArray(rows) && rows[0] && rows[0].storage_path;
+      if (!path) { res.status(404).json({ error: 'payment_not_found' }); return; }
+      const url = await sbStorageSignedUrl('devfit-payment-proofs', path, 120);
+      if (!url) { res.status(503).json({ error: 'receipt_unavailable' }); return; }
+      res.status(200).json({ url, expiresIn: 120 });
+      return;
+    }
+
+    if (action === 'reviewPayment') {
+      const id = String(body.id || '');
+      const status = String(body.status || '');
+      if (!/^[0-9a-f-]{36}$/i.test(id) || !['pending', 'verified', 'rejected'].includes(status)) {
+        res.status(400).json({ error: 'invalid_payment_review' }); return;
+      }
+      const saved = await sbPatch('devfit_payments', 'id=eq.' + encodeURIComponent(id), {
+        status,
+        reviewed_at: status === 'pending' ? null : new Date().toISOString(),
+        reviewed_by: status === 'pending' ? null : 'owner'
+      });
+      if (!Array.isArray(saved) || !saved[0]) { res.status(404).json({ error: 'payment_not_found' }); return; }
+      res.status(200).json({ ok: true, payment: saved[0] });
+      return;
+    }
+
     // Password-gated, whitelisted and paged. The server never accepts an
     // arbitrary table name, and the admin page encrypts every page into one
     // off-site backup before it is downloaded.
@@ -156,7 +199,8 @@ export default async function handler(req, res) {
       if (!email || !email.includes('@')) { res.status(400).json({ error: 'missing_email' }); return; }
       const counts = await deletionCounts(email);
       if (!counts) { res.status(503).json({ error: 'account_store_unavailable' }); return; }
-      res.status(200).json({ email, counts });
+      const publicCounts = { ...counts }; delete publicCounts.paymentPaths;
+      res.status(200).json({ email, counts: publicCounts });
       return;
     }
 
@@ -168,12 +212,19 @@ export default async function handler(req, res) {
       }
       const rl = await rateLimit('admin_delete:' + clientIp(req), 10, 24 * 60 * 60);
       if (!rl.ok) { res.status(429).json({ error: 'rate_limited', retryAfter: rl.retryAfter }); return; }
+      const counts = await deletionCounts(email);
+      if (!counts) { res.status(503).json({ error: 'account_store_unavailable' }); return; }
+      if (counts.paymentPaths.length && !(await sbStorageDelete('devfit-payment-proofs', counts.paymentPaths))) {
+        res.status(503).json({ error: 'payment_proof_delete_failed' }); return;
+      }
       const deleted = await sbRpc('delete_devfit_account', { p_email: email });
       if (!deleted || deleted.email !== email) { res.status(500).json({ error: 'delete_failed' }); return; }
       const remaining = await deletionCounts(email);
-      if (!remaining || Object.values(remaining).some((count) => count !== 0)) {
+      if (!remaining || ['subscribers','currentData','recoveryVersions','devices','records','payments']
+        .some((key) => remaining[key] !== 0)) {
         res.status(500).json({ error: 'delete_verification_failed', remaining }); return;
       }
+      delete remaining.paymentPaths;
       res.status(200).json({ ok: true, deleted, remaining });
       return;
     }

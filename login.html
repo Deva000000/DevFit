@@ -34,6 +34,13 @@ html.nosplash #devfit-splash{display:none!important}#devfit-splash{position:fixe
 </style>
 <script>try{document.documentElement.removeAttribute('data-theme');if(sessionStorage.getItem('devfit_splash_shown'))document.documentElement.className+=' nosplash';}catch(e){}</script>
 <link rel="stylesheet" href="theme.css"><script src="devfit-errorlog.js"></script><script src="devfit-auth.js"></script>
+<style>
+html{background:#16151b}
+details.browser-help{border-top:1px solid #45434d;padding-top:12px}
+details.browser-help summary{cursor:pointer;color:#ddd;font-size:13px;font-weight:600;padding:4px 0}
+details.browser-help p{margin:10px 0;color:#bdbbc4;font-size:13px}
+#restart-signin{display:inline-block;color:#fff;background:#b00;text-decoration:none;border-radius:8px;padding:10px 14px;font-size:14px;font-weight:700}
+</style>
 </head>
 <body>
 <div id="devfit-splash"><div class="si"><img src="icon-192.png" alt="DevFit"><div class="w">DEV<b>FIT</b></div><div class="t">DOMINANCE THROUGH DISCIPLINE</div><div class="bar"><i></i></div></div></div>
@@ -50,6 +57,18 @@ html.nosplash #devfit-splash{display:none!important}#devfit-splash{position:fixe
     <p id="browser-copy-status" role="status"></p>
   </section>
   <button id="login-retry" type="button" hidden>Retry Google sign-in</button>
+  <details class="browser-help" id="signin-help"><summary>Trouble signing in?</summary>
+    <p>Choose <strong>Use another account</strong> on Google, then enter your Google account email. If you see <strong>Find your email</strong>, that is Google's recovery page: go back to sign-in unless you need account recovery.</p>
+    <p>If the keyboard or Google page stops responding, return here and restart sign-in. Do not delete DevFit or clear website data.</p>
+    <a href="/login.html" id="restart-signin">Restart sign-in</a>
+    <p>If it still fails, contact DevFit with your iOS/Android version and a screenshot of the error. Never send your password or a Google sign-in URL.</p>
+  </details>
+  <details class="browser-help" id="install-help"><summary>Install DevFit</summary>
+    <p id="install-instructions"></p>
+    <button id="install-now" type="button" hidden>Install DevFit</button>
+    <p>Install only from a DevFit page—not Google's sign-in or recovery page. Open the new DevFit icon and sign in there. Your browser and installed app may need separate sign-ins.</p>
+    <p id="install-status" role="status"></p>
+  </details>
   <div class="spinner" id="spinner"></div>
   <div class="status-box status-checking" id="status-checking" role="status">Signing you in…</div><div class="status-box status-pending" id="status-pending" role="status">This account is not active.<br>Please contact DevFit.</div><div class="status-box status-denied" id="status-denied" role="alert">Couldn’t sign you in. Please try again.</div>
   <div class="footer">DevFit · Secure sign-in<br><a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · <a href="https://wa.me/60183679177">Contact DevFit</a></div>
@@ -87,7 +106,20 @@ function waitForGoogle(){
     if(++tries>=40){clearInterval(googleTimer);el('google-button').textContent='Google sign-in could not load.';fail('Check your connection, then retry. If you opened this inside another app, open the link in Safari or Chrome.');el('login-retry').hidden=false;}
   },250);
 }
-function initGoogle(){if(googleReady||!window.google||!google.accounts||!google.accounts.id)return false;googleReady=true;const config={client_id:CLIENT_ID,auto_select:false,cancel_on_tap_outside:true};if(isIOS()){config.ux_mode='redirect';config.login_uri=location.origin+'/api/google-login'}else{config.callback=function(response){if(response&&response.credential)finishLogin('google_id',response.credential);else fail()}}google.accounts.id.initialize(config);el('google-button').innerHTML='';google.accounts.id.renderButton(el('google-button'),{type:'standard',theme:'outline',size:'large',text:'continue_with',shape:'rectangular',logo_alignment:'left',width:Math.min(344,el('google-button').clientWidth||344)});return true}
+function initGoogle(){
+  if(googleReady)return true;
+  if(!window.google||!google.accounts||!google.accounts.id)return false;
+  const config={client_id:CLIENT_ID,auto_select:false,cancel_on_tap_outside:true};
+  if(isIOS()){config.ux_mode='redirect';config.login_uri=location.origin+'/api/google-login'}
+  else{config.callback=function(response){if(response&&response.credential)finishLogin('google_id',response.credential);else fail()}}
+  try{
+    google.accounts.id.initialize(config);
+    el('google-button').innerHTML='';
+    google.accounts.id.renderButton(el('google-button'),{type:'standard',theme:'outline',size:'large',text:'continue_with',shape:'rectangular',logo_alignment:'left',width:Math.min(344,el('google-button').clientWidth||344)});
+    googleReady=true;
+    return true;
+  }catch(_){return false;}
+}
 document.addEventListener('DOMContentLoaded',function(){
   // Never auto-redirect from a cached browser flag. If the dashboard rejected an
   // expired token, the login form must remain usable instead of forming a loop.
@@ -96,8 +128,12 @@ document.addEventListener('DOMContentLoaded',function(){
   el('login-retry').onclick=function(){location.reload()};
   waitForGoogle();
 });
-window.addEventListener('pageshow',function(){busy(false)});
+window.addEventListener('pageshow',function(event){
+  busy(false);
+  if(event.persisted){clearStatus();googleReady=false;waitForGoogle();}
+});
 </script>
+<script src="login-install.js"></script>
 <script src="pwa-update.js"></script>
 </body>
 </html>

@@ -228,6 +228,17 @@
   .bill-step .n{flex-shrink:0;width:21px;height:21px;border-radius:50%;background:rgba(204,0,0,0.16);color:#ff6b6b;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px}
   .bill-step .tx{font-size:12px;color:#b6b6bc;line-height:1.5}
   .bill-step .tx b{color:#fff;font-weight:700}
+  .payment-proof-box{margin-top:14px;padding:14px;border-radius:12px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.1)}
+  .payment-ref{display:flex;align-items:center;gap:8px;margin:9px 0 12px;padding:11px 12px;border-radius:9px;background:#151518;border:1px solid #34343a}
+  .payment-ref code{min-width:0;flex:1;color:#fff;font:700 12px ui-monospace,Consolas,monospace;overflow-wrap:anywhere}
+  .payment-ref button,.receipt-actions button{border:0;border-radius:8px;padding:9px 11px;background:#333;color:#fff;font:700 12px 'DM Sans',sans-serif;cursor:pointer}
+  .receipt-actions{display:flex;gap:8px;flex-wrap:wrap}.receipt-actions .primary{background:#cc0000;flex:1}
+  .receipt-file{margin-top:9px;color:#a9a9b2;font-size:11.5px;line-height:1.45}
+  .payment-history{margin-top:14px;border-top:1px solid rgba(255,255,255,.09);padding-top:12px}
+  .payment-history-item{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.07)}
+  .payment-history-item:last-child{border-bottom:0}.payment-history-item .ref{font-size:11px;color:#ddd;font-weight:700;overflow-wrap:anywhere}
+  .payment-history-item .when{font-size:10.5px;color:#888}.payment-history-item .status{font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+  .payment-history-item .status.pending{color:#fbbf24}.payment-history-item .status.verified{color:#4ade80}.payment-history-item .status.rejected{color:#ff6b6b}
 
   /* Usage */
   .usage-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
@@ -383,7 +394,7 @@ html.nosplash #devfit-splash{display:none!important}
   </div>
 
   <!-- ============================ BILLING & PLAN ============================ -->
-  <div class="group-title">Billing &amp; Plan</div>
+  <div class="group-title" id="billing-group-title">Billing &amp; Pro</div>
 
   <!-- PLAN STATUS -->
   <div class="card" id="card-plan">
@@ -407,13 +418,28 @@ html.nosplash #devfit-splash{display:none!important}
 
     <a href="pricing.html" id="renew-btn" class="upgrade-btn">Renew Pro — RM19.90/month</a>
 
+    <div class="payment-proof-box" id="payment-proof-box">
+      <div class="section-label" style="margin-bottom:4px">Paid already? Submit your receipt</div>
+      <div class="card-sub" style="margin-top:0">Use the reference below during payment. Your signed-in Gmail is linked automatically when you submit the receipt.</div>
+      <div class="payment-ref"><code id="payment-reference">Loading…</code><button id="copy-payment-reference" type="button">Copy</button></div>
+      <div class="receipt-actions">
+        <button id="choose-payment-proof" type="button">Choose screenshot</button>
+        <button id="submit-payment-proof" class="primary" type="button" disabled>Submit receipt</button>
+      </div>
+      <input id="payment-proof-file" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+      <div class="receipt-file" id="payment-proof-file-status">JPG, PNG or WebP. DevFit compresses it securely before upload; maximum saved size 450 KB.</div>
+      <div class="payment-history">
+        <div class="section-label" style="margin-bottom:4px">Payment history</div>
+        <div id="payment-history-list" class="card-sub">Loading…</div>
+      </div>
+    </div>
+
     <!-- How billing works -->
     <div class="bill-steps" id="bill-steps">
-      <div class="bill-step"><div class="n">1</div><div class="tx"><b>Pay RM19.90</b> via DuitNow QR on the activation page, then WhatsApp the receipt with your Gmail.</div></div>
-      <div class="bill-step"><div class="n">2</div><div class="tx"><b>Activated within 24 hours.</b> Your plan turns Pro and the end date above is set to 30 days out.</div></div>
-      <div class="bill-step"><div class="n">3</div><div class="tx"><b>Full access until the end date.</b> Everything unlocks — history, charts, reports, share cards.</div></div>
-      <div class="bill-step"><div class="n">4</div><div class="tx"><b>Reverts to Free automatically</b> when the date passes. Your logged data is never deleted — it's safe and waiting.</div></div>
-      <div class="bill-step"><div class="n">5</div><div class="tx"><b>Renew anytime</b> by paying again — your end date extends and Pro switches straight back on.</div></div>
+      <div class="bill-step"><div class="n">1</div><div class="tx"><b>Pay RM19.90</b> via DuitNow QR and use the reference shown above.</div></div>
+      <div class="bill-step"><div class="n">2</div><div class="tx"><b>Upload the receipt here.</b> It is linked to your signed-in Gmail and submitted for verification.</div></div>
+      <div class="bill-step"><div class="n">3</div><div class="tx"><b>Activation follows verification.</b> Your plan dates appear above after access is approved.</div></div>
+      <div class="bill-step"><div class="n">4</div><div class="tx"><b>Full access lasts through the displayed end date.</b> When it ends, the app returns to Free and keeps your logged data.</div></div>
     </div>
   </div>
 
@@ -572,15 +598,15 @@ html.nosplash #devfit-splash{display:none!important}
     </section>
 
     <section id="ig-ios" class="ig-platform">
-      <div class="ig-platform-title">iPhone / iPad · Safari</div>
-      <div class="ig-platform-sub" style="color:#e4ba37">Apple allows home-screen installation only from Safari. Chrome, Firefox and Edge on iPhone cannot install it.</div>
+      <div class="ig-platform-title">iPhone / iPad · Safari or Chrome</div>
+      <div class="ig-platform-sub">Install from a DevFit page, never from Google's sign-in page. If Add to Home Screen is unavailable in your browser, use Safari.</div>
       <button id="ig-copy-link" class="ig-secondary" type="button" style="display:none">Copy DevFit link for Safari</button>
       <ol class="ig-steps">
-        <li>Open <strong>devfitportal.vercel.app</strong> in <strong>Safari</strong>.</li>
-        <li>Tap Safari’s <strong class="red">Share</strong> icon—the square with the upward arrow.</li>
+        <li>Open <strong>devfitportal.vercel.app</strong> in <strong>Safari or Chrome</strong>.</li>
+        <li>Tap the browser’s <strong class="red">Share</strong> icon—the square with the upward arrow.</li>
         <li>Scroll down and choose <strong class="red">Add to Home Screen</strong>.</li>
-        <li>Keep the name <strong>DevFit</strong>, then tap <strong>Add</strong> in the top-right.</li>
-        <li>Open the DevFit icon from your home screen and sign in once.</li>
+        <li>Keep <strong>Open as Web App</strong> on if offered, then tap <strong>Add</strong>.</li>
+        <li>Open the DevFit icon and sign in there. Browser and installed-app sessions may be separate.</li>
       </ol>
     </section>
 
@@ -820,6 +846,86 @@ function fmtDate(d){ try{ const x=new Date(d); if(isNaN(x)) return '—'; return
     buildRangeOptions();
   }catch(e){}
 })();
+
+// ---------- PAYMENT RECEIPTS ----------
+var pendingPaymentImage='';
+function paymentToken(){try{return DevFitAuth.getToken()||'';}catch(e){return '';}}
+function paymentDate(value){try{return new Date(value).toLocaleString('en-MY',{dateStyle:'medium',timeStyle:'short'});}catch(e){return '—';}}
+function paymentEscape(value){return String(value==null?'':value).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function paintPaymentHistory(rows){
+  var box=document.getElementById('payment-history-list'); if(!box)return;
+  if(!rows||!rows.length){box.innerHTML='<div class="card-sub">No receipts submitted yet.</div>';return;}
+  box.innerHTML=rows.map(function(p){
+    var status=String(p.status||'pending');
+    var label=status==='verified'?'Verified':status==='rejected'?'Needs attention':'Under review';
+    return '<div class="payment-history-item"><div class="ref">'+paymentEscape(p.reference||'DevFit payment')+'</div>'+
+      '<div class="status '+status+'">'+label+'</div><div class="when">'+paymentEscape(paymentDate(p.uploaded_at))+' · '+Math.max(1,Math.round((p.byte_size||0)/1024))+' KB</div></div>';
+  }).join('');
+}
+async function paymentRequest(options){
+  var token=paymentToken(); if(!token)throw new Error('Sign in again to continue.');
+  var res=await fetch('/api/payments',Object.assign({cache:'no-store',headers:{'Authorization':'Bearer '+token}},options||{}));
+  var data=await res.json().catch(function(){return {};});
+  if(!res.ok){
+    var messages={invalid_image:'Choose a valid JPG, PNG or WebP screenshot.',image_too_large:'The compressed receipt is still too large.',upload_limit_reached:'Upload limit reached. Contact DevFit if you need help.',receipt_storage_unavailable:'Receipt storage is temporarily unavailable.',payment_save_failed:'The receipt could not be saved. Please retry.'};
+    throw new Error(messages[data.error]||'Payment service is temporarily unavailable.');
+  }
+  return data;
+}
+async function loadPaymentHistory(){
+  try{
+    var data=await paymentRequest({method:'GET'});
+    document.getElementById('payment-reference').textContent=data.reference||'—';
+    paintPaymentHistory(data.payments||[]);
+  }catch(e){
+    var box=document.getElementById('payment-history-list');if(box)box.textContent=e.message;
+    var ref=document.getElementById('payment-reference');if(ref)ref.textContent='Unavailable';
+  }
+}
+function canvasBlob(canvas,quality){return new Promise(function(resolve){canvas.toBlob(resolve,'image/jpeg',quality);});}
+function readAsDataUrl(blob){return new Promise(function(resolve,reject){var r=new FileReader();r.onload=function(){resolve(r.result);};r.onerror=reject;r.readAsDataURL(blob);});}
+function loadReceiptImage(file){return new Promise(function(resolve,reject){
+  var url=URL.createObjectURL(file),img=new Image();
+  img.onload=function(){URL.revokeObjectURL(url);resolve(img);};
+  img.onerror=function(){URL.revokeObjectURL(url);reject(new Error('That file is not a readable image.'));};img.src=url;
+});}
+async function compressPaymentProof(file){
+  if(!file||!/^image\/(jpeg|png|webp)$/i.test(file.type)||file.size>15*1024*1024)throw new Error('Choose a JPG, PNG or WebP image under 15 MB.');
+  var img=await loadReceiptImage(file),limits=[1200,1050,900,760],qualities=[.78,.68,.58,.5],blob=null;
+  for(var i=0;i<limits.length;i++){
+    var scale=Math.min(1,limits[i]/Math.max(img.naturalWidth,img.naturalHeight));
+    var c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.naturalWidth*scale));c.height=Math.max(1,Math.round(img.naturalHeight*scale));
+    var ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(img,0,0,c.width,c.height);
+    blob=await canvasBlob(c,qualities[i]);if(blob&&blob.size<=450000)break;
+  }
+  if(!blob||blob.size>450000)throw new Error('This screenshot could not be compressed enough. Crop it to the payment details and try again.');
+  return {data:await readAsDataUrl(blob),bytes:blob.size};
+}
+async function choosePaymentProof(event){
+  var file=event.target.files&&event.target.files[0];event.target.value='';if(!file)return;
+  var status=document.getElementById('payment-proof-file-status'),submit=document.getElementById('submit-payment-proof');
+  pendingPaymentImage='';submit.disabled=true;status.textContent='Preparing a small secure copy…';
+  try{var packed=await compressPaymentProof(file);pendingPaymentImage=packed.data;submit.disabled=false;status.textContent='Ready to submit · '+Math.max(1,Math.round(packed.bytes/1024))+' KB. The full image is not kept on this page.';}
+  catch(e){status.textContent=e.message;toast(e.message,true);}
+}
+async function submitPaymentProof(){
+  if(!pendingPaymentImage)return;
+  var btn=document.getElementById('submit-payment-proof'),status=document.getElementById('payment-proof-file-status');
+  btn.disabled=true;btn.textContent='Submitting…';
+  try{
+    var data=await paymentRequest({method:'POST',headers:{'Authorization':'Bearer '+paymentToken(),'Content-Type':'application/json'},body:JSON.stringify({image:pendingPaymentImage})});
+    pendingPaymentImage='';status.textContent=data.duplicate?'This receipt was already submitted.':'Receipt submitted securely. You can track its status below.';toast('Payment receipt submitted ✓');await loadPaymentHistory();
+  }catch(e){btn.disabled=false;status.textContent=e.message;toast(e.message,true);}
+  finally{btn.textContent='Submit receipt';}
+}
+document.getElementById('choose-payment-proof').addEventListener('click',function(){document.getElementById('payment-proof-file').click();});
+document.getElementById('payment-proof-file').addEventListener('change',choosePaymentProof);
+document.getElementById('submit-payment-proof').addEventListener('click',submitPaymentProof);
+document.getElementById('copy-payment-reference').addEventListener('click',async function(){
+  var value=document.getElementById('payment-reference').textContent;
+  try{await navigator.clipboard.writeText(value);toast('Payment reference copied ✓');}catch(e){prompt('Copy your payment reference:',value);}
+});
+loadPaymentHistory();
 
 // ---------- REPORT RANGE PICKER ----------
 // Report choices follow elapsed program time, not planned duration. A 12-week
@@ -1736,8 +1842,7 @@ function isIOS(){
   return (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) ||
          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
-// True only for REAL Safari on iOS. Chrome (CriOS), Firefox (FxiOS) and Edge
-// (EdgiOS) on iPhone canNOT add to the home screen — only Safari can.
+// Offer a Safari fallback for other iOS browsers; Chrome also supports installation.
 function isIOSNonSafari(){
   return isIOS() && /CriOS|FxiOS|EdgiOS|OPT\//.test(navigator.userAgent);
 }
@@ -1762,7 +1867,7 @@ function showIosHint(){
   if(ios) ios.style.display=onAndroid?'none':'block';
   if(nativeBtn) nativeBtn.style.display=(onAndroid&&deferredInstallPrompt)?'block':'none';
   if(copyBtn) copyBtn.style.display=isIOSNonSafari()?'block':'none';
-  if(subtitle) subtitle.textContent=onIOS?'Follow these Safari steps exactly.':onAndroid?'Use the install button or Chrome menu below.':'Android and iPhone installation instructions.';
+  if(subtitle) subtitle.textContent=onIOS?'Use Share in Safari or Chrome.':onAndroid?'Use the install button or Chrome menu below.':'Android and iPhone installation instructions.';
   if(note){
     if(isStandalone()){
       note.style.display='block'; note.style.color='#22c55e';
@@ -1771,7 +1876,7 @@ function showIosHint(){
     } else if(isIOSNonSafari()){
       note.style.display='block'; note.style.color='#ff6b6b';
       note.style.background='rgba(204,0,0,.10)'; note.style.border='1px solid rgba(204,0,0,.35)';
-      note.innerHTML='You’re on an <strong>iPhone using another browser</strong>. Adding to the home screen only works in <strong>Safari</strong> — open <strong>devfitportal.vercel.app</strong> in Safari, then follow the iPhone steps below.';
+      note.innerHTML='On <strong>Chrome for iPhone</strong>, tap <strong>Share → Add to Home Screen</strong>. If your browser does not offer it, copy the DevFit link and open it in Safari.';
     } else if(isIOS()){
       note.style.display='block'; note.style.color='#c4c8ce';
       note.style.background='rgba(255,255,255,.05)'; note.style.border='1px solid #2a2a2a';
@@ -1962,6 +2067,14 @@ paintThemeToggle();
 // collapsible section so the page stays short — tap a header to expand it.
 (function collapsibleGroups(){
   try{
+    // Billing is the first settings group and opens by default so payment and
+    // receipt history never get buried under profile/appearance controls.
+    var billing=document.getElementById('billing-group-title');
+    var first=document.querySelector('.group-title');
+    if(billing&&first&&billing!==first){
+      var plan=document.getElementById('card-plan'),usage=document.getElementById('card-usage'),parent=first.parentNode;
+      parent.insertBefore(billing,first);if(plan)parent.insertBefore(plan,first);if(usage)parent.insertBefore(usage,first);
+    }
     var titles=[].slice.call(document.querySelectorAll('.group-title'));
     titles.forEach(function(t,idx){
       var body=document.createElement('div'); body.className='settings-group-body';
@@ -1971,7 +2084,8 @@ paintThemeToggle();
       t.classList.add('group-toggle');
       var chev=document.createElement('span'); chev.className='group-chev'; chev.textContent='▾'; t.appendChild(chev);
       // All groups collapsed by default — tap a header to open it (max compact).
-      body.style.display='none'; t.classList.add('collapsed');
+      var open=t.id==='billing-group-title';
+      body.style.display=open?'':'none'; t.classList.toggle('collapsed',!open);
       t.addEventListener('click', function(){
         var hidden = body.style.display==='none';
         body.style.display = hidden ? '' : 'none';

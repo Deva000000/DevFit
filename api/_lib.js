@@ -97,6 +97,55 @@ const sbHeaders = () => ({
   'Content-Type': 'application/json'
 });
 
+function storagePath(bucket, path) {
+  const b = encodeURIComponent(String(bucket || ''));
+  const p = String(path || '').split('/').filter(Boolean).map(encodeURIComponent).join('/');
+  return b + '/' + p;
+}
+
+// Private Supabase Storage helpers. The service key is used only inside Vercel;
+// browsers never receive it or a permanent receipt URL.
+export async function sbStorageUpload(bucket, path, bytes, mimeType) {
+  try {
+    const r = await fetch(`${SB_URL}/storage/v1/object/${storagePath(bucket, path)}`, {
+      method: 'POST',
+      headers: {
+        apikey: SB_SERVICE, Authorization: 'Bearer ' + SB_SERVICE,
+        'Content-Type': mimeType, 'x-upsert': 'false'
+      },
+      body: bytes,
+      signal: AbortSignal.timeout(10000)
+    });
+    return r.ok;
+  } catch (_) { return false; }
+}
+
+export async function sbStorageSignedUrl(bucket, path, expiresIn = 120) {
+  try {
+    const r = await fetch(`${SB_URL}/storage/v1/object/sign/${storagePath(bucket, path)}`, {
+      method: 'POST', headers: sbHeaders(),
+      body: JSON.stringify({ expiresIn: Math.max(30, Math.min(300, Number(expiresIn) || 120)) }),
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
+    const signed = String(data.signedURL || data.signedUrl || '');
+    return signed ? (signed.startsWith('http') ? signed : SB_URL + '/storage/v1' + signed) : null;
+  } catch (_) { return null; }
+}
+
+export async function sbStorageDelete(bucket, paths) {
+  const list = (Array.isArray(paths) ? paths : [paths]).filter(Boolean).map(String);
+  if (!list.length) return true;
+  try {
+    const r = await fetch(`${SB_URL}/storage/v1/object/${encodeURIComponent(String(bucket || ''))}`, {
+      method: 'DELETE', headers: sbHeaders(), body: JSON.stringify({ prefixes: list }),
+      signal: AbortSignal.timeout(10000)
+    });
+    return r.ok;
+  } catch (_) { return false; }
+}
+
 export async function sbSelect(table, query, timeoutMs = 8000) {
   try {
     const r = await fetch(`${SB_URL}/rest/v1/${table}?${query}`, {

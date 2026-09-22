@@ -64,6 +64,11 @@
   .dev-item:last-child{border-bottom:none}
   .dev-item b{color:#ddd}
   .sub-row .tap{white-space:nowrap}
+  .payment-actions{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px}
+  .payment-actions button{padding:7px 10px;background:#242424;border:1px solid #383838;color:#ddd;font-size:11px}
+  .payment-actions button:hover{border-color:#cc0000;color:#fff}
+  .payment-actions .verify{background:#14532d;border-color:#166534;color:#dcfce7}
+  .payment-actions .reject{background:#3f1616;border-color:#7f1d1d;color:#fecaca}
   .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:none;align-items:center;justify-content:center;padding:16px}
   .modal-bg.show{display:flex}
   .modal{background:#111;border:1px solid #333;border-top:3px solid #cc0000;border-radius:14px;padding:20px;max-width:420px;width:100%}
@@ -90,9 +95,24 @@
   <div id="panel" class="hide">
     <div class="tabs">
       <button id="tab-manage" class="on">Activate & Plans</button>
+      <button id="tab-payments">Payments</button>
       <button id="tab-logins">Logins & Devices</button>
       <button id="tab-errors">Production Alerts</button>
       <button id="tab-backups">Backups</button>
+    </div>
+
+    <!-- ===== PAYMENTS VIEW ===== -->
+    <div id="view-payments" class="hide">
+      <div class="card">
+        <h2>Payment verification <span class="tap" id="refresh-payments">refresh</span></h2>
+        <div class="hint" style="margin-top:0;margin-bottom:10px">Receipts are private. Open a proof only when reviewing it, then mark it verified or rejected. Pro activation remains a separate owner action.</div>
+        <div class="list" id="payments"><div class="hint">Open this tab to load payment history.</div></div>
+      </div>
+      <div class="card hide" id="payment-proof-panel">
+        <h2 id="payment-proof-title">Payment proof</h2>
+        <img id="payment-proof-image" alt="Submitted payment receipt" style="display:block;max-width:100%;max-height:70vh;margin:12px auto;border-radius:10px;background:#fff;object-fit:contain">
+        <button class="btn" id="payment-proof-close">Close receipt</button>
+      </div>
     </div>
 
     <!-- ===== MANAGE VIEW ===== -->
@@ -276,7 +296,7 @@ async function call(action, extra){
 }
 
 /* ---------- encrypted owner backup ---------- */
-var BACKUP_TABLES=['devfit_subscribers','devfit_data','devfit_data_versions','devfit_logins','devfit_config'];
+var BACKUP_TABLES=['devfit_subscribers','devfit_data','devfit_data_versions','devfit_logins','devfit_payments','devfit_config'];
 var BACKUP_AAD='DevFit Owner Backup v1';
 function bytesToB64(bytes){
   var out='', chunk=0x8000;
@@ -788,12 +808,54 @@ async function refreshErrors(){
   else $('errors').innerHTML='<div class="hint">Failed: '+safeText(r.data.error||r.status)+'</div>';
 }
 
+/* ---------- payment proofs ---------- */
+function paymentStatus(status){
+  var s=String(status||'pending');
+  var color=s==='verified'?'#4ade80':s==='rejected'?'#ff6b6b':'#fbbf24';
+  return '<b style="color:'+color+'">'+safeText(s.toUpperCase())+'</b>';
+}
+function paymentWhen(value){
+  try{return new Date(value).toLocaleString('en-MY',{dateStyle:'medium',timeStyle:'short'});}catch(e){return '—';}
+}
+async function refreshPayments(){
+  var box=$('payments'); box.innerHTML='<div class="hint">Loading payment history…</div>';
+  var r=await call('payments');
+  if(r.status!==200){box.innerHTML='<div class="hint">Payment history could not load. Retry shortly.</div>';return;}
+  var rows=r.data.payments||[];
+  if(!rows.length){box.innerHTML='<div class="hint">No payment receipts submitted yet.</div>';return;}
+  box.innerHTML=rows.map(function(p){return '<div class="sub-row" style="display:grid;grid-template-columns:1fr auto;gap:7px 12px">'+
+    '<span style="display:block;color:#fff;font-size:13px;font-weight:700;min-width:0;overflow-wrap:anywhere" title="'+safeText(p.email)+'">'+safeText(p.email)+'</span>'+paymentStatus(p.status)+
+    '<span class="win" style="grid-column:1/-1">'+safeText(p.reference)+' · '+safeText(paymentWhen(p.uploaded_at))+' · '+Math.max(1,Math.round((p.byte_size||0)/1024))+' KB</span>'+
+    '<span class="payment-actions">'+
+      '<button data-pay-proof="'+safeText(p.id)+'">View receipt</button>'+
+      '<button class="verify" data-pay-review="'+safeText(p.id)+'" data-status="verified">Mark verified</button>'+
+      '<button class="reject" data-pay-review="'+safeText(p.id)+'" data-status="rejected">Reject</button>'+
+      '<button data-pay-manage="'+encodeURIComponent(p.email)+'">Manage account</button>'+
+    '</span></div>';}).join('');
+  Array.prototype.forEach.call(box.querySelectorAll('[data-pay-proof]'),function(btn){btn.addEventListener('click',async function(){
+    btn.disabled=true;var r=await call('paymentProof',{id:btn.getAttribute('data-pay-proof')});btn.disabled=false;
+    if(r.status===200&&r.data.url){$('payment-proof-image').src=r.data.url;$('payment-proof-title').textContent='Payment proof · private link expires in 2 minutes';$('payment-proof-panel').classList.remove('hide');$('payment-proof-panel').scrollIntoView({behavior:'smooth'});}
+    else alert('Receipt could not be opened. Please retry.');
+  });});
+  Array.prototype.forEach.call(box.querySelectorAll('[data-pay-review]'),function(btn){btn.addEventListener('click',async function(){
+    btn.disabled=true;var r=await call('reviewPayment',{id:btn.getAttribute('data-pay-review'),status:btn.getAttribute('data-status')});
+    if(r.status===200)refreshPayments();else{btn.disabled=false;alert('Payment status could not be saved.');}
+  });});
+  Array.prototype.forEach.call(box.querySelectorAll('[data-pay-manage]'),function(btn){btn.addEventListener('click',function(){
+    var em=decodeURIComponent(btn.getAttribute('data-pay-manage'));$('email').value=em;
+    var s=currentSubs.filter(function(x){return x.email===em;})[0];
+    if(s){if(s.start_date)$('start').value=s.start_date;if(s.expiry)$('end').value=s.expiry;if(s.name)$('name').value=s.name;updateDuration();}
+    showTab('manage');$('email').scrollIntoView({behavior:'smooth'});
+  });});
+}
+
 /* ---------- tabs ---------- */
 function showTab(which){
   var m=which==='manage';
-  var l=which==='logins', e=which==='errors', b=which==='backups';
-  $('tab-manage').classList.toggle('on',m); $('tab-logins').classList.toggle('on',l); $('tab-errors').classList.toggle('on',e); $('tab-backups').classList.toggle('on',b);
-  $('view-manage').classList.toggle('hide',!m); $('view-logins').classList.toggle('hide',!l); $('view-errors').classList.toggle('hide',!e); $('view-backups').classList.toggle('hide',!b);
+  var p=which==='payments', l=which==='logins', e=which==='errors', b=which==='backups';
+  $('tab-manage').classList.toggle('on',m); $('tab-payments').classList.toggle('on',p); $('tab-logins').classList.toggle('on',l); $('tab-errors').classList.toggle('on',e); $('tab-backups').classList.toggle('on',b);
+  $('view-manage').classList.toggle('hide',!m); $('view-payments').classList.toggle('hide',!p); $('view-logins').classList.toggle('hide',!l); $('view-errors').classList.toggle('hide',!e); $('view-backups').classList.toggle('hide',!b);
+  if(p) refreshPayments();
   if(l) refreshLogins();
   if(e) refreshErrors();
 }
@@ -869,11 +931,14 @@ $('logout-btn').addEventListener('click', async function(){ await call('logout')
 $('refresh').addEventListener('click', refreshList);
 $('refresh-logins').addEventListener('click', refreshLogins);
 $('refresh-errors').addEventListener('click', refreshErrors);
+$('refresh-payments').addEventListener('click', refreshPayments);
+$('payment-proof-close').addEventListener('click',function(){$('payment-proof-image').removeAttribute('src');$('payment-proof-panel').classList.add('hide');});
 $('backup-download').addEventListener('click', downloadOwnerBackup);
 $('backup-verify').addEventListener('click', verifyOwnerBackup);
 $('delete-preview').addEventListener('click', previewAccountDeletion);
 $('delete-account').addEventListener('click', deleteAccountPermanently);
 $('tab-manage').addEventListener('click', function(){ showTab('manage'); });
+$('tab-payments').addEventListener('click', function(){ showTab('payments'); });
 $('tab-logins').addEventListener('click', function(){ showTab('logins'); });
 $('tab-errors').addEventListener('click', function(){ showTab('errors'); });
 $('tab-backups').addEventListener('click', function(){ showTab('backups'); });

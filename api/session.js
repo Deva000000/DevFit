@@ -13,8 +13,9 @@
 import crypto from 'crypto';
 import {
   haveServerConfig, identityFromGoogleIdToken,
-  getSubscriber, computeTier, signToken, rateLimit, clientIp, readJsonBody, recordLogin, sbUpsert,
-  recordServerEvent, setApiSecurityHeaders, sameOriginIfPresent
+  getSubscriber, computeTier, signToken, rateLimit, clientIp, readJsonBody, sbUpsert,
+  recordServerEvent, setApiSecurityHeaders, sameOriginIfPresent, checkSecurityAccess,
+  guardInvalidAuth
 } from './_lib.js';
 
 export default async function handler(req, res) {
@@ -49,6 +50,12 @@ export default async function handler(req, res) {
   verifiedName = identity && identity.name;
   if (!email) {
     await recordServerEvent('login_failure', 'Google identity verification failed', { page: '/api/session', status: 401, ua: req.headers['user-agent'] });
+    const invalid = await guardInvalidAuth(req, '/api/session');
+    if (invalid.blocked) {
+      res.setHeader('Retry-After', String(invalid.retryAfter));
+      res.status(invalid.unavailable ? 503 : 429).json({ error: invalid.unavailable ? 'login_temporarily_unavailable' : 'rate_limited' });
+      return;
+    }
     res.status(401).json({ error: 'invalid_identity' }); return;
   }
 
@@ -60,10 +67,23 @@ export default async function handler(req, res) {
     res.status(429).json({ error: 'rate_limited', retryAfter: accountRate.retryAfter }); return;
   }
 
-  // Record the login for every verified identity — including people who aren't
-  // subscribers yet — so the trainer has full visibility of who signed in and
-  // from which device (two phones / phone+tablet+laptop all show up).
-  await recordLogin(email, body.deviceId, req.headers['user-agent'], true);
+  // Bind the signed session to this installation and stop ordinary account
+  // resale/sharing at a fourth active device. Existing registered devices are
+  // grandfathered so rollout never ejects a current customer.
+  const security = await checkSecurityAccess(req, email, body.deviceId, {
+    route: '/api/session', register: true, isLogin: true
+  });
+  if (security.status === 'unavailable') {
+    res.status(503).json({ error: 'login_temporarily_unavailable' }); return;
+  }
+  if (security.status !== 'ok') {
+    const limited = security.status === 'device_limit';
+    res.status(403).json({
+      error: limited ? 'device_limit' : 'account_blocked',
+      maxDevices: limited ? 3 : undefined
+    });
+    return;
+  }
 
   // OPEN SIGNUP: DevFit is free to join. Any verified email that has no record yet
   // is auto-provisioned a Free account, so anyone can sign in. Pro is the paid
@@ -90,7 +110,7 @@ export default async function handler(req, res) {
   if (!sub.approved) { res.status(200).json({ approved: false, status: 'pending' }); return; }
 
   const tier = computeTier(sub);
-  const signed = signToken({ email, tier, expiry: sub.expiry || '', startDate: sub.start_date || '' });
+  const signed = signToken({ email, did: security.deviceHash, tier, expiry: sub.expiry || '', startDate: sub.start_date || '' });
 
   res.status(200).json({
     approved: true,

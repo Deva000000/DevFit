@@ -16,7 +16,12 @@
     if (previous && Date.now() - previous.at < TTL) return response(previous.data);
     if (pending.has(key)) return (await pending.get(key)).clone();
     const promise = (async () => {
-      const r = await fetch(url, { signal: AbortSignal.timeout(15000), cache: 'no-store', headers: { Authorization: 'Bearer ' + token } });
+      let deviceId = 'unknown';
+      try { deviceId = (global.localStorage && global.localStorage.getItem('devfit_device_id')) || 'unknown'; } catch (_) {}
+      const r = await fetch(url, {
+        signal: AbortSignal.timeout(15000), cache: 'no-store',
+        headers: { Authorization: 'Bearer ' + token, 'X-DevFit-Device': deviceId }
+      });
       if (r.ok) {
         const data = await r.clone().json();
         const list = data.products || data.foods || data.data;

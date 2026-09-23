@@ -18,26 +18,33 @@ on your existing Vercel project.
 | `api/session.js` | Login → verifies identity, returns a **signed** session token |
 | `api/google-login.js` | Secure Google redirect callback required by iPhone/iPad |
 | `api/verify.js` | Every page load → validates the token, returns live tier |
-| `api/admin.js` | Password-gated activation backend (rate-limited) |
-| `admin.html` | DevFit panel — activate/extend/revoke clients and view production alerts |
+| `api/admin.js` | Password-gated owner backend (rate-limited) |
+| `admin.html` | Owner panel — plans, receipts, support, alerts, devices and blocklist |
 | `devfit-auth.js` | Shared client gate used by all app pages |
 
 Wired into: `login.html`, `index.html`, `nutrition.html`, `workouts.html`,
-`settings.html`. Current service worker release is **v4.87.3**.
+`settings.html`. Current service worker release is **v4.92.0**.
 
 ---
 
-## Rollout is safe by design
+## Current production security model
 
-The client runs in **transition mode** first. If the backend isn't configured,
-every endpoint returns `501` and the app **falls back to the current Sheet
-behaviour** — so you can deploy this commit right now and **no one is locked
-out**. You only get the security benefit after the steps below, and you flip on
-"strict" enforcement as the final step.
+Strict server verification is enabled. Google proves the Gmail identity, DevFit
+issues a signed session bound to the browser installation, and every protected
+request re-checks the account on the server. Free/Pro status is never accepted
+from localStorage or request-body email. Existing pre-device-binding sessions are
+upgraded during normal verification without forcing customers to log in again.
 
 ---
 
-## Step 1 — Supabase: create the tables
+## Step 1 — Supabase schema
+
+The committed files in `supabase/migrations/` are the schema source of truth.
+Do not copy isolated table snippets into production; apply the ordered migrations
+so RLS, grants, atomic save/delete functions, payment/support privacy, security
+events, device enforcement and the blocklist stay aligned.
+
+The original baseline was:
 
 Supabase dashboard → **SQL Editor** → run:
 
@@ -179,33 +186,25 @@ Two options:
 4. Try the old hack: set `devfit_user.tier='pro'` for a Free account, reload →
    with the backend live, `/api/verify` corrects it back to Free.
 
-## Step 5 — Turn on strict enforcement
+## Step 5 — Verify enforcement
 
-In `devfit-auth.js`, change:
+`devfit-auth.js` is already in strict mode. Test a Free account, a Pro account,
+a revoked account, a replaced phone after an owner device reset, and a fourth
+new device. The first three active devices are allowed; a fourth is denied and
+appears in Admin → Security & Blocklist.
 
-```js
-var STRICT = false;   →   var STRICT = true;
-```
+## Incident response
 
-Bump the service worker version (`sw.js`: `VERSION` + top comment) and redeploy.
-Now an invalid/absent token **while online** forces re-login. (Offline still
-trusts the cached session — that's required for the PWA to work offline, and is
-the documented Layer-1 limit.)
-
-> **One-time re-login:** existing users logged in *before* this system only
-> have a session, not a signed token. The moment you flip strict, each of them
-> is asked to log in once with Google, which mints their token.
-> Expected and harmless — just don't flip it in the middle of a busy day.
-
-## Rollback
-
-If anything misbehaves: unset `DEVFIT_JWT_SECRET` in Vercel and redeploy. Every
-endpoint returns `501`, the client falls back to the Sheet path, and you're
-exactly where you started. No data is lost — `devfit_subscribers` just sits idle.
+Do not remove `DEVFIT_JWT_SECRET` as a routine rollback; that disables signed
+session verification. Revert the application commit, preserve the database, and
+use Admin → Security & Blocklist to revoke a confirmed abusive account or reset
+trusted devices for a legitimate customer.
 
 ## Honest scope
 
-Layer 1 stops **persistent** forgery (faked localStorage that survives reload)
-and hides the backend secret. It does **not** stop someone overriding `isPro()`
-live in their own console for a single session — that resets on reload and would
-require the Layer-3 server-rendered rewrite you chose to skip.
+Server enforcement stops forged sessions, cross-account data access, API use by
+revoked accounts, and changes to the authoritative Pro subscription. A browser
+owner can always alter pixels or JavaScript on their own screen, so DevFit does
+not use unreliable DevTools detection or auto-ban people for opening developer
+tools. Any premium computation that must be impossible to reproduce locally must
+eventually run on the server; frontend code can be inspected by design.

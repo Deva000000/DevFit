@@ -483,14 +483,14 @@ test('permanent account deletion requires exact confirmation and verifies zero r
       rpcCalls++;
       return { ok: true, json: async () => ({ email: 'person@gmail.com', subscribers: 1, currentData: 3, recoveryVersions: 5, devices: 2, payments: 1, supportRequests: 1 }) };
     }
-    if (/\/rest\/v1\/devfit_(subscribers|data|data_versions|logins|records|payments|support_requests)\?/.test(target) && method === 'GET') return { ok: true, json: async () => [] };
+    if (/\/rest\/v1\/devfit_(subscribers|data|data_versions|logins|records|payments|support_requests|security_events|security_blocks)\?/.test(target) && method === 'GET') return { ok: true, json: async () => [] };
     throw new Error('unexpected request ' + method + ' ' + target);
   };
   const deleted = await run({ confirmEmail: 'person@gmail.com', confirmation: 'DELETE DEVFIT ACCOUNT' });
   assert.equal(deleted.status, 200);
   assert.equal(deleted.body.ok, true);
   assert.equal(rpcCalls, 1);
-  assert.deepEqual(deleted.body.remaining, { subscribers: 0, currentData: 0, recoveryVersions: 0, devices: 0, records: 0, payments: 0, supportRequests: 0 });
+  assert.deepEqual(deleted.body.remaining, { subscribers: 0, currentData: 0, recoveryVersions: 0, devices: 0, records: 0, payments: 0, supportRequests: 0, securityEvents: 0, securityBlocks: 0 });
 
   const migration = fs.readFileSync(new URL('../supabase/migrations/20260817163640_atomic_account_deletion.sql', import.meta.url), 'utf8');
   assert.match(migration, /security definer/);
@@ -575,7 +575,7 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
   assert.match(settings, /<div class="title">Install DevFit App<\/div>/);
   assert.match(settings, /if\(!deferredInstallPrompt\)\{\s*showIosHint\(\)/);
   assert.equal(manifest.display, 'standalone');
-  assert.match(worker, /devfit-v4\.91\.0/);
+  assert.match(worker, /devfit-v4\.92\.0/);
   assert.doesNotMatch(worker, /\.then\(\(\) => self\.skipWaiting\(\)\)/);
 
   for (const html of [index, settings]) {
@@ -827,9 +827,9 @@ test('settings install guide is device-focused and exposes real platform actions
 test('verification records only the signed token email', () => {
   const source = fs.readFileSync(new URL('../api/verify.js', import.meta.url), 'utf8');
   const verifiedAt = source.indexOf('const payload = verifyToken(bearerToken(req) || body.token)');
-  const recordedAt = source.indexOf('recordLogin(payload.email');
+  const recordedAt = source.indexOf('checkSecurityAccess(req, payload.email');
   assert.ok(verifiedAt >= 0 && recordedAt > verifiedAt);
-  assert.doesNotMatch(source, /recordLogin\(body\.email/);
+  assert.doesNotMatch(source, /checkSecurityAccess\(req, body\.email/);
 });
 
 test('paid reports use the adaptive premium renderer and never plot missing values as zero', () => {

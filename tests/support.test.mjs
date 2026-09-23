@@ -34,12 +34,12 @@ async function run(body = {}, signed = true) {
 
 test('support requests require a signed DevFit account', async () => {
   const original = globalThis.fetch;
-  let calls = 0;
-  globalThis.fetch = async () => { calls++; throw new Error('unsigned request reached storage'); };
+  const calls = [];
+  globalThis.fetch = async (url) => { calls.push(String(url)); throw new Error('unsigned request reached storage'); };
   try {
     const result = await run({ op: 'submitSupport', whatsapp: '+60183679177', message: 'Please help with login.' }, false);
     assert.equal(result.status, 401);
-    assert.equal(calls, 0);
+    assert.ok(calls.every((url) => url.includes('/rpc/consume_devfit_rate_limit')));
   } finally { globalThis.fetch = original; }
 });
 

@@ -78,7 +78,10 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       cache: 'no-store',
-      body: JSON.stringify(Object.assign({ op: op }, extra || {}))
+      body: JSON.stringify(Object.assign({
+        op: op,
+        deviceId: localStorage.getItem('devfit_device_id') || 'unknown'
+      }, extra || {}))
     });
     if (res.status === 501 || res.status === 401) return { skip: true, status: res.status };
     if (res.status === 409) {

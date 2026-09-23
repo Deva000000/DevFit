@@ -18,7 +18,7 @@ import {
   haveServerConfig, sbSelect, sbUpsert, sbPatch, sbRpc, getSubscriber,
   rateLimit, clientIp, readJsonBody, listLogins, sameSiteOnly,
   signAdminSession, verifyAdminSession, cookieValue, setApiSecurityHeaders,
-  sbStorageSignedUrl, sbStorageDelete
+  sbStorageSignedUrl, sbStorageDelete, sha256Hex, recordSecurityEvent
 } from './_lib.js';
 import { getSupportRequest, sendSupportNotification } from './_support.js';
 
@@ -30,6 +30,8 @@ const BACKUP_TABLES = {
   devfit_logins: 'email.asc,device_id.asc',
   devfit_payments: 'email.asc,uploaded_at.asc',
   devfit_support_requests: 'email.asc,created_at.asc',
+  devfit_security_events: 'id.asc',
+  devfit_security_blocks: 'created_at.asc',
   devfit_config: 'id.asc'
 };
 const BACKUP_PAGE_ROWS = 50;
@@ -57,7 +59,9 @@ async function deletionCounts(email) {
     sbSelect('devfit_logins', 'email=eq.' + encoded + '&select=device_id'),
     sbSelect('devfit_records', 'email=eq.' + encoded + '&select=record_key'),
     sbSelect('devfit_payments', 'email=eq.' + encoded + '&select=id,storage_path'),
-    sbSelect('devfit_support_requests', 'email=eq.' + encoded + '&select=id')
+    sbSelect('devfit_support_requests', 'email=eq.' + encoded + '&select=id'),
+    sbSelect('devfit_security_events', 'email=eq.' + encoded + '&select=id'),
+    sbSelect('devfit_security_blocks', 'email=eq.' + encoded + '&select=id')
   ]);
   if (results.some((rows) => !Array.isArray(rows))) return null;
   return {
@@ -68,6 +72,8 @@ async function deletionCounts(email) {
     records: results[4].length,
     payments: results[5].length,
     supportRequests: results[6].length,
+    securityEvents: results[7].length,
+    securityBlocks: results[8].length,
     paymentPaths: results[5].map((row) => row.storage_path).filter(Boolean)
   };
 }
@@ -91,6 +97,12 @@ export default async function handler(req, res) {
       // login/data routes remain independent of this admin-only safeguard.
       if (rl.unavailable) { res.status(503).json({ error: 'security_store_unavailable' }); return; }
       if (!rl.ok) {
+        if (!rl.currentHits || rl.currentHits === 11) {
+          await recordSecurityEvent({
+            ipHash: sha256Hex(clientIp(req)), type: 'admin_login_rate', severity: 'high',
+            route: '/api/admin', reason: 'Repeated invalid owner-password attempts', blocked: true
+          });
+        }
         res.setHeader('Retry-After', String(Math.max(1, rl.retryAfter || 1)));
         res.status(429).json({ error: 'rate_limited', retryAfter: rl.retryAfter }); return;
       }
@@ -131,6 +143,61 @@ export default async function handler(req, res) {
     if (action === 'errors') {
       const rows = await sbSelect('devfit_errors', 'select=*&order=at.desc&limit=100');
       res.status(200).json({ errors: rows || [] });
+      return;
+    }
+
+    if (action === 'security') {
+      const [events, blocks] = await Promise.all([
+        sbSelect('devfit_security_events', 'select=id,email,device_hash,ip_hash,event_type,severity,route,reason,blocked,at&order=at.desc&limit=250'),
+        sbSelect('devfit_security_blocks', 'select=id,scope,key_hash,email,reason,active,expires_at,created_at,released_at&order=created_at.desc&limit=250')
+      ]);
+      if (!Array.isArray(events) || !Array.isArray(blocks)) {
+        res.status(503).json({ error: 'security_store_unavailable' }); return;
+      }
+      res.status(200).json({ events, blocks });
+      return;
+    }
+
+    if (action === 'securityBlock') {
+      const scope = String(body.scope || '');
+      const reason = String(body.reason || '').trim().slice(0, 500);
+      const blockEmail = String(body.email || '').trim().toLowerCase();
+      let keyHash = String(body.keyHash || '').trim().toLowerCase();
+      if (!['account', 'device', 'ip'].includes(scope) || reason.length < 3) {
+        res.status(400).json({ error: 'invalid_security_block' }); return;
+      }
+      if (scope === 'account') {
+        if (!blockEmail || blockEmail.length > 254 || !blockEmail.includes('@')) {
+          res.status(400).json({ error: 'invalid_security_block' }); return;
+        }
+        keyHash = sha256Hex(blockEmail);
+      } else if (!/^[0-9a-f]{64}$/.test(keyHash)) {
+        res.status(400).json({ error: 'invalid_security_block' }); return;
+      }
+      const saved = await sbRpc('block_devfit_security_identity', {
+        p_scope: scope, p_key_hash: keyHash, p_email: blockEmail, p_reason: reason
+      });
+      if (!saved) { res.status(503).json({ error: 'security_block_failed' }); return; }
+      res.status(200).json({ ok: true, block: saved });
+      return;
+    }
+
+    if (action === 'securityUnblock') {
+      const id = String(body.id || '');
+      if (!/^[0-9a-f-]{36}$/i.test(id)) { res.status(400).json({ error: 'invalid_security_block' }); return; }
+      const saved = await sbPatch('devfit_security_blocks', 'id=eq.' + encodeURIComponent(id), {
+        active: false, released_at: new Date().toISOString()
+      });
+      if (!Array.isArray(saved) || !saved[0]) { res.status(404).json({ error: 'security_block_not_found' }); return; }
+      res.status(200).json({ ok: true, block: saved[0] });
+      return;
+    }
+
+    if (action === 'securityResetDevices') {
+      if (!email || !email.includes('@')) { res.status(400).json({ error: 'missing_email' }); return; }
+      const removed = await sbRpc('reset_devfit_devices', { p_email: email });
+      if (!Number.isFinite(Number(removed))) { res.status(503).json({ error: 'device_reset_failed' }); return; }
+      res.status(200).json({ ok: true, removed: Number(removed) });
       return;
     }
 
@@ -264,7 +331,7 @@ export default async function handler(req, res) {
       const deleted = await sbRpc('delete_devfit_account', { p_email: email });
       if (!deleted || deleted.email !== email) { res.status(500).json({ error: 'delete_failed' }); return; }
       const remaining = await deletionCounts(email);
-      if (!remaining || ['subscribers','currentData','recoveryVersions','devices','records','payments','supportRequests']
+      if (!remaining || ['subscribers','currentData','recoveryVersions','devices','records','payments','supportRequests','securityEvents','securityBlocks']
         .some((key) => remaining[key] !== 0)) {
         res.status(500).json({ error: 'delete_verification_failed', remaining }); return;
       }

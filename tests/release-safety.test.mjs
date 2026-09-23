@@ -89,7 +89,7 @@ test('food search requires a signed session and fails closed if durable limits a
     globalThis.fetch = async () => { calls++; throw new Error('must not be called'); };
     const denied = await foodSearchIdentity({ headers: {} });
     assert.deepEqual(denied, { ok: false, status: 401, error: 'sign_in_required' });
-    assert.equal(calls, 0);
+    assert.equal(calls, 1, 'unsigned abuse tracking may touch only the durable rate limiter');
 
     const valid = signToken({ email: 'food@example.com' });
     const req = { headers: { authorization: 'Bearer ' + valid, 'x-forwarded-for': '203.0.113.6' } };

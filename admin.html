@@ -98,8 +98,33 @@
       <button id="tab-payments">Payments</button>
       <button id="tab-support">Support</button>
       <button id="tab-logins">Logins & Devices</button>
+      <button id="tab-security">Security & Blocklist</button>
       <button id="tab-errors">Production Alerts</button>
       <button id="tab-backups">Backups</button>
+    </div>
+
+    <!-- ===== SECURITY VIEW ===== -->
+    <div id="view-security" class="hide">
+      <div class="card">
+        <h2>Security controls <span class="tap" id="refresh-security">refresh</span></h2>
+        <div class="hint" style="margin-top:0;margin-bottom:12px">DevFit allows up to <b>3 active devices per account</b>. A fourth new device is denied and recorded. Block only confirmed abuse—not ordinary browser tools, connection failures or phone replacements.</div>
+        <label>Account Gmail</label>
+        <input type="email" id="security-email" autocomplete="off" placeholder="client@gmail.com">
+        <div class="actions" style="margin-top:10px">
+          <button class="b-red" id="security-block-account">Block account</button>
+          <button class="b-amber" id="security-reset-devices">Reset trusted devices</button>
+        </div>
+        <div class="msg" id="security-msg"></div>
+        <div class="hint"><b>Reset devices</b> is the safe fix after a customer replaces a phone or clears browser data. <b>Block account</b> immediately revokes app access and Pro status. Unblocking does not automatically reactivate access; use Activate &amp; Plans after reviewing it.</div>
+      </div>
+      <div class="card">
+        <h2>Active blocklist</h2>
+        <div class="list" id="security-blocks"><div class="hint">Open this tab to load blocks.</div></div>
+      </div>
+      <div class="card">
+        <h2>Recent security activity</h2>
+        <div class="list" id="security-events"><div class="hint">Open this tab to load events.</div></div>
+      </div>
     </div>
 
     <!-- ===== SUPPORT VIEW ===== -->
@@ -306,7 +331,7 @@ async function call(action, extra){
 }
 
 /* ---------- encrypted owner backup ---------- */
-var BACKUP_TABLES=['devfit_subscribers','devfit_data','devfit_data_versions','devfit_logins','devfit_payments','devfit_support_requests','devfit_config'];
+var BACKUP_TABLES=['devfit_subscribers','devfit_data','devfit_data_versions','devfit_logins','devfit_payments','devfit_support_requests','devfit_security_events','devfit_security_blocks','devfit_config'];
 var BACKUP_AAD='DevFit Owner Backup v1';
 function bytesToB64(bytes){
   var out='', chunk=0x8000;
@@ -899,15 +924,80 @@ async function refreshSupport(){
   });});
 }
 
+/* ---------- security & blocklist ---------- */
+function shortHash(value){var s=String(value||'');return s?s.slice(0,10)+'…':'—';}
+async function securityBlock(scope,keyHash,email){
+  var label=scope==='account'?(email||'this account'):scope+' '+shortHash(keyHash);
+  var reason=prompt('Reason for blocking '+label+':','Confirmed account sharing or abuse');
+  if(reason===null)return;
+  reason=reason.trim();if(reason.length<3){alert('Add a clear reason before blocking.');return;}
+  var r=await call('securityBlock',{scope:scope,keyHash:keyHash||'',email:email||'',reason:reason});
+  if(r.status===200){msg($('security-msg'),'Blocked '+label+' immediately.',true);refreshSecurity();}
+  else msg($('security-msg'),'Could not apply block: '+(r.data.error||r.status),false);
+}
+async function securityResetDevices(email){
+  email=String(email||$('security-email').value||'').trim().toLowerCase();
+  if(!email||email.indexOf('@')<0){msg($('security-msg'),'Enter a valid account Gmail.',false);return;}
+  if(!confirm('Reset all trusted devices for '+email+'? They can sign in again on up to 3 devices.'))return;
+  var r=await call('securityResetDevices',{email:email});
+  if(r.status===200){msg($('security-msg'),'Reset '+r.data.removed+' trusted device record(s) for '+email+'.',true);refreshSecurity();}
+  else msg($('security-msg'),'Could not reset devices: '+(r.data.error||r.status),false);
+}
+function renderSecurity(blocks,events){
+  var active=(blocks||[]).filter(function(b){return b.active;});
+  var blockBox=$('security-blocks');
+  if(!active.length)blockBox.innerHTML='<div class="hint">No active blocks.</div>';
+  else blockBox.innerHTML=active.map(function(b){
+    var who=b.email||shortHash(b.key_hash);
+    return '<div class="sub-row" style="display:block"><b style="color:#fca5a5">'+safeText(String(b.scope||'').toUpperCase())+'</b> '+safeText(who)+
+      '<br><span class="hint">'+safeText(b.reason)+' · '+safeText(paymentWhen(b.created_at))+'</span><br>'+
+      '<span class="payment-actions"><button data-security-unblock="'+safeText(b.id)+'">Unblock</button></span></div>';
+  }).join('');
+
+  var eventBox=$('security-events');
+  if(!events||!events.length)eventBox.innerHTML='<div class="hint">No suspicious activity recorded.</div>';
+  else eventBox.innerHTML=events.map(function(e){
+    var controls='';
+    if(e.email)controls+='<button data-security-account="'+encodeURIComponent(e.email)+'">Block account</button>';
+    if(e.device_hash)controls+='<button data-security-device="'+safeText(e.device_hash)+'">Block device</button>';
+    if(e.ip_hash)controls+='<button data-security-ip="'+safeText(e.ip_hash)+'">Block network</button>';
+    return '<div class="sub-row" style="display:block"><b style="color:'+(e.severity==='high'?'#fca5a5':'#fbbf24')+'">'+safeText(String(e.event_type||'security').replace(/_/g,' '))+'</b> '+
+      (e.email?'<span style="overflow-wrap:anywhere">'+safeText(e.email)+'</span>':'')+
+      '<br><span class="hint">'+safeText(e.reason||'Request denied')+' · '+safeText(e.route||'')+' · '+safeText(paymentWhen(e.at))+'</span>'+
+      (controls?'<br><span class="payment-actions">'+controls+'</span>':'')+'</div>';
+  }).join('');
+
+  Array.prototype.forEach.call(blockBox.querySelectorAll('[data-security-unblock]'),function(btn){btn.addEventListener('click',async function(){
+    if(!confirm('Remove this block? Account access is not automatically reactivated.'))return;
+    btn.disabled=true;var r=await call('securityUnblock',{id:btn.getAttribute('data-security-unblock')});
+    if(r.status===200){msg($('security-msg'),'Block removed. Reactivate the account separately if appropriate.',true);refreshSecurity();}
+    else{btn.disabled=false;msg($('security-msg'),'Could not remove block.',false);}
+  });});
+  Array.prototype.forEach.call(eventBox.querySelectorAll('[data-security-account]'),function(btn){btn.addEventListener('click',function(){securityBlock('account','',decodeURIComponent(btn.getAttribute('data-security-account')));});});
+  Array.prototype.forEach.call(eventBox.querySelectorAll('[data-security-device]'),function(btn){btn.addEventListener('click',function(){securityBlock('device',btn.getAttribute('data-security-device'),'');});});
+  Array.prototype.forEach.call(eventBox.querySelectorAll('[data-security-ip]'),function(btn){btn.addEventListener('click',function(){securityBlock('ip',btn.getAttribute('data-security-ip'),'');});});
+}
+async function refreshSecurity(){
+  $('security-blocks').innerHTML='<div class="hint">Loading blocklist…</div>';
+  $('security-events').innerHTML='<div class="hint">Loading security activity…</div>';
+  var r=await call('security');
+  if(r.status===200)renderSecurity(r.data.blocks||[],r.data.events||[]);
+  else{
+    $('security-blocks').innerHTML='<div class="hint">Security data could not load.</div>';
+    $('security-events').innerHTML='<div class="hint">Retry shortly.</div>';
+  }
+}
+
 /* ---------- tabs ---------- */
 function showTab(which){
   var m=which==='manage';
-  var p=which==='payments', s=which==='support', l=which==='logins', e=which==='errors', b=which==='backups';
-  $('tab-manage').classList.toggle('on',m); $('tab-payments').classList.toggle('on',p); $('tab-support').classList.toggle('on',s); $('tab-logins').classList.toggle('on',l); $('tab-errors').classList.toggle('on',e); $('tab-backups').classList.toggle('on',b);
-  $('view-manage').classList.toggle('hide',!m); $('view-payments').classList.toggle('hide',!p); $('view-support').classList.toggle('hide',!s); $('view-logins').classList.toggle('hide',!l); $('view-errors').classList.toggle('hide',!e); $('view-backups').classList.toggle('hide',!b);
+  var p=which==='payments', s=which==='support', l=which==='logins', q=which==='security', e=which==='errors', b=which==='backups';
+  $('tab-manage').classList.toggle('on',m); $('tab-payments').classList.toggle('on',p); $('tab-support').classList.toggle('on',s); $('tab-logins').classList.toggle('on',l); $('tab-security').classList.toggle('on',q); $('tab-errors').classList.toggle('on',e); $('tab-backups').classList.toggle('on',b);
+  $('view-manage').classList.toggle('hide',!m); $('view-payments').classList.toggle('hide',!p); $('view-support').classList.toggle('hide',!s); $('view-logins').classList.toggle('hide',!l); $('view-security').classList.toggle('hide',!q); $('view-errors').classList.toggle('hide',!e); $('view-backups').classList.toggle('hide',!b);
   if(p) refreshPayments();
   if(s) refreshSupport();
   if(l) refreshLogins();
+  if(q) refreshSecurity();
   if(e) refreshErrors();
 }
 
@@ -981,6 +1071,9 @@ $('pw').addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); 
 $('logout-btn').addEventListener('click', async function(){ await call('logout'); $('pw').value=''; $('panel').classList.add('hide'); $('login-card').classList.remove('hide'); });
 $('refresh').addEventListener('click', refreshList);
 $('refresh-logins').addEventListener('click', refreshLogins);
+$('refresh-security').addEventListener('click', refreshSecurity);
+$('security-block-account').addEventListener('click',function(){var email=($('security-email').value||'').trim().toLowerCase();if(!email||email.indexOf('@')<0){msg($('security-msg'),'Enter a valid account Gmail.',false);return;}securityBlock('account','',email);});
+$('security-reset-devices').addEventListener('click',function(){securityResetDevices();});
 $('refresh-errors').addEventListener('click', refreshErrors);
 $('refresh-payments').addEventListener('click', refreshPayments);
 $('refresh-support').addEventListener('click', refreshSupport);
@@ -993,6 +1086,7 @@ $('tab-manage').addEventListener('click', function(){ showTab('manage'); });
 $('tab-payments').addEventListener('click', function(){ showTab('payments'); });
 $('tab-support').addEventListener('click', function(){ showTab('support'); });
 $('tab-logins').addEventListener('click', function(){ showTab('logins'); });
+$('tab-security').addEventListener('click', function(){ showTab('security'); });
 $('tab-errors').addEventListener('click', function(){ showTab('errors'); });
 $('tab-backups').addEventListener('click', function(){ showTab('backups'); });
 $('start').addEventListener('change', updateDuration);

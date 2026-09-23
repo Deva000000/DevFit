@@ -17,8 +17,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DevFit — Settings</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Inter:ital,wght@1,700;1,800&family=Lora:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600;1,700&family=Anton&family=Righteous&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<script>if(typeof Chart==='undefined'){document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"><\/script>')}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js" integrity="sha384-dug+JxfBvklEQdJ4AYuBBAIScUz0bVN73xpy273gcAwHjb3qI0fXmuYNaNfdyYJG" crossorigin="anonymous"></script>
+<script>if(typeof Chart==='undefined'){document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"><\/script>')}</script>
 <script src="pdf-loader.js"></script>
 <script src="progress-model.js"></script><!-- versioned programs + safe account merge -->
 <script src="scoring.js"></script><!-- shared scoring engine (app score === report score) -->
@@ -920,7 +920,7 @@ function paintPaymentHistory(rows){
 }
 async function paymentRequest(op,payload){
   var token=paymentToken(); if(!token)throw new Error('Sign in again to continue.');
-  var body=Object.assign({op:op},payload||{});
+  var body=Object.assign({op:op,deviceId:localStorage.getItem('devfit_device_id')||'unknown'},payload||{});
   var res=await fetch('/api/data',{method:'POST',cache:'no-store',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(body)});
   var data=await res.json().catch(function(){return {};});
   if(!res.ok){
@@ -1007,7 +1007,7 @@ loadPaymentHistory();
     sendBtn.disabled=true;sendBtn.textContent='Sending…';resultEl.className='support-result';
     try{
       var token=paymentToken();if(!token)throw new Error('Sign in again to send your request.');
-      var response=await fetch('/api/data',{method:'POST',cache:'no-store',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({op:'submitSupport',category:category,whatsapp:whatsapp,message:message})});
+      var response=await fetch('/api/data',{method:'POST',cache:'no-store',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({op:'submitSupport',deviceId:localStorage.getItem('devfit_device_id')||'unknown',category:category,whatsapp:whatsapp,message:message})});
       var data=await response.json().catch(function(){return {};});
       if(!response.ok){
         var errors={invalid_whatsapp:'Enter a valid WhatsApp number, including the country code.',invalid_support_message:'Your message must be between 10 and 2,000 characters.',support_limit_reached:'You have sent several requests recently. Please wait before trying again.',account_unavailable:'Your account could not be verified. Sign in again and retry.',support_save_failed:'Your request could not be saved. Please check your connection and retry.'};

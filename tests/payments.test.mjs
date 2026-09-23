@@ -20,8 +20,8 @@ async function run(body={},signed=true){
 }
 
 test('payment history requires a signed account and never trusts a body email',async()=>{
-  const original=globalThis.fetch;let calls=0;globalThis.fetch=async()=>{calls++;throw new Error('unsigned request reached storage');};
-  try{const r=await run({op:'paymentHistory'},false);assert.equal(r.status,401);assert.equal(calls,0);}finally{globalThis.fetch=original;}
+  const original=globalThis.fetch,calls=[];globalThis.fetch=async(url)=>{calls.push(String(url));throw new Error('unsigned request reached storage');};
+  try{const r=await run({op:'paymentHistory'},false);assert.equal(r.status,401);assert.ok(calls.every(x=>x.includes('/rpc/consume_devfit_rate_limit')));}finally{globalThis.fetch=original;}
 });
 
 test('customer payment history exposes metadata but never receipt paths',async()=>{

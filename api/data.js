@@ -5,7 +5,8 @@
 import crypto from 'crypto';
 import {
   haveServerConfig, verifyToken, sbRpc, readJsonBody, recordServerEvent,
-  clientIp, bearerToken, setApiSecurityHeaders, sameOriginIfPresent
+  clientIp, bearerToken, setApiSecurityHeaders, sameOriginIfPresent,
+  checkSecurityAccess, tokenDeviceMatches, guardInvalidAuth, recordDeviceMismatch
 } from './_lib.js';
 import { handlePaymentOperation } from './_payments.js';
 import { handleSupportOperation } from './_support.js';
@@ -34,9 +35,30 @@ export default async function handler(req, res) {
   // Authorization is the current contract. Body fallback keeps already-installed
   // PWAs working during the staggered service-worker rollout.
   const payload = verifyToken(bearerToken(req) || body.token);
-  if (!payload || !payload.email) { res.status(401).json({ error: 'invalid_token' }); return; }
+  if (!payload || !payload.email) {
+    const invalid = await guardInvalidAuth(req, '/api/data');
+    if (invalid.blocked) res.setHeader('Retry-After', String(invalid.retryAfter));
+    res.status(invalid.blocked ? (invalid.unavailable ? 503 : 429) : 401)
+      .json({ error: invalid.blocked ? (invalid.unavailable ? 'service_unavailable' : 'rate_limited') : 'invalid_token' });
+    return;
+  }
   const email = String(payload.email).trim().toLowerCase();
   const op = String(body.op || '');
+
+  // Existing signed sessions are accepted during rollout, then /api/verify
+  // replaces them with a device-bound token. Bound tokens cannot be replayed
+  // from a different browser installation.
+  if (payload.did) {
+    if (!tokenDeviceMatches(payload, body.deviceId)) {
+      await recordDeviceMismatch(req, email, body.deviceId, '/api/data');
+      res.status(401).json({ error: 'invalid_device' }); return;
+    }
+    const security = await checkSecurityAccess(req, email, body.deviceId, {
+      route: '/api/data', requireKnown: true
+    });
+    if (security.status === 'unavailable') { res.status(503).json({ error: 'security_store_unavailable' }); return; }
+    if (security.status !== 'ok') { res.status(403).json({ error: security.status }); return; }
+  }
 
   try {
     if (op === 'paymentHistory' || op === 'submitPayment') {

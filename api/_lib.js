@@ -409,6 +409,75 @@ export async function listLogins() {
   return rows || [];
 }
 
+// ── Account / device security ───────────────────────────────────────────────
+// Raw IP addresses are never retained. Device IDs remain in the private login
+// table for owner support, while blocks/events use one-way SHA-256 keys.
+export function sha256Hex(value) {
+  return crypto.createHash('sha256').update(String(value || '')).digest('hex');
+}
+
+export function tokenDeviceMatches(payload, deviceId) {
+  // Legacy signed tokens did not contain a device binding. /api/verify upgrades
+  // them on the next normal page load so current installed PWAs stay signed in.
+  if (!payload || !payload.did) return true;
+  const actual = Buffer.from(sha256Hex(String(deviceId || '')));
+  const expected = Buffer.from(String(payload.did || ''));
+  return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+}
+
+export async function recordSecurityEvent(event = {}) {
+  try {
+    const email = String(event.email || '').trim().toLowerCase();
+    const row = {
+      email: email && email.length <= 254 ? email : null,
+      device_hash: /^[0-9a-f]{64}$/.test(String(event.deviceHash || '')) ? event.deviceHash : null,
+      ip_hash: /^[0-9a-f]{64}$/.test(String(event.ipHash || '')) ? event.ipHash : null,
+      event_type: String(event.type || 'security_event').slice(0, 50),
+      severity: ['info', 'warning', 'high'].includes(event.severity) ? event.severity : 'warning',
+      route: String(event.route || '').slice(0, 120),
+      reason: String(event.reason || '').slice(0, 500),
+      blocked: event.blocked === true,
+      at: new Date().toISOString()
+    };
+    await sbInsert('devfit_security_events', row);
+  } catch (_) {}
+}
+
+export async function checkSecurityAccess(req, email, deviceId, options = {}) {
+  const result = await sbRpc('check_devfit_security_access', {
+    p_email: String(email || '').trim().toLowerCase(),
+    p_device_id: String(deviceId || '').slice(0, 80),
+    p_ip_hash: sha256Hex(clientIp(req)),
+    p_user_agent: String((req.headers && req.headers['user-agent']) || '').slice(0, 300),
+    p_route: String(options.route || '').slice(0, 120),
+    p_register: options.register === true,
+    p_is_login: options.isLogin === true,
+    p_require_known: options.requireKnown === true
+  }, options.timeoutMs || 5000);
+  if (!result || typeof result.status !== 'string') return { status: 'unavailable' };
+  return result;
+}
+
+export async function recordDeviceMismatch(req, email, deviceId, route) {
+  const deviceHash = sha256Hex(deviceId);
+  const ipHash = sha256Hex(clientIp(req));
+  const dedupe = await rateLimit(
+    'security_device_mismatch:' + sha256Hex(String(email || '') + '|' + deviceHash + '|' + ipHash),
+    1, 15 * 60, { failClosed: true, timeoutMs: 3000 }
+  );
+  if (!dedupe.ok) return;
+  await recordSecurityEvent({
+    email,
+    deviceHash,
+    ipHash,
+    type: 'device_token_mismatch',
+    severity: 'high',
+    route,
+    reason: 'A device-bound session token was presented by a different installation',
+    blocked: true
+  });
+}
+
 // ── Rate limiter (Supabase-backed; reliable across serverless instances) ─────
 // The database RPC increments atomically, so simultaneous serverless invocations
 // cannot all observe the same old hit count.
@@ -421,8 +490,30 @@ export async function rateLimit(id, limit, windowSeconds, options = {}) {
     }, options.timeoutMs || 8000);
     const row = Array.isArray(result) ? result[0] : result;
     if (!row || typeof row.allowed !== 'boolean') return { ok: !options.failClosed, unavailable: true };
-    return { ok: row.allowed, retryAfter: Math.max(0, Number(row.retry_after) || 0) };
+    return {
+      ok: row.allowed,
+      retryAfter: Math.max(0, Number(row.retry_after) || 0),
+      currentHits: Math.max(0, Number(row.current_hits) || 0)
+    };
   } catch (e) { return { ok: !options.failClosed, unavailable: true }; }
+}
+
+export async function guardInvalidAuth(req, route) {
+  const ipHash = sha256Hex(clientIp(req));
+  const limit = await rateLimit('invalid_auth:' + ipHash, 12, 15 * 60, { failClosed: true, timeoutMs: 3000 });
+  // The request is already denied for invalid authentication. If the shared
+  // abuse counter is briefly unavailable, do not turn one bad token into a
+  // service outage response; just skip escalation for that attempt.
+  if (limit.unavailable) return { blocked: false, unavailable: true, retryAfter: 0 };
+  // Emit once when the threshold is first crossed. Later blocked attempts stay
+  // cheap and cannot amplify into an unbounded security-event write attack.
+  if (!limit.ok && (!limit.currentHits || limit.currentHits === 13)) {
+    await recordSecurityEvent({
+      ipHash, type: 'invalid_auth_rate', severity: 'high', route,
+      reason: 'Repeated invalid or forged authentication tokens', blocked: true
+    });
+  }
+  return { blocked: !limit.ok, retryAfter: Math.max(1, limit.retryAfter || 1) };
 }
 
 // Food search can invoke paid/quota-limited third-party services. Browser
@@ -436,10 +527,28 @@ export async function foodSearchIdentity(req) {
   const match = raw.match(/^Bearer\s+(.+)$/i);
   const payload = verifyToken(match && match[1]);
   const email = payload && String(payload.email || '').trim().toLowerCase();
-  if (!email || email.length > 254) return { ok: false, status: 401, error: 'sign_in_required' };
+  if (!email || email.length > 254) {
+    const invalid = await guardInvalidAuth(req, '/api/food-search');
+    return invalid.blocked
+      ? { ok: false, status: invalid.unavailable ? 503 : 429, error: invalid.unavailable ? 'food_search_unavailable' : 'rate_limited', retryAfter: invalid.retryAfter }
+      : { ok: false, status: 401, error: 'sign_in_required' };
+  }
   const subscriber = await getSubscriber(email, 3000);
   if (subscriber === undefined) return { ok: false, status: 503, error: 'food_search_unavailable' };
   if (!subscriber || !subscriber.approved) return { ok: false, status: 403, error: 'account_unavailable' };
+
+  const deviceId = String((req.headers && req.headers['x-devfit-device']) || '');
+  if (payload.did) {
+    if (!tokenDeviceMatches(payload, deviceId)) {
+      await recordDeviceMismatch(req, email, deviceId, '/api/food-search');
+      return { ok: false, status: 401, error: 'invalid_device' };
+    }
+    const security = await checkSecurityAccess(req, email, deviceId, {
+      route: '/api/food-search', requireKnown: true, timeoutMs: 3000
+    });
+    if (security.status === 'unavailable') return { ok: false, status: 503, error: 'food_search_unavailable' };
+    if (security.status !== 'ok') return { ok: false, status: 403, error: 'account_unavailable' };
+  }
 
   const strict = { failClosed: true, timeoutMs: 3000 };
   const [account, ip] = await Promise.all([
@@ -480,6 +589,7 @@ export function clientIp(req) {
 
 export async function readJsonBody(req) {
   if (req.body && typeof req.body === 'object') return req.body;
+  if (!req || typeof req.on !== 'function') return {};
   return await new Promise((resolve) => {
     let data = '';
     req.on('data', (c) => { data += c; if (data.length > 1e6) req.destroy(); });

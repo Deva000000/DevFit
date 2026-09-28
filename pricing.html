@@ -78,6 +78,14 @@
 
   .info-note{background:#1a1a1a;border:1px solid #2a2a2a;border-left:3px solid #cc0000;border-radius:8px;padding:14px 16px;font-size:12px;color:#aaa;line-height:1.6;margin-bottom:24px}
   .info-note strong{color:#fff}
+  .coaching-card{background:#111;border:1px solid #2a2a2a;border-radius:16px;padding:22px;margin-bottom:24px}
+  .coaching-card h2{font-size:20px;color:#fff;margin-bottom:7px}
+  .coaching-card p{font-size:12px;color:#aaa;line-height:1.6;margin-bottom:14px}
+  .coaching-card img{display:block;width:100%;height:auto;border-radius:10px;margin-bottom:14px}
+  .coaching-card .coaching-prices{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}
+  .coaching-card .coaching-prices div{border:1px solid #333;border-radius:9px;padding:11px;color:#bbb;font-size:12px}
+  .coaching-card .coaching-prices b{display:block;color:#fff;font-size:18px;margin-top:4px}
+  .offer-select{display:block;width:100%;font:700 16px 'DM Sans',sans-serif;color:#fff;background:#202024;border:1px solid #484850;border-radius:9px;padding:12px;margin:0 0 18px}
 
   .footer{text-align:center;font-size:12px;color:#555;padding-top:16px}
   .footer a{color:#cc0000;text-decoration:none;font-weight:700}
@@ -129,7 +137,7 @@
   <div class="pro-card">
     <span class="pro-badge">DevFit Pro</span>
     <h3>One plan. Everything unlocked.</h3>
-    <div class="sub">No tiers. No upsells. Cancel anytime.</div>
+    <div class="sub">One 30-day app plan. Coaching is optional. No recurring charge.</div>
     <div class="price"><span id="pc-amt">RM19.90</span><small>/month</small></div>
     <div class="price-note"><span id="pc-perday">≈ 66 sen a day</span> &middot; 30 days full access &middot; DuitNow QR</div>
     <div class="pro-feature-grid">
@@ -287,9 +295,20 @@
     </div>
   </div>
 
+  <section class="coaching-card" id="coaching">
+    <h2>Prefer personal coaching?</h2>
+    <p>A custom training and diet plan, weekly reviews, and WhatsApp check-ins. DevFit Pro app access is included after your payment is reviewed.</p>
+    <img src="devfit-coaching-poster.png" loading="lazy" alt="DevFit online coaching: custom training and diet plan, weekly reviews, WhatsApp check-ins, and DevFit app access. Packages: 4 weeks RM200, 8 weeks RM360, 12 weeks RM500, student 4 weeks RM160.">
+    <p>The poster QR is for coaching enquiries. Use the DuitNow QR in the payment section below to pay.</p>
+    <div class="coaching-prices"><div>4 weeks<b>RM200</b></div><div>8 weeks<b>RM360</b></div><div>12 weeks<b>RM500</b></div><div>Student · 4 weeks<b>RM160</b></div></div>
+    <p style="margin:12px 0 0">Student pricing requires eligibility confirmation. Coaching starts after DevFit confirms your payment and onboarding details.</p>
+  </section>
+
   <!-- Payment -->
   <div class="pay-section">
     <h2>Scan &amp; pay <span class="red" id="pc-head">RM19.90</span></h2>
+    <label for="pricing-offer" style="display:block;color:#aaa;font-size:12px;margin-bottom:7px">Choose what you're buying</label>
+    <select id="pricing-offer" class="offer-select"><option value="app_pro">DevFit Pro app · 30 days</option><option value="coaching_4w">Coaching · 4 weeks · RM200</option><option value="coaching_8w">Coaching · 8 weeks · RM360</option><option value="coaching_12w">Coaching · 12 weeks · RM500</option><option value="coaching_student_4w">Student coaching · 4 weeks · RM160</option></select>
 
     <div class="qr-box">
       <img id="qr-img" src="duitnow-qr.jpg" alt="DuitNow QR" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
@@ -308,7 +327,7 @@
         <div class="step-body"><strong>Upload the screenshot</strong> in DevFit Settings → Billing &amp; Pro. It is linked to your signed-in Gmail automatically.</div>
       </div>
       <div class="step">
-        <div class="step-body"><strong>Activated within 24 hours</strong> — login at <a href="login.html" style="color:#cc0000;text-decoration:none;font-weight:700">devfit login</a></div>
+        <div class="step-body"><strong>DevFit reviews the receipt</strong> and confirms activation. Uploading proof does not automatically unlock Pro.</div>
       </div>
     </div>
 
@@ -338,15 +357,20 @@
 <script>
   let phone = '60183679177';   // default; overridden by /api/config (admin-editable)
   let PRICE = 'RM19.90';       // default; overridden by /api/config (admin-editable)
+  const coachingAmounts={coaching_4w:'RM200',coaching_8w:'RM360',coaching_12w:'RM500',coaching_student_4w:'RM160'};
+  const offerSuffix={app_pro:'APP',coaching_4w:'C4',coaching_8w:'C8',coaching_12w:'C12',coaching_student_4w:'STU4'};
+  try{const selected=localStorage.getItem('devfit_selected_offer');if(offerSuffix[selected])document.getElementById('pricing-offer').value=selected;}catch(e){}
+  function selectedPrice(){return coachingAmounts[document.getElementById('pricing-offer').value]||PRICE;}
   function ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
   function showPaymentReference(){
     let u={};try{u=JSON.parse(localStorage.getItem('devfit_user')||'{}');}catch(e){}
     if(!u.email)return;
     const month=new Intl.DateTimeFormat('en',{timeZone:'Asia/Kuala_Lumpur',month:'short',year:'2-digit'}).format(new Date()).replace(/[^a-z0-9]/gi,'').toUpperCase();
     const gmail=String(u.email).split('@')[0].replace(/[^a-z0-9]/gi,'').toUpperCase().slice(0,24)||'ACCOUNT';
-    document.getElementById('pay-reference').textContent='DEVFIT_'+month+'_'+gmail;
+    document.getElementById('pay-reference').textContent='DEVFIT_'+month+'_'+gmail+'_'+offerSuffix[document.getElementById('pricing-offer').value];
   }
   showPaymentReference();
+  document.getElementById('pc-head').textContent=selectedPrice();document.getElementById('pc-step').textContent=selectedPrice();
 
   // Apply an admin-set price everywhere it appears. Accepts "19.90", "RM19.90",
   // "RM 19.90" etc; normalises to "RM19.90" and recomputes the per-day figure.
@@ -357,37 +381,23 @@
     PRICE = 'RM' + (Number.isInteger(num) ? num : num.toFixed(2));
     const perDay = Math.round((num/30)*100); // sen/day
     const set=(id,txt)=>{ const el=document.getElementById(id); if(el) el.textContent=txt; };
-    set('pc-amt', PRICE); set('pc-head', PRICE); set('pc-step', PRICE);
+    set('pc-amt', PRICE); set('pc-head', selectedPrice()); set('pc-step', selectedPrice());
     set('pc-perday', '≈ ' + perDay + ' sen a day');
     refreshWa();
   }
 
-  // Pre-fill the WhatsApp receipt with everything the trainer needs to activate:
-  // the payer's account email + name, and the exact 30-day window (start → end).
-  // If they're renewing early (expiry still in the future), the new window
-  // continues from the day after their current end so they don't lose paid days.
   function buildReceiptMsg(){
-    let u = {};
-    try{ u = JSON.parse(localStorage.getItem('devfit_user')||'{}'); }catch(e){}
-    const today = new Date(); today.setHours(0,0,0,0);
-    let start = today;
-    if(u.expiry){ const e = new Date(u.expiry); if(!isNaN(e) && e > today){ start = new Date(e); start.setDate(start.getDate()+1); } }
-    const end = new Date(start); end.setDate(end.getDate()+29); // 30-day inclusive span
-    return [
-      "Hi DevFit! I've paid " + PRICE + " for Pro — please activate my account:",
-      "",
-      "• Email: " + (u.email || '(type your Gmail here)'),
-      "• Name: "  + (u.name  || '(type your name here)'),
-      "• Start: " + ymd(start),
-      "• End: "   + ymd(end),
-      "",
-      "My payment receipt is attached. Thank you!"
-    ].join("\n");
+    return "Hi DevFit, I have a question about " + document.getElementById('pricing-offer').selectedOptions[0].textContent + ".";
   }
   function refreshWa(){
     document.getElementById('wa-link').href = 'https://wa.me/'+phone+'?text='+encodeURIComponent(buildReceiptMsg());
   }
   refreshWa();
+  document.getElementById('pricing-offer').addEventListener('change',function(){
+    localStorage.setItem('devfit_selected_offer',this.value);
+    document.getElementById('pc-head').textContent=selectedPrice();document.getElementById('pc-step').textContent=selectedPrice();
+    showPaymentReference();refreshWa();
+  });
 
   // Live payment settings the trainer can update from admin.html (QR + WhatsApp +
   // note) — no code change needed. Falls back to the static QR / number above if

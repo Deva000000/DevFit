@@ -21,6 +21,7 @@ import {
   sbStorageSignedUrl, sbStorageDelete, sha256Hex, recordSecurityEvent
 } from './_lib.js';
 import { getSupportRequest, sendSupportNotification } from './_support.js';
+import { notifySavedPayment } from './_payments.js';
 
 const ADMIN_PW = process.env.DEVFIT_ADMIN_PASSWORD || '';
 const BACKUP_TABLES = {
@@ -203,9 +204,35 @@ export default async function handler(req, res) {
 
     if (action === 'payments') {
       const rows = await sbSelect('devfit_payments',
-        'select=id,email,reference,status,byte_size,uploaded_at,reviewed_at&order=uploaded_at.desc&limit=250');
+        'select=id,email,reference,offer_code,payer_name,payer_whatsapp,expected_amount_cents,detected_amount_cents,email_status,status,byte_size,uploaded_at,reviewed_at&order=uploaded_at.desc&limit=250');
       if (!Array.isArray(rows)) { res.status(503).json({ error: 'payment_history_unavailable' }); return; }
       res.status(200).json({ payments: rows });
+      return;
+    }
+
+    if (action === 'notifyPayment') {
+      const id = String(body.id || '');
+      if (!/^[0-9a-f-]{36}$/i.test(id)) { res.status(400).json({ error: 'invalid_payment' }); return; }
+      const rows = await sbSelect('devfit_payments', 'id=eq.' + encodeURIComponent(id) +
+        '&select=id,email,reference,offer_code,payer_name,payer_whatsapp,expected_amount_cents,uploaded_at&limit=1');
+      if (!Array.isArray(rows)) { res.status(503).json({ error: 'payment_history_unavailable' }); return; }
+      if (!rows[0]) { res.status(404).json({ error: 'payment_not_found' }); return; }
+      const delivery = await notifySavedPayment(rows[0]);
+      res.status(delivery.ok ? 200 : 503).json({ ok: delivery.ok, error: delivery.ok ? undefined : delivery.error });
+      return;
+    }
+
+    if (action === 'paymentAmount') {
+      const id = String(body.id || '');
+      const cents = body.amountCents === null ? null : Number(body.amountCents);
+      if (!/^[0-9a-f-]{36}$/i.test(id) || (cents !== null && (!Number.isInteger(cents) || cents < 1 || cents > 1000000))) {
+        res.status(400).json({ error: 'invalid_payment_amount' }); return;
+      }
+      const saved = await sbPatch('devfit_payments', 'id=eq.' + encodeURIComponent(id), {
+        detected_amount_cents: cents
+      });
+      if (!Array.isArray(saved) || !saved[0]) { res.status(404).json({ error: 'payment_not_found' }); return; }
+      res.status(200).json({ ok: true });
       return;
     }
 

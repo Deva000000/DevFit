@@ -200,6 +200,31 @@ session verification. Revert the application commit, preserve the database, and
 use Admin → Security & Blocklist to revoke a confirmed abusive account or reset
 trusted devices for a legitimate customer.
 
+## Payment receipt notifications
+
+The customer selects App Pro or a coaching package in Settings → Billing,
+enters a name and WhatsApp number, pays the listed amount, then uploads a
+compressed receipt. The signed DevFit Gmail is taken from the authenticated
+session, not from a browser claim. Receipts are private and remain visible in
+Admin → Payments even when an external notification fails. The listed price is
+snapshotted by the server. The owner can read the amount from the receipt image
+in Admin, correct it manually, and compare it to the listed price. Receipt OCR
+does **not** prove bank settlement and never activates Pro.
+
+For automatic owner email, add `RESEND_API_KEY` to the Vercel `devfit` project
+Production environment, set `DEVFIT_SUPPORT_FROM` to a sender on a domain
+verified in Resend, and set `DEVFIT_SUPPORT_TO=devaa1024@gmail.com`. Redeploy,
+submit a small test receipt, and confirm both email delivery and the Admin
+payment row's `email_status=sent`. If sending fails, the receipt is still saved;
+Admin → Payments provides a Retry email button. Do not paste the API key into
+HTML, Git, or chat.
+
+WhatsApp is a customer-tapped prepared message after upload, not an automatic
+server notification. Automatic WhatsApp requires a separately approved
+WhatsApp Business integration and credentials; never promise it without an
+end-to-end delivery test. Payment proof remains pending until the owner checks
+the bank transaction and manually verifies and activates access.
+
 ## Honest scope
 
 Server enforcement stops forged sessions, cross-account data access, API use by

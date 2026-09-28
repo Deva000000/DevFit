@@ -29,10 +29,11 @@ test('customer payment history exposes metadata but never receipt paths',async()
   globalThis.fetch=async(url)=>{
     const u=String(url);
     if(u.includes('/devfit_subscribers?'))return {ok:true,json:async()=>[{approved:true}]};
+    if(u.includes('/rest/v1/devfit_config?'))return {ok:true,json:async()=>[{price:null,whatsapp:'60183679177'}]};
     if(u.includes('/devfit_payments?'))return {ok:true,json:async()=>[{id:'1',reference:'DEVFIT_SEP26_PAYER',status:'pending',byte_size:120000,uploaded_at:'2026-09-22T01:00:00Z'}]};
     throw new Error('unexpected '+u);
   };
-  try{const r=await run({op:'paymentHistory',email:'victim@gmail.com'});assert.equal(r.status,200);assert.equal(r.body.reference,'DEVFIT_SEP26_PAYER');assert.equal(r.body.payments[0].storage_path,undefined);}finally{globalThis.fetch=original;}
+  try{const r=await run({op:'paymentHistory',email:'victim@gmail.com'});assert.equal(r.status,200);assert.equal(r.body.reference,'DEVFIT_SEP26_PAYER_APP');assert.equal(r.body.payments[0].storage_path,undefined);assert.equal(r.body.offers.length,5);}finally{globalThis.fetch=original;}
 });
 
 test('valid receipt is rate-limited, stored privately and linked to signed Gmail',async()=>{
@@ -40,6 +41,7 @@ test('valid receipt is rate-limited, stored privately and linked to signed Gmail
   globalThis.fetch=async(url,options={})=>{
     const u=String(url),method=options.method||'GET';requests.push({u,method,body:options.body});
     if(u.includes('/devfit_subscribers?'))return {ok:true,json:async()=>[{approved:true}]};
+    if(u.includes('/rest/v1/devfit_config?'))return {ok:true,json:async()=>[{price:null,whatsapp:'60183679177'}]};
     if(u.includes('/rpc/consume_devfit_rate_limit'))return {ok:true,json:async()=>({allowed:true,retry_after:0})};
     if(u.includes('/devfit_payments?')&&method==='GET')return {ok:true,json:async()=>[]};
     if(u.includes('/storage/v1/object/devfit-payment-proofs/')&&method==='POST')return {ok:true,json:async()=>({})};
@@ -62,9 +64,41 @@ test('non-image payloads are rejected before private storage',async()=>{
   globalThis.fetch=async(url)=>{
     const u=String(url);
     if(u.includes('/devfit_subscribers?'))return {ok:true,json:async()=>[{approved:true}]};
+    if(u.includes('/rest/v1/devfit_config?'))return {ok:true,json:async()=>[{price:null,whatsapp:'60183679177'}]};
     if(u.includes('/rpc/consume_devfit_rate_limit'))return {ok:true,json:async()=>({allowed:true,retry_after:0})};
     if(u.includes('/storage/v1/object/'))storageWrites++;
     return {ok:true,json:async()=>({})};
   };
   try{const r=await run({op:'submitPayment',image:'data:image/jpeg;base64,'+Buffer.from('not-an-image').toString('base64')});assert.equal(r.status,400);assert.equal(storageWrites,0);}finally{globalThis.fetch=original;}
+});
+
+test('coaching receipt snapshots the server price, not a browser amount, and sends owner email without granting Pro',async()=>{
+  const original=globalThis.fetch,previousKey=process.env.RESEND_API_KEY,requests=[];
+  process.env.RESEND_API_KEY='re_test_private_key';
+  globalThis.fetch=async(url,options={})=>{
+    const u=String(url),method=options.method||'GET';requests.push({u,method,body:options.body});
+    if(u.includes('/devfit_subscribers?'))return {ok:true,json:async()=>[{approved:true,pro:false}]};
+    if(u.includes('/rest/v1/devfit_config?'))return {ok:true,json:async()=>[{price:'RM19.90',whatsapp:'60183679177'}]};
+    if(u.includes('/rpc/consume_devfit_rate_limit'))return {ok:true,json:async()=>({allowed:true,retry_after:0})};
+    if(u.includes('/devfit_payments?')&&method==='GET')return {ok:true,json:async()=>[]};
+    if(u.includes('/storage/v1/object/devfit-payment-proofs/')&&method==='POST')return {ok:true,json:async()=>({})};
+    if(u.endsWith('/rest/v1/devfit_payments')&&method==='POST'){
+      const row=JSON.parse(options.body);
+      assert.equal(row.offer_code,'coaching_8w');assert.equal(row.expected_amount_cents,36000);
+      assert.equal(row.payer_name,'Test Client');assert.equal(row.payer_whatsapp,'+60123456789');
+      assert.equal(row.pro,undefined);
+      return {ok:true,json:async()=>[{...row,uploaded_at:'2026-09-28T01:00:00Z'}]};
+    }
+    if(u.includes('/rest/v1/devfit_payments?')&&method==='PATCH')return {ok:true,json:async()=>[{id:'saved'}]};
+    if(u==='https://api.resend.com/emails')return {ok:true,json:async()=>({id:'email_123'})};
+    throw new Error('unexpected '+method+' '+u);
+  };
+  const jpeg=Buffer.from('ffd8ffdb0011223344','hex');
+  try{
+    const r=await run({op:'submitPayment',offerCode:'coaching_8w',payerName:'Test Client',payerWhatsApp:'+60 12 345 6789',payerEmail:'payer@gmail.com',amountCents:1,image:'data:image/jpeg;base64,'+jpeg.toString('base64')});
+    assert.equal(r.status,201);assert.equal(r.body.payment.expected_amount_cents,36000);
+    assert.equal(r.body.emailDelivered,true);
+    assert.equal(requests.some(x=>x.u.includes('/devfit_subscribers?')&&x.method!=='GET'),false);
+    assert.equal(requests.filter(x=>x.u==='https://api.resend.com/emails').length,1);
+  }finally{globalThis.fetch=original;if(previousKey===undefined)delete process.env.RESEND_API_KEY;else process.env.RESEND_API_KEY=previousKey;}
 });

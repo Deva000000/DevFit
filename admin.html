@@ -146,6 +146,13 @@
       <div class="card hide" id="payment-proof-panel">
         <h2 id="payment-proof-title">Payment proof</h2>
         <img id="payment-proof-image" alt="Submitted payment receipt" style="display:block;max-width:100%;max-height:70vh;margin:12px auto;border-radius:10px;background:#fff;object-fit:contain">
+        <div class="hint" id="payment-proof-details">Compare the receipt with the selected package, payment date and destination account before marking verified.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;align-items:end">
+          <button class="btn" id="payment-detect-amount">Read amount from image</button>
+          <label style="margin:0;flex:1;min-width:135px">Receipt amount (RM)<input id="payment-amount-input" type="number" inputmode="decimal" min="0.01" max="10000" step="0.01" placeholder="Check manually"></label>
+          <button class="btn" id="payment-save-amount">Save amount</button>
+        </div>
+        <div class="hint" id="payment-amount-result">Image reading is only a review aid. It does not verify payment or activate access.</div>
         <button class="btn" id="payment-proof-close">Close receipt</button>
       </div>
     </div>
@@ -313,6 +320,7 @@
   </div>
 </div>
 
+<script src="receipt-amount.js"></script>
 <script>
 'use strict';
 var API = '/api/admin';
@@ -844,6 +852,20 @@ async function refreshErrors(){
 }
 
 /* ---------- payment proofs ---------- */
+var currentPaymentProof=null;
+var tesseractPromise=null;
+function paymentOfferLabel(code){return ({app_pro:'DevFit Pro app · 30 days',coaching_4w:'Coaching · 4 weeks',coaching_8w:'Coaching · 8 weeks',coaching_12w:'Coaching · 12 weeks',coaching_student_4w:'Student coaching · 4 weeks'})[code]||'Legacy app payment';}
+function money(cents){return cents==null?'Not recorded':'RM'+(Number(cents)/100).toFixed(2);}
+function loadReceiptReader(){
+  if(window.Tesseract)return Promise.resolve(window.Tesseract);
+  if(!tesseractPromise)tesseractPromise=new Promise(function(resolve,reject){
+    var script=document.createElement('script');script.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+    script.integrity='sha384-GJqSu7vueQ9qN0E9yLPb3Wtpd7OrgK8KmYzC8T1IysG1bcvxvIO4qtYR/D3A991F';script.crossOrigin='anonymous';
+    script.onload=function(){window.Tesseract?resolve(window.Tesseract):reject(new Error('Reader unavailable'));};
+    script.onerror=function(){reject(new Error('Reader unavailable'));};document.head.appendChild(script);
+  }).catch(function(e){tesseractPromise=null;throw e;});
+  return tesseractPromise;
+}
 function paymentStatus(status){
   var s=String(status||'pending');
   var color=s==='verified'?'#4ade80':s==='rejected'?'#ff6b6b':'#fbbf24';
@@ -858,21 +880,41 @@ async function refreshPayments(){
   if(r.status!==200){box.innerHTML='<div class="hint">Payment history could not load. Retry shortly.</div>';return;}
   var rows=r.data.payments||[];
   if(!rows.length){box.innerHTML='<div class="hint">No payment receipts submitted yet.</div>';return;}
-  box.innerHTML=rows.map(function(p){return '<div class="sub-row" style="display:grid;grid-template-columns:1fr auto;gap:7px 12px">'+
-    '<span style="display:block;color:#fff;font-size:13px;font-weight:700;min-width:0;overflow-wrap:anywhere" title="'+safeText(p.email)+'">'+safeText(p.email)+'</span>'+paymentStatus(p.status)+
-    '<span class="win" style="grid-column:1/-1">'+safeText(p.reference)+' · '+safeText(paymentWhen(p.uploaded_at))+' · '+Math.max(1,Math.round((p.byte_size||0)/1024))+' KB</span>'+
+  box.innerHTML=rows.map(function(p){var mismatch=p.detected_amount_cents!=null&&p.expected_amount_cents!=null&&p.detected_amount_cents!==p.expected_amount_cents;return '<div class="sub-row" style="display:grid;grid-template-columns:1fr auto;gap:7px 12px">'+
+    '<span style="display:block;color:#fff;font-size:13px;font-weight:700;min-width:0;overflow-wrap:anywhere" title="'+safeText(p.email)+'">'+safeText(p.payer_name||p.email)+'</span>'+paymentStatus(p.status)+
+    '<span class="win" style="grid-column:1/-1">'+safeText(p.email)+' · '+safeText(p.payer_whatsapp||'No phone on legacy receipt')+'</span>'+
+    '<span class="win" style="grid-column:1/-1">'+safeText(paymentOfferLabel(p.offer_code))+' · listed '+safeText(money(p.expected_amount_cents))+' · receipt '+safeText(money(p.detected_amount_cents))+(mismatch?' · AMOUNT MISMATCH':'')+'</span>'+
+    '<span class="win" style="grid-column:1/-1">'+safeText(p.reference)+' · '+safeText(paymentWhen(p.uploaded_at))+' · '+Math.max(1,Math.round((p.byte_size||0)/1024))+' KB · email '+safeText(p.email_status||'pending')+'</span>'+
     '<span class="payment-actions">'+
       '<button data-pay-proof="'+safeText(p.id)+'">View receipt</button>'+
+      (p.email_status!=='sent'?'<button data-pay-notify="'+safeText(p.id)+'">Retry email</button>':'')+
       '<button class="verify" data-pay-review="'+safeText(p.id)+'" data-status="verified">Mark verified</button>'+
       '<button class="reject" data-pay-review="'+safeText(p.id)+'" data-status="rejected">Reject</button>'+
       '<button data-pay-manage="'+encodeURIComponent(p.email)+'">Manage account</button>'+
     '</span></div>';}).join('');
   Array.prototype.forEach.call(box.querySelectorAll('[data-pay-proof]'),function(btn){btn.addEventListener('click',async function(){
     btn.disabled=true;var r=await call('paymentProof',{id:btn.getAttribute('data-pay-proof')});btn.disabled=false;
-    if(r.status===200&&r.data.url){$('payment-proof-image').src=r.data.url;$('payment-proof-title').textContent='Payment proof · private link expires in 2 minutes';$('payment-proof-panel').classList.remove('hide');$('payment-proof-panel').scrollIntoView({behavior:'smooth'});}
+    if(r.status===200&&r.data.url){
+      currentPaymentProof=rows.filter(function(x){return x.id===btn.getAttribute('data-pay-proof');})[0]||null;
+      $('payment-proof-image').src=r.data.url;$('payment-proof-title').textContent='Payment proof · private link expires in 2 minutes';
+      $('payment-proof-details').textContent=currentPaymentProof?paymentOfferLabel(currentPaymentProof.offer_code)+' · listed '+money(currentPaymentProof.expected_amount_cents)+' · '+(currentPaymentProof.payer_name||currentPaymentProof.email)+' · '+paymentWhen(currentPaymentProof.uploaded_at):'Check the payment details.';
+      $('payment-amount-input').value=currentPaymentProof&&currentPaymentProof.detected_amount_cents!=null?(currentPaymentProof.detected_amount_cents/100).toFixed(2):'';
+      $('payment-amount-result').textContent='Image reading is only a review aid. It does not verify payment or activate access.';
+      $('payment-proof-panel').classList.remove('hide');$('payment-proof-panel').scrollIntoView({behavior:'smooth'});
+      if(currentPaymentProof&&currentPaymentProof.detected_amount_cents==null)$('payment-detect-amount').click();
+    }
     else alert('Receipt could not be opened. Please retry.');
   });});
+  Array.prototype.forEach.call(box.querySelectorAll('[data-pay-notify]'),function(btn){btn.addEventListener('click',async function(){
+    btn.disabled=true;var r=await call('notifyPayment',{id:btn.getAttribute('data-pay-notify')});
+    if(r.status===200)refreshPayments();else{btn.disabled=false;alert('Email was not delivered. Check Resend configuration; the receipt is still saved in Admin.');}
+  });});
   Array.prototype.forEach.call(box.querySelectorAll('[data-pay-review]'),function(btn){btn.addEventListener('click',async function(){
+    var payment=rows.filter(function(x){return x.id===btn.getAttribute('data-pay-review');})[0];
+    if(btn.getAttribute('data-status')==='verified'){
+      var mismatch=payment&&payment.detected_amount_cents!=null&&payment.expected_amount_cents!=null&&payment.detected_amount_cents!==payment.expected_amount_cents;
+      if(!confirm((mismatch?'AMOUNT MISMATCH. ':'')+'Confirm the actual transaction in your bank account, including destination, amount and date. The image alone is not proof of settlement. Mark receipt verified?'))return;
+    }
     btn.disabled=true;var r=await call('reviewPayment',{id:btn.getAttribute('data-pay-review'),status:btn.getAttribute('data-status')});
     if(r.status===200)refreshPayments();else{btn.disabled=false;alert('Payment status could not be saved.');}
   });});
@@ -1078,6 +1120,36 @@ $('refresh-errors').addEventListener('click', refreshErrors);
 $('refresh-payments').addEventListener('click', refreshPayments);
 $('refresh-support').addEventListener('click', refreshSupport);
 $('payment-proof-close').addEventListener('click',function(){$('payment-proof-image').removeAttribute('src');$('payment-proof-panel').classList.add('hide');});
+$('payment-detect-amount').addEventListener('click',async function(){
+  if(!currentPaymentProof)return;
+  var btn=this,result=$('payment-amount-result');btn.disabled=true;result.textContent='Reading receipt locally in Admin…';
+  var worker=null;
+  try{
+    var engine=await loadReceiptReader();
+    var imageResponse=await fetch($('payment-proof-image').src,{cache:'no-store'});
+    if(!imageResponse.ok)throw new Error('Private receipt link expired. Reopen the receipt.');
+    var imageBlob=await imageResponse.blob();
+    worker=await engine.createWorker('eng');
+    var recognized=await worker.recognize(imageBlob);
+    var parsed=window.DevFitReceiptAmount.parseReceiptAmount(recognized&&recognized.data&&recognized.data.text);
+    if(!parsed.amountCents){result.textContent='Could not read a reliable amount. Enter it manually after inspecting the receipt.';return;}
+    $('payment-amount-input').value=(parsed.amountCents/100).toFixed(2);
+    var expected=currentPaymentProof.expected_amount_cents;
+    result.textContent='Possible amount '+money(parsed.amountCents)+(parsed.ambiguous?' · Multiple amounts found — check manually.':expected!=null&&expected!==parsed.amountCents?' · DOES NOT MATCH listed price.':' · Compare with the image before saving.')+' OCR does not prove payment.';
+  }catch(e){result.textContent='Image reading unavailable: '+String(e.message||e)+'. Inspect and enter the amount manually.';}
+  finally{if(worker)try{await worker.terminate();}catch(e){}btn.disabled=false;}
+});
+$('payment-save-amount').addEventListener('click',async function(){
+  if(!currentPaymentProof)return;
+  var value=$('payment-amount-input').value.trim(),num=Number(value),cents=value===''?null:Math.round(num*100);
+  if(value!==''&&(!Number.isFinite(num)||num<=0||num>10000||Math.abs(num*100-cents)>.001)){alert('Enter a valid RM amount with at most two decimal places.');return;}
+  var btn=this;btn.disabled=true;
+  var r=await call('paymentAmount',{id:currentPaymentProof.id,amountCents:cents});btn.disabled=false;
+  if(r.status!==200){alert('Amount could not be saved.');return;}
+  currentPaymentProof.detected_amount_cents=cents;
+  $('payment-amount-result').textContent='Receipt amount saved for your review. Access has not changed.';
+  refreshPayments();
+});
 $('backup-download').addEventListener('click', downloadOwnerBackup);
 $('backup-verify').addEventListener('click', verifyOwnerBackup);
 $('delete-preview').addEventListener('click', previewAccountDeletion);

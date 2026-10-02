@@ -158,12 +158,12 @@ export async function sbSelect(table, query, timeoutMs = 8000) {
 
 // Plain insert (no conflict key). Returns the inserted rows, or null on any error
 // — callers treat null as "not persisted" and never fail because of it.
-export async function sbInsert(table, row) {
+export async function sbInsert(table, row, timeoutMs = 8000) {
   try {
     const r = await fetch(`${SB_URL}/rest/v1/${table}`, {
       method: 'POST',
       headers: { ...sbHeaders(), Prefer: 'return=minimal' },
-      body: JSON.stringify(row)
+      body: JSON.stringify(row), signal: AbortSignal.timeout(timeoutMs)
     });
     return r.ok ? true : null;
   } catch (e) { return null; }
@@ -174,10 +174,10 @@ export async function sbInsertReturning(table, row) {
     const r = await fetch(`${SB_URL}/rest/v1/${table}`, {
       method: 'POST',
       headers: { ...sbHeaders(), Prefer: 'return=representation' },
-      body: JSON.stringify(row)
+      body: JSON.stringify(row), signal: AbortSignal.timeout(8000)
     });
     if (!r.ok) return null;
-    return r.json();
+    return await r.json();
   } catch (e) { return null; }
 }
 
@@ -186,10 +186,10 @@ export async function sbPatch(table, query, changes) {
     const r = await fetch(`${SB_URL}/rest/v1/${table}?${query}`, {
       method: 'PATCH',
       headers: { ...sbHeaders(), Prefer: 'return=representation' },
-      body: JSON.stringify(changes)
+      body: JSON.stringify(changes), signal: AbortSignal.timeout(8000)
     });
     if (!r.ok) return null;
-    return r.json();
+    return await r.json();
   } catch (e) { return null; }
 }
 
@@ -197,13 +197,13 @@ export async function sbUpsert(table, row, onConflict) {
   const r = await fetch(`${SB_URL}/rest/v1/${table}?on_conflict=${onConflict}`, {
     method: 'POST',
     headers: { ...sbHeaders(), Prefer: 'resolution=merge-duplicates,return=representation' },
-    body: JSON.stringify(row)
+    body: JSON.stringify(row), signal: AbortSignal.timeout(8000)
   });
   if (!r.ok) return null;
   return r.json();
 }
 
-export async function sbRpc(name, args, timeoutMs = null) {
+export async function sbRpc(name, args, timeoutMs = 8000) {
   try {
     const r = await fetch(`${SB_URL}/rest/v1/rpc/${name}`, {
       method: 'POST',
@@ -212,7 +212,7 @@ export async function sbRpc(name, args, timeoutMs = null) {
       body: JSON.stringify(args || {})
     });
     if (!r.ok) return null;
-    return r.json();
+    return await r.json();
   } catch (e) { return null; }
 }
 
@@ -224,7 +224,7 @@ export async function sbInsertIgnore(table, row, onConflict) {
     const r = await fetch(`${SB_URL}/rest/v1/${table}${suffix}`, {
       method: 'POST',
       headers: { ...sbHeaders(), Prefer: 'resolution=ignore-duplicates,return=minimal' },
-      body: JSON.stringify(row)
+      body: JSON.stringify(row), signal: AbortSignal.timeout(8000)
     });
     return r.ok ? true : null;
   } catch (e) { return null; }
@@ -260,6 +260,7 @@ export function cookieValue(req, name) {
 // Durable production event reporting. Always write to Vercel logs and, when the
 // server database is available, retain the event in devfit_errors. This helper
 // never throws back into a user request.
+const eventCooldowns = new Map();
 export async function recordServerEvent(type, message, details = {}) {
   const rec = {
     type: String(type || 'server').slice(0, 20),
@@ -272,6 +273,17 @@ export async function recordServerEvent(type, message, details = {}) {
     at: new Date().toISOString()
   };
   try { console.error('[DevFit monitor]', JSON.stringify(rec)); } catch (_) {}
+  // Database outages must not turn every failed request into two additional
+  // writes against the same unhealthy database. Logs still capture every event;
+  // identical durable events are sampled per warm instance for ten seconds.
+  const eventKey = JSON.stringify([rec.type, rec.message, rec.page, rec.status]);
+  const now = Date.now();
+  if ((eventCooldowns.get(eventKey) || 0) > now) return;
+  if (eventCooldowns.size >= 100) {
+    for (const [key, until] of eventCooldowns) if (until <= now) eventCooldowns.delete(key);
+    if (eventCooldowns.size >= 100) eventCooldowns.delete(eventCooldowns.keys().next().value);
+  }
+  eventCooldowns.set(eventKey, now + 10000);
   try {
     if (haveServerConfig()) {
       // This RPC inserts and bounds retained monitoring rows atomically. Fall
@@ -279,8 +291,8 @@ export async function recordServerEvent(type, message, details = {}) {
       const stored = await sbRpc('record_devfit_error', {
         p_type: rec.type, p_message: rec.message, p_stack: rec.stack,
         p_src: rec.src, p_page: rec.page, p_ua: rec.ua, p_status: rec.status
-      });
-      if (stored === null) await sbInsert('devfit_errors', rec);
+      }, 1500);
+      if (stored === null) await sbInsert('devfit_errors', rec, 1500);
     }
   } catch (_) {}
 }
@@ -292,25 +304,39 @@ export async function recordServerEvent(type, message, details = {}) {
 // them only for the duration advertised by Google's Cache-Control header.
 let googleJwks = null;
 let googleJwksUntil = 0;
+let googleJwksPending = null;
+let googleUnknownRefreshAt = 0;
 
-async function getGoogleJwk(kid) {
-  const hadFreshCache = Boolean(googleJwks && Date.now() < googleJwksUntil);
-  if (!googleJwks || Date.now() >= googleJwksUntil) {
-    const r = await fetch('https://www.googleapis.com/oauth2/v3/certs', { cache: 'no-store' });
-    if (!r.ok) return null;
+async function refreshGoogleJwks() {
+  if (googleJwksPending) return googleJwksPending;
+  googleJwksPending = (async function () {
+    const r = await fetch('https://www.googleapis.com/oauth2/v3/certs', {
+      cache: 'no-store', signal: AbortSignal.timeout(8000)
+    });
+    if (!r.ok) throw new Error('google_keys_unavailable');
     const body = await r.json();
     googleJwks = Array.isArray(body.keys) ? body.keys : [];
     const cc = r.headers && r.headers.get ? (r.headers.get('cache-control') || '') : '';
     const maxAge = Number((cc.match(/max-age=(\d+)/i) || [])[1] || 3600);
     googleJwksUntil = Date.now() + Math.max(60, Math.min(maxAge, 86400)) * 1000;
-  }
+  })();
+  try { await googleJwksPending; } finally { googleJwksPending = null; }
+}
+
+async function getGoogleJwk(kid) {
+  const hadFreshCache = Boolean(googleJwks && Date.now() < googleJwksUntil);
+  if (!hadFreshCache) await refreshGoogleJwks();
   const found = googleJwks.find((key) => key && key.kid === kid) || null;
+  if (!found && googleJwksPending) {
+    await googleJwksPending;
+    return googleJwks.find((key) => key && key.kid === kid) || null;
+  }
   // A new signing key can appear before our cached max-age elapses. Refresh once
   // on an unknown kid so key rotation never locks legitimate users out.
-  if (!found && hadFreshCache) {
-    googleJwks = null;
-    googleJwksUntil = 0;
-    return getGoogleJwk(kid);
+  if (!found && hadFreshCache && Date.now() - googleUnknownRefreshAt > 30000) {
+    googleUnknownRefreshAt = Date.now();
+    await refreshGoogleJwks();
+    return googleJwks.find((key) => key && key.kid === kid) || null;
   }
   return found;
 }

@@ -412,7 +412,7 @@ test('database hardening uses private atomic RPCs and bounded recovery history',
   assert.match(atomic, /create table if not exists public\.devfit_records/);
 
   const dataApi = fs.readFileSync(new URL('../api/data.js', import.meta.url), 'utf8');
-  assert.match(dataApi, /sbRpc\('save_devfit_data_atomic'/);
+  assert.match(dataApi, /sbRpc\(op === 'patch' \? 'patch_devfit_data_atomic' : 'save_devfit_data_atomic'/);
 });
 
 test('release infrastructure enforces security headers and monitors production health', () => {
@@ -575,7 +575,7 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
   assert.match(settings, /<div class="title">Install DevFit App<\/div>/);
   assert.match(settings, /if\(!deferredInstallPrompt\)\{\s*showIosHint\(\)/);
   assert.equal(manifest.display, 'standalone');
-  assert.match(worker, /devfit-v4\.93\.0/);
+  assert.match(worker, /devfit-v4\.94\.0/);
   assert.doesNotMatch(worker, /\.then\(\(\) => self\.skipWaiting\(\)\)/);
 
   for (const html of [index, settings]) {

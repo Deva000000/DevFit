@@ -1,5 +1,5 @@
 // Public, non-sensitive production health probe for automated monitoring.
-import { haveServerConfig, sbSelect } from './_lib.js';
+import { haveServerConfig, sbRpc, SB_URL } from './_lib.js';
 
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
@@ -13,10 +13,15 @@ export default async function handler(req, res) {
     return;
   }
   const started = Date.now();
-  const rows = await sbSelect('devfit_config', 'select=id&limit=1');
-  if (!Array.isArray(rows)) {
+  const health = await sbRpc('devfit_sync_health', {}, 8000);
+  if (!health || health.ok !== true) {
     res.status(503).json({ ok: false, service: 'devfit', database: 'unavailable' });
     return;
   }
-  res.status(200).json({ ok: true, service: 'devfit', database: 'ok', latencyMs: Date.now() - started });
+  const projectRef = new URL(SB_URL).hostname.split('.')[0];
+  const isolated = process.env.DEVFIT_ENVIRONMENT === 'staging'
+    && projectRef !== 'zngberygrzpkhiqrrzwj'
+    && projectRef === process.env.DEVFIT_LOAD_PROJECT_REF;
+  res.status(200).json({ ok: true, service: 'devfit', database: 'ok', syncProtocol: health.syncProtocol, latencyMs: Date.now() - started,
+    ...(isolated ? { loadTest: { isolated: true, projectRef } } : {}) });
 }

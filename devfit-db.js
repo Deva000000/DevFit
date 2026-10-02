@@ -74,10 +74,14 @@
   async function apiCall(op, extra) {
     const token = getToken();
     if (!token) return { skip: true, reason: 'no_token' };
-    const res = await fetch(DATA_API, {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeout = controller ? setTimeout(function () { controller.abort(); }, 20000) : null;
+    let res;
+    try { res = await fetch(DATA_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       cache: 'no-store',
+      ...(controller ? { signal: controller.signal } : {}),
       body: JSON.stringify(Object.assign({
         op: op,
         deviceId: localStorage.getItem('devfit_device_id') || 'unknown'
@@ -101,6 +105,7 @@
       throw err;
     }
     return await res.json();
+    } finally { if (timeout) clearTimeout(timeout); }
   }
 
   // ══ MERGE ═══════════════════════════════════════════════════════════════
@@ -435,13 +440,84 @@
   // notify[type]   — the page's callback for "here is the reconciled document".
   const pulled = {};
   const pulling = {};
+  const syncOutcome = {};
   const notify = {};
   const cloudVersion = {};
+  const cloudSnapshot = {};
+  const patchSupported = {};
+  const ACK_KEY = 'devfit_sync_ack_v2';
   const pendingSave = {};
   const saveWorker = {};
   const debounceTimer = {};
   const retryTimer = {};
+  const retryNotBefore = {};
   const saveWaiters = {};
+
+  function clone(value) { return JSON.parse(JSON.stringify(value)); }
+  // Only an exact, acknowledged snapshot can supply a conditional-read version.
+  // A dirty/offline document is never treated as the server's copy. Store a hash,
+  // not a second copy of the customer's history, to stay within device quotas.
+  async function fingerprint(data) {
+    if (!global.crypto || !global.crypto.subtle || typeof TextEncoder === 'undefined') return '';
+    const bytes = new TextEncoder().encode(JSON.stringify(data));
+    const digest = await global.crypto.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(digest)).map(function (n) { return n.toString(16).padStart(2, '0'); }).join('');
+  }
+  function rememberCloud(dataType, data, version, protocol) {
+    const snapshot = clone(data);
+    cloudSnapshot[dataType] = snapshot;
+    cloudVersion[dataType] = version || '';
+    patchSupported[dataType] = protocol === 2;
+    const owner = getEmail();
+    if (!owner || !LOCAL_KEY[dataType] || !version || protocol !== 2) return;
+    fingerprint(snapshot).then(function (hash) {
+      if (!hash || getEmail() !== owner || cloudSnapshot[dataType] !== snapshot) return;
+      let ack = {}; try { ack = JSON.parse(localStorage.getItem(ACK_KEY) || '{}'); } catch (_) {}
+      if (ack.email !== owner) ack = { email: owner, types: {} };
+      if (!ack.types || typeof ack.types !== 'object') ack.types = {};
+      ack.types[dataType] = { version: version, hash: hash };
+      try { localStorage.setItem(ACK_KEY, JSON.stringify(ack)); } catch (_) {}
+    }).catch(function () {});
+  }
+  async function seedAcknowledged(dataType) {
+    if (cloudSnapshot[dataType] || readDirty()[dataType]) return;
+    try {
+      const ack = JSON.parse(localStorage.getItem(ACK_KEY) || '{}');
+      const entry = ack.email === getEmail() && ack.types && ack.types[dataType];
+      const local = readLocal(dataType);
+      if (entry && local && entry.hash && entry.version && await fingerprint(local) === entry.hash) {
+        rememberCloud(dataType, local, entry.version, 2);
+      }
+    } catch (_) {}
+  }
+  // Bounded field patches. Arrays use position only against an exact document
+  // version; the DB rejects replay/conflicts before applying any operation.
+  function changesBetween(before, after) {
+    const changes = []; let supported = true;
+    function walk(a, b, path) {
+      if (!supported || a === b) return;
+      if (path.length > 12 || path.some(function (s) {
+        return s.length > 180 || s === '__proto__' || s === 'constructor' || s === 'prototype';
+      })) { supported = false; return; }
+      if (a && b && typeof a === 'object' && typeof b === 'object' && Array.isArray(a) === Array.isArray(b)) {
+        if (Array.isArray(a)) {
+          for (let i = 0; i < b.length; i++) walk(a[i], b[i], path.concat(String(i)));
+          for (let i = a.length - 1; i >= b.length; i--) changes.push({ op: 'remove', path: path.concat(String(i)) });
+        } else {
+          Object.keys(a).forEach(function (k) {
+            if (!Object.prototype.hasOwnProperty.call(b, k)) changes.push({ op: 'remove', path: path.concat(k) });
+          });
+          Object.keys(b).forEach(function (k) { walk(a[k], b[k], path.concat(k)); });
+        }
+      } else changes.push({ op: 'set', path: path, value: b });
+      if (changes.length > 128) supported = false;
+    }
+    walk(before, after, []);
+    if (changes.some(function (c) { return !c.path.length || c.path.length > 12 || c.path.some(function (s) {
+      return s.length > 180 || ['__proto__', 'constructor', 'prototype'].indexOf(s) >= 0;
+    }); })) supported = false;
+    return supported ? changes : null;
+  }
 
   // Effective local timestamp = most recent of last cloud sync and last local edit.
   function localTsFor(dataType) {
@@ -454,16 +530,25 @@
   async function push(dataType, data) {
     setIndicator('syncing');
     try {
-      let candidate = data;
+      let candidate = clone(data);
       for (let attempt = 0; attempt < 3; attempt++) {
-        const r = await apiCall('set', {
+        // Freeze what is actually sent. UI edits may mutate the original object
+        // while this request is in flight; that newer edit needs its own ACK.
+        candidate = clone(candidate);
+        const changes = cloudSnapshot[dataType] ? changesBetween(cloudSnapshot[dataType], candidate) : null;
+        if (changes && changes.length === 0) { setIndicator('ok'); return true; }
+        const encoded = changes && JSON.stringify(changes);
+        const incremental = patchSupported[dataType] && cloudVersion[dataType] && encoded
+          && encoded.length < 32768 && encoded.length < JSON.stringify(candidate).length * 0.6;
+        const r = await apiCall(incremental ? 'patch' : 'set', {
           dataType: dataType,
-          data: candidate,
+          ...(incremental ? { changes: changes } : { data: candidate }),
           baseUpdatedAt: cloudVersion[dataType] || '',
           deviceId: localStorage.getItem('devfit_device_id') || 'unknown'
         });
         if (r && r.skip) { setIndicator('offline'); return false; }
         if (r && r.conflict && r.row) {
+          rememberCloud(dataType, r.row.data, r.row.updated_at, patchSupported[dataType] ? 2 : 1);
           const serverTs = new Date(r.row.updated_at).getTime();
           const serverWins = serverTs > localTsFor(dataType) + 3000;
           candidate = serverWins
@@ -476,13 +561,20 @@
           }
           continue;
         }
-        cloudVersion[dataType] = (r && r.updated_at) || cloudVersion[dataType] || '';
+        if (r && r.conflict) {
+          delete cloudSnapshot[dataType]; cloudVersion[dataType] = ''; continue;
+        }
+        if (!r || r.ok !== true) throw new Error('save was not acknowledged');
+        rememberCloud(dataType, candidate, r.updated_at || cloudVersion[dataType], r.syncProtocol);
+        if (LOCAL_KEY[dataType]) writeLocal(dataType, pendingSave[dataType]
+          ? mergeDoc(dataType, pendingSave[dataType], candidate) : candidate);
         localStorage.setItem('devfit_cloud_ts_' + dataType, String(Date.now()));
         setIndicator('ok');
         return true;
       }
       throw new Error('save conflict did not converge');
     } catch (e) {
+      if (e.retryAfter) retryNotBefore[dataType] = Date.now() + Number(e.retryAfter) * 1000;
       console.warn('[DevFit Cloud] save failed (' + dataType + '):', e.message || e);
       setIndicator('err');
       return false;
@@ -497,16 +589,24 @@
   function reconcile(dataType) {
     if (pulling[dataType]) return pulling[dataType];
     const p = (async function () {
+      syncOutcome[dataType] = false;
       const localTs = localTsFor(dataType);
       let merged = readLocal(dataType);
       try {
-        const r = await apiCall('get', { dataType: dataType });
+        await seedAcknowledged(dataType);
+        const r = await apiCall('get', { dataType: dataType,
+          ...(cloudSnapshot[dataType] && cloudVersion[dataType] ? { knownVersions: { [dataType]: cloudVersion[dataType] } } : {}) });
         if (r && r.skip) { setIndicator('offline'); return merged; }
         const rows = (r && r.rows) || [];
         const row = rows.filter(function (x) { return x.data_type === dataType; })[0];
 
+        if (row && row.notModified) {
+          if (!cloudSnapshot[dataType]) throw new Error('conditional read missing verified cache');
+          row.data = clone(cloudSnapshot[dataType]);
+        }
+
         if (row && row.data) {
-          cloudVersion[dataType] = row.updated_at || '';
+          rememberCloud(dataType, row.data, row.updated_at, r.syncProtocol);
           const cloudTs = new Date(row.updated_at).getTime();
           // The timestamp no longer decides who SURVIVES — only who wins a
           // straight conflict on the same field. Everything additive is unioned
@@ -520,7 +620,8 @@
           if (typeof notify[dataType] === 'function') {
             try { notify[dataType](merged); } catch (e) {}
           }
-        } else cloudVersion[dataType] = '';
+        } else { cloudVersion[dataType] = ''; delete cloudSnapshot[dataType]; }
+        syncOutcome[dataType] = true;
         setIndicator('ok');
       } catch (e) {
         console.warn('[DevFit Cloud] sync failed (' + dataType + '):', e.message || e);
@@ -559,16 +660,19 @@
     entry.attempts = Math.min(10, Number(entry.attempts || 0) + 1);
     dirty[dataType] = entry;
     writeDirty(dirty);
-    const backoff = Math.min(60000, Math.max(
+    const backoff = Math.max(
       Number(retryAfterSeconds || 0) * 1000,
-      2000 * Math.pow(2, Math.min(entry.attempts - 1, 5))
-    ));
+      Number(retryNotBefore[dataType] || 0) - Date.now(),
+      Math.min(60000, 2000 * Math.pow(2, Math.min(entry.attempts - 1, 5)))
+    );
     const delay = backoff + Math.floor(Math.random() * Math.min(1000, backoff * 0.2));
     retryTimer[dataType] = setTimeout(function () {
       retryTimer[dataType] = null;
       const latest = readLocal(dataType);
       if (latest || dataType === 'prefs') {
-        pendingSave[dataType] = latest || pendingSave[dataType];
+        pendingSave[dataType] = pendingSave[dataType]
+          ? mergeDoc(dataType, pendingSave[dataType], latest)
+          : latest;
         flushSave(dataType);
       }
     }, delay);
@@ -576,19 +680,38 @@
 
   async function flushSave(dataType) {
     if (saveWorker[dataType]) return saveWorker[dataType];
+    if (Number(retryNotBefore[dataType] || 0) > Date.now()) {
+      scheduleRetry(dataType);
+      resolveWaiters(dataType, false);
+      return false;
+    }
     if (debounceTimer[dataType]) { clearTimeout(debounceTimer[dataType]); debounceTimer[dataType] = null; }
     saveWorker[dataType] = (async function () {
       if (!getToken()) { setIndicator('offline'); return false; }
       if (!pulled[dataType] && LOCAL_KEY[dataType]) await reconcile(dataType);
+      if (LOCAL_KEY[dataType] && syncOutcome[dataType] !== true) {
+        pulled[dataType] = false;
+        scheduleRetry(dataType);
+        return false;
+      }
       let allSaved = true;
       while (pendingSave[dataType]) {
         let latest = pendingSave[dataType];
         pendingSave[dataType] = null;
         if (LOCAL_KEY[dataType]) latest = mergeDoc(dataType, latest, readLocal(dataType));
         const ok = await push(dataType, latest);
-        if (!ok) { allSaved = false; pendingSave[dataType] = latest; break; }
+        if (!ok) {
+          allSaved = false;
+          pendingSave[dataType] = pendingSave[dataType]
+            ? mergeDoc(dataType, pendingSave[dataType], latest) : latest;
+          break;
+        }
       }
-      if (allSaved) clearDirty(dataType);
+      if (allSaved) {
+        clearDirty(dataType);
+        if (retryTimer[dataType]) { clearTimeout(retryTimer[dataType]); retryTimer[dataType] = null; }
+        retryNotBefore[dataType] = 0;
+      }
       else scheduleRetry(dataType);
       return allSaved;
     })();
@@ -599,7 +722,7 @@
       resolveWaiters(dataType, result);
       // An edit can arrive in the few milliseconds after the worker's final
       // loop check. Never leave that value stranded until another user input.
-      if (pendingSave[dataType] && !debounceTimer[dataType] && !retryTimer[dataType]) {
+      if (getToken() && pendingSave[dataType] && !debounceTimer[dataType] && !retryTimer[dataType]) {
         debounceTimer[dataType] = setTimeout(function () {
           debounceTimer[dataType] = null;
           flushSave(dataType);
@@ -669,14 +792,15 @@
         const cloudTs = new Date(row.updated_at).getTime();
         const localTs = localTsFor(dataType);
         const local = readLocal(dataType);
+        rememberCloud(dataType, row.data, row.updated_at, r.syncProtocol);
         const cloudWins = cloudTs > localTs + 3000;
         const merged = cloudWins
           ? mergeDoc(dataType, row.data, local)
           : mergeDoc(dataType, local, row.data);
-        cloudVersion[dataType] = row.updated_at || '';
         writeLocal(dataType, merged);
         localStorage.setItem('devfit_cloud_ts_' + dataType, String(cloudTs));
         pulled[dataType] = true;
+        syncOutcome[dataType] = true;
         if (JSON.stringify(merged) !== before) restored++;
         if (typeof notify[dataType] === 'function') {
           try { notify[dataType](merged); } catch (e) {}
@@ -710,6 +834,7 @@
         const before = JSON.stringify(readLocal(t) || null);
         pulled[t] = false;                       // force a fresh look
         const merged = await reconcile(t);
+        if (syncOutcome[t] !== true) return { ok: false, updated: updated, reason: 'Saved on device; account sync unavailable' };
         if (merged) {
           if (JSON.stringify(merged) !== before) updated++;
           await cloudSave(t, merged);
@@ -760,7 +885,7 @@
       if (!r || r.skip) return;
       const row = ((r && r.rows) || []).filter(function (x) { return x.data_type === 'prefs'; })[0];
       if (!row || !row.data) return;
-      cloudVersion.prefs = row.updated_at || '';
+      rememberCloud('prefs', row.data, row.updated_at, r.syncProtocol);
       Object.keys(row.data).forEach(function (k) {
         if (PREF_KEYS.indexOf(k) < 0) return;
         try { if (localStorage.getItem(k) == null) localStorage.setItem(k, row.data[k]); } catch (e) {}
@@ -794,7 +919,8 @@
       if (dataType === 'prefs') { backupPrefs(); return; }
       const latest = readLocal(dataType);
       if (!latest) { clearDirty(dataType); return; }
-      pendingSave[dataType] = latest;
+      pendingSave[dataType] = pendingSave[dataType]
+        ? mergeDoc(dataType, pendingSave[dataType], latest) : latest;
       if (!saveWorker[dataType] && !debounceTimer[dataType]) flushSave(dataType);
     });
   }

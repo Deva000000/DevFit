@@ -1,0 +1,57 @@
+name: DevFit isolated scale validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      soak_seconds:
+        description: Sustained workload duration (seconds, 0–3600)
+        default: '300'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: synthetic-local-only
+          POSTGRES_DB: devfit_scale
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      DEVFIT_SCALE_DATABASE_URL: postgresql://postgres:synthetic-local-only@127.0.0.1:5432/devfit_scale
+      DEVFIT_SCALE_USERS: '2000'
+      DEVFIT_SCALE_SOAK_SECONDS: ${{ inputs.soak_seconds }}
+      PGPASSWORD: synthetic-local-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tests/scaling/package-lock.json
+      - run: npm ci --prefix tests/scaling
+      - name: Bootstrap disposable PostgreSQL and apply migrations
+        run: |
+          set -euo pipefail
+          psql -h 127.0.0.1 -U postgres -d devfit_scale -v ON_ERROR_STOP=1 -f tests/scaling/bootstrap.sql
+          for file in supabase/migrations/*.sql; do
+            psql -h 127.0.0.1 -U postgres -d devfit_scale -v ON_ERROR_STOP=1 -f "$file"
+          done
+      - name: Rollback-only incremental SQL regression
+        run: psql -h 127.0.0.1 -U postgres -d devfit_scale -v ON_ERROR_STOP=1 -f tests/scaling/incremental-regression.sql
+      - name: Real handler and PostgreSQL stress tests (no production credentials)
+        run: node tests/scaling/scale.mjs
+      - name: Preserve results even when the capacity gate fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: isolated-scale-results
+          path: tests/scaling/results/*.json

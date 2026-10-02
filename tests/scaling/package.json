@@ -1,0 +1,7 @@
+{
+  "name": "devfit-isolated-scale-validation",
+  "private": true,
+  "type": "module",
+  "dependencies": { "pg": "8.23.1" },
+  "scripts": { "test": "node scale.mjs" }
+}

@@ -24,7 +24,8 @@ test('payment history requires a signed account and never trusts a body email',a
   try{const r=await run({op:'paymentHistory'},false);assert.equal(r.status,401);assert.ok(calls.every(x=>x.includes('/rpc/consume_devfit_rate_limit')));}finally{globalThis.fetch=original;}
 });
 
-test('customer payment history exposes metadata but never receipt paths',async()=>{
+test('customer payment history exposes metadata but never receipt paths',async(t)=>{
+  t.mock.timers.enable({apis:['Date'],now:new Date('2026-09-22T01:00:00Z')});
   const original=globalThis.fetch;
   globalThis.fetch=async(url)=>{
     const u=String(url);

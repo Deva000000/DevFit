@@ -552,6 +552,7 @@ html.nosplash #devfit-splash{display:none!important}
       </div>
       <button class="pdf-btn" id="program-report-btn" type="button">Create PDF</button>
     </div>
+    <div id="report-history-status" role="status" aria-live="polite" style="font-size:12px;margin-top:10px;line-height:1.55">Checking your saved report history…</div>
     <div style="font-size:11px;color:#888;margin-top:10px;line-height:1.55">
       Every report includes progress trends, training, nutrition and the day-by-day logs recorded during the selected period.
     </div>
@@ -665,7 +666,7 @@ html.nosplash #devfit-splash{display:none!important}
 
   <div class="footer">
     DevFit · Dominance Through Discipline<br>
-    <a href="#support-group-title" id="footer-support-link">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.91.0
+    <a href="#support-group-title" id="footer-support-link">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.94.1
   </div>
 
 
@@ -804,6 +805,13 @@ let currentWeek = 0;
 // still be in its temporal dead zone at that moment and the ReferenceError would
 // vanish into the render's try/catch, leaving the dropdown silently empty.
 let REPORT_RANGES = [];
+let reportSelectionKey = null;
+function reportRangeKey(range){
+  if(!range) return null;
+  const program=appData.activeProgramId||appData.programStart||'';
+  if(range.kind==='week') return program+':week:'+range.startW;
+  return program+':'+(range.startW===0?'program':'recent:'+(range.endW-range.startW+1));
+}
 
 function freshCheckin(){ return {overload:null, bf:'', bfDir:null, diet:null, stress:null, notes:''}; }
 
@@ -816,7 +824,7 @@ let appData = {
   weeklyCheckin: Array.from({length:totalWeeks},freshCheckin)
 };
 
-(function loadData(){
+function loadReportData(){
   try{
     const s = localStorage.getItem('progressLog2');
     if(s){
@@ -824,13 +832,31 @@ let appData = {
       if(window.DevFitProgress) appData=DevFitProgress.ensureDocument(appData);
       totalWeeks = appData.bw.length || 4;
     }
+    currentWeek=0;
     // Use last week with data as currentWeek for sync/export
     for(let w = totalWeeks-1; w>=0; w--){
-      const hasData = appData.bw[w].some(v=>v!=='') || (appData.weeklyCheckin[w] && (appData.weeklyCheckin[w].overload || appData.weeklyCheckin[w].diet));
-      if(hasData){ currentWeek = w; return; }
+      const hasData = ['bw','steps','sleep'].some(k=>(appData[k]&&appData[k][w]||[]).some(v=>v!==''&&v!=null)) ||
+        Object.entries(appData.weeklyCheckin[w]||{}).some(([k,v])=>k==='meas'
+          ? Object.values(v||{}).some(n=>n!==''&&n!=null)
+          : v!==''&&v!=null);
+      if(hasData){ currentWeek = w; break; }
     }
-  }catch(e){}
-})();
+    // Training/nutrition may be logged without any bodyweight entries.
+    const workouts=JSON.parse(localStorage.getItem('devfitTrainingV1')||'{}');
+    const nutrition=JSON.parse(localStorage.getItem('devfitNutritionV2')||'{}');
+    const start=programStartDate();
+    if(start){
+      const dates=(workouts.sessions||[]).map(s=>s.date).concat(Object.keys(nutrition.days||{}));
+      dates.forEach(date=>{
+        if(!/^\d{4}-\d{2}-\d{2}$/.test(date||'')) return;
+        const week=Math.floor((new Date(date+'T00:00:00')-start)/(7*86400000));
+        if(week>=0&&week<totalWeeks) currentWeek=Math.max(currentWeek,week);
+      });
+    }
+    return !!s;
+  }catch(e){ return false; }
+}
+loadReportData();
 
 // Pre-load logo for PDF exports
 let pdfLogoImg=null;
@@ -1165,8 +1191,12 @@ function buildRangeOptions(){
     }
   }
 
-  sel.value='0';
-  sel.onchange=updateReportRangeSummary;
+  const selectedIndex=REPORT_RANGES.findIndex(r=>reportRangeKey(r)===reportSelectionKey);
+  sel.value=String(selectedIndex<0?0:selectedIndex);
+  sel.onchange=function(){
+    reportSelectionKey=reportRangeKey(REPORT_RANGES[parseInt(sel.value,10)]);
+    updateReportRangeSummary();
+  };
   updateReportRangeSummary();
 
   // Name the one-tap button after the week it will actually export.
@@ -1190,6 +1220,9 @@ function saveClientName(){
   try{
     const el=document.getElementById('clientNameInput');
     if(!el) return;
+    // Other tabs/account recovery may have replaced the program since page load.
+    // A name edit must never write this page's stale program metadata back.
+    if(!loadReportData()){ toast('Your program is still loading. Please retry.',true); return; }
     appData.clientName=el.value.trim();
     localStorage.setItem('progressLog2',JSON.stringify(appData));
     if(typeof DevFitDB!=='undefined') DevFitDB.cloudSave('progress',appData);
@@ -1940,18 +1973,20 @@ function paintReport(A, N){
 }
 
 // ---------- REPORT BUTTON HANDLERS ----------
-function exportWeekPDF(){
+async function exportWeekPDF(){
+  if(!(await refreshReportHistory(true))) return;
   const w = currentWeek;
-  generateReport({ startW:w, endW:w, kind:'week',
+  return generateReport({ startW:w, endW:w, kind:'week',
                    title:'Week '+(w+1)+' Report', fileBase:'Week_'+(w+1)+'_Report' });
 }
 
-function exportProgramPDF(){
+async function exportProgramPDF(){
+  if(!(await refreshReportHistory(true))) return;
   const sel = document.getElementById('program-report-range');
   const idx = sel ? parseInt(sel.value,10) : 0;
   const range = REPORT_RANGES[isNaN(idx)?0:idx] || REPORT_RANGES[0];
   if(!range){ toast('No weeks to report on yet', true); return; }
-  generateReport(range);
+  return generateReport(range);
 }
 
 // ---------- TIER GATING ----------
@@ -2223,6 +2258,46 @@ body{padding-bottom:104px!important}
 <script src="/pwa-update.js"></script>
 <script src="devfit-db.js"></script>
 <script>
+// Read ALL report sources on a fresh/reinstalled device, and again before an
+// export. Do not use cloudSync here: opening reports must not write any data.
+var reportHistoryPending=null, reportHistoryCheckedAt=0;
+function reportHistoryStatus(message,busy){
+  const status=document.getElementById('report-history-status');
+  if(status) status.textContent=message;
+  ['week-report-btn','program-report-btn'].forEach(id=>{
+    const btn=document.getElementById(id); if(btn) btn.disabled=!!busy;
+  });
+}
+async function refreshReportHistory(force){
+  if(reportHistoryPending) return reportHistoryPending;
+  if(!force&&reportHistoryCheckedAt&&Date.now()-reportHistoryCheckedAt<15000) return true;
+  reportHistoryStatus('Checking your saved report history…',true);
+  reportHistoryPending=(async function(){
+    try{
+      if(!window.DevFitDB||!DevFitDB.restoreAccount) throw new Error('Account recovery unavailable');
+      const result=await DevFitDB.restoreAccount();
+      if(!result||!result.ok) throw new Error('Account history could not be verified');
+      if(!loadReportData()){
+        reportHistoryStatus('No saved program yet. Open Progress to set up your program.',false);
+        return false;
+      }
+      buildRangeOptions(); paintUsage();
+      reportHistoryCheckedAt=Date.now();
+      reportHistoryStatus('Account history checked · reports use your saved program dates.',false);
+      return true;
+    }catch(e){
+      reportHistoryStatus('Could not check account history. Nothing was deleted. Reconnect and tap the report again to retry.',false);
+      toast('History could not be checked. Please reconnect and retry.',true);
+      return false;
+    }
+  })();
+  try{ return await reportHistoryPending; }
+  finally{ reportHistoryPending=null; }
+}
+refreshReportHistory();
+document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState==='visible') refreshReportHistory();
+});
 </script>
 <script>
 function paintThemeToggle(){

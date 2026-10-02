@@ -25,7 +25,7 @@ jobs:
         run: |
           for file in api/*.js; do node --check "$file"; done
       - name: Reliability regression suite
-        run: node --test tests/reliability.test.mjs tests/release-safety.test.mjs tests/security-controls.test.mjs tests/payments.test.mjs tests/support.test.mjs tests/login-recovery.test.mjs tests/receipt-amount.test.mjs tests/sync-backpressure.test.mjs tests/incremental-sync.test.mjs tests/auth-concurrency.test.mjs tests/monitor-backpressure.test.mjs
+        run: node --test tests/reliability.test.mjs tests/release-safety.test.mjs tests/security-controls.test.mjs tests/payments.test.mjs tests/support.test.mjs tests/login-recovery.test.mjs tests/receipt-amount.test.mjs tests/sync-backpressure.test.mjs tests/incremental-sync.test.mjs tests/auth-concurrency.test.mjs tests/monitor-backpressure.test.mjs tests/report-recovery.test.mjs
 
   production-smoke:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'

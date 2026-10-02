@@ -489,11 +489,11 @@ html.nosplash #devfit-splash{display:none!important}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
       <div>
         <div class="section-label" style="margin-bottom:5px;">Start weight (kg)</div>
-        <input style="width:100%;font-family:'DM Sans',sans-serif;font-size:14px;padding:8px 12px;border:1px solid #d1d5db;border-radius:var(--radius);background:#fff;color:#111;outline:none;" id="startWeight" placeholder="e.g. 80" type="number" step="0.1" inputmode="decimal" onblur="save();render()">
+        <input style="width:100%;font-family:'DM Sans',sans-serif;font-size:14px;padding:8px 12px;border:1px solid #d1d5db;border-radius:var(--radius);background:#fff;color:#111;outline:none;" id="startWeight" placeholder="e.g. 80" type="number" step="0.1" inputmode="decimal" onblur="saveProgramField(this);render()">
       </div>
       <div>
         <div class="section-label" style="margin-bottom:5px;">Target weight (kg)</div>
-        <input style="width:100%;font-family:'DM Sans',sans-serif;font-size:14px;padding:8px 12px;border:1px solid #d1d5db;border-radius:var(--radius);background:#fff;color:#111;outline:none;" id="goalInput" placeholder="e.g. 70" type="number" step="0.1" inputmode="decimal" onblur="save();render()">
+        <input style="width:100%;font-family:'DM Sans',sans-serif;font-size:14px;padding:8px 12px;border:1px solid #d1d5db;border-radius:var(--radius);background:#fff;color:#111;outline:none;" id="goalInput" placeholder="e.g. 70" type="number" step="0.1" inputmode="decimal" onblur="saveProgramField(this);render()">
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
@@ -513,7 +513,7 @@ html.nosplash #devfit-splash{display:none!important}
     </div>
     <div style="margin-bottom:10px;">
       <div class="section-label" style="margin-bottom:5px;">Daily step goal</div>
-      <input style="width:100%;box-sizing:border-box;font-family:'DM Sans',sans-serif;font-size:14px;padding:8px 12px;border:1px solid #d1d5db;border-radius:var(--radius);background:#fff;color:#111;outline:none;" id="targetSteps" placeholder="10000" type="number" step="500" inputmode="numeric" onblur="save();render()">
+      <input style="width:100%;box-sizing:border-box;font-family:'DM Sans',sans-serif;font-size:14px;padding:8px 12px;border:1px solid #d1d5db;border-radius:var(--radius);background:#fff;color:#111;outline:none;" id="targetSteps" placeholder="10000" type="number" step="500" inputmode="numeric" onblur="saveProgramField(this);render()">
       <div style="font-size:10.5px;color:#aaa;margin-top:5px;line-height:1.4">Sleep is scored against the medical optimal of 7–9 hours.</div>
     </div>
     <div>
@@ -1238,6 +1238,25 @@ function drawTeaserSparkline(){
 // Unreadable data must never silently become a blank program — save() would then
 // write that blank over the only copy on the device. Quarantine and stop writing.
 let loadFailed=false, saveWarned=false;
+// The setup form is a VIEW of the loaded program, not a source of daily-log
+// metadata. A cold device can render today's defaults before cloud recovery.
+function populateProgramInputs(){
+  const fields={clientName:appData.clientName||'',goalInput:appData.goal||'',
+    startWeight:appData.startWeight||'',programDuration:appData.programDuration||'8',
+    targetSteps:appData.targetSteps||'',targetSleep:appData.targetSleep||'',
+    programStart:appData.programStart||ymd(programStartDate())};
+  Object.keys(fields).forEach(id=>{
+    const el=document.getElementById(id);
+    if(el && (id==='programStart' || document.activeElement!==el)) el.value=fields[id];
+  });
+}
+function saveProgramField(el){
+  const fields={goalInput:'goal',startWeight:'startWeight',targetSteps:'targetSteps',targetSleep:'targetSleep',clientName:'clientName'};
+  const field=el&&fields[el.id];
+  if(!field || loadFailed) return;
+  appData[field]=el.value;
+  save();
+}
 function loadData(){
   try{
     const s=localStorage.getItem('progressLog2');
@@ -1252,20 +1271,9 @@ function loadData(){
       ensureShape();
       totalWeeks=appData.bw.length||1;
     }
-    // Pro → restore full history + open on the current week; Free → single rolling
-    // week (non-destructive: Pro history is preserved for re-upgrade).
+    // Both tiers keep the full dated program; tier controls navigation only.
     reconcileTierWeeks();
-    // Null-safe: some inputs (e.g. clientName) may not exist on every layout, and a
-    // single missing element must not abort populating the rest of the profile fields.
-    const setVal=(id,v)=>{ const el=document.getElementById(id); if(el) el.value=v; };
-    setVal('clientName', appData.clientName||'');
-    setVal('goalInput', appData.goal||'');
-    setVal('startWeight', appData.startWeight||'');
-    setVal('programDuration', appData.programDuration||'8');
-    setVal('targetSteps', appData.targetSteps||'');
-    setVal('targetSleep', appData.targetSleep||'');
-    // Show the resolved Monday anchor even when not explicitly set, so it's never blank
-    setVal('programStart', appData.programStart||ymd(programStartDate()));
+    populateProgramInputs();
   }catch(e){}
 }
 
@@ -1315,14 +1323,10 @@ function applyTierGates(){
   if(wtabsBox) wtabsBox.style.display = isPro() ? 'flex' : 'none';
 }
 function save(){
-  appData.goal=document.getElementById('goalInput').value;
-  appData.startWeight=document.getElementById('startWeight').value;
-  appData.programStart=document.getElementById('programStart').value;
-  appData.programDuration=document.getElementById('programDuration').value;
-  const _ts=document.getElementById('targetSteps'); if(_ts) appData.targetSteps=_ts.value;
-  const _sl=document.getElementById('targetSleep'); if(_sl) appData.targetSleep=_sl.value;
+  if(loadFailed) return;   // Never mutate unreadable account data.
+  // Save only model edits. Never copy a read-only date or untouched setup fields
+  // into a recovered program when a weight, sleep or steps entry changes.
   if(typeof DevFitProgress!=='undefined') appData=DevFitProgress.captureActive(appData);
-  if(loadFailed) return;   // storage holds data we could not read — do not clobber it
   try{
     localStorage.setItem('progressLog2',JSON.stringify(appData));
   }catch(e){
@@ -2402,6 +2406,7 @@ function applyRestoredProgress(){
     totalWeeks=(appData.bw&&appData.bw.length)||4;
     currentWeek=Math.min(currentWeek,totalWeeks-1);
     reconcileTierWeeks();
+    populateProgramInputs();
     onbMarkDone();
     const onb=document.getElementById('onb-overlay'); if(onb) onb.classList.remove('show');
     hideRestoreState();
@@ -2559,6 +2564,7 @@ function runProgressSync(){
     // Re-apply the shared program model after every cloud replacement. Tier only
     // changes visibility; it never reshapes or moves the saved weeks.
     reconcileTierWeeks();
+    populateProgramInputs();
     renderTabs();render();applyTierGates();
     // A separate background sync may complete before the first-run account check.
     // If it restored a program, dismiss every recovery/setup surface immediately.

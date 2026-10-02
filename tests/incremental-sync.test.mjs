@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { webcrypto } from 'node:crypto';
+import { webcrypto, createHash } from 'node:crypto';
 
 const code=fs.readFileSync(new URL('../devfit-db.js',import.meta.url),'utf8');
 const copy=o=>JSON.parse(JSON.stringify(o));
@@ -14,7 +14,12 @@ function client(fetch, initial=doc(), shared=new Map()){
   shared.set('devfit_token','synthetic');shared.set('devfit_user',JSON.stringify({email:'test@example.invalid'}));
   if(!shared.has('devfitTrainingV1'))shared.set('devfitTrainingV1',JSON.stringify(initial));
   const storage={getItem:k=>shared.get(k)??null,setItem:(k,v)=>shared.set(k,String(v)),removeItem:k=>shared.delete(k)};
-  const context={fetch,localStorage:storage,crypto:webcrypto,TextEncoder,Uint8Array,console:{warn(){}},Date:class extends Date{static now(){return now;}},
+  // This harness owns a virtual clock. Native WebCrypto uses a real worker pool,
+  // which can finish after advance() has already jumped past the debounce tick.
+  // Keep the SHA-256 result real, but its completion on the microtask scheduler.
+  // Browser integration checks separately exercise native asynchronous WebCrypto.
+  const crypto={randomUUID:()=>webcrypto.randomUUID(),subtle:{digest:async(_algorithm,bytes)=>Uint8Array.from(createHash('sha256').update(bytes).digest()).buffer}};
+  const context={fetch,localStorage:storage,crypto,TextEncoder,Uint8Array,console:{warn(){}},Date:class extends Date{static now(){return now;}},
     document:{getElementById:()=>null,createElement:()=>({style:{},setAttribute(){}}),body:{appendChild(){}},addEventListener(){}},
     setTimeout:(cb,ms)=>{timers.set(++id,{at:now+ms,cb});return id;},clearTimeout:id=>timers.delete(id),addEventListener(){}};
   context.window=context;vm.runInNewContext(code,context);

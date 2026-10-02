@@ -25,7 +25,8 @@
     return Number.isFinite(n) && n > 0 ? n : fallback;
   }
   function mondayYmd(input) {
-    const d = input ? new Date(String(input).slice(0, 10) + 'T00:00:00') : new Date();
+    const d = input && typeof input.getFullYear==='function' ? new Date(input.getTime())
+      : input ? new Date(String(input).slice(0, 10) + 'T00:00:00') : new Date();
     if (isNaN(d)) return mondayYmd();
     const day = d.getDay();
     d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
@@ -35,6 +36,13 @@
     const d = new Date(mondayYmd(start) + 'T00:00:00');
     d.setDate(d.getDate() + index * 7);
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  function calendarWeekIndex(start, date) {
+    const day=v=>{
+      const d=typeof v==='string'?new Date(v.slice(0,10)+'T00:00:00'):new Date(v);
+      return Date.UTC(d.getFullYear(),d.getMonth(),d.getDate());
+    };
+    return Math.floor((day(date)-day(start))/(7*86400000));
   }
   function newId() {
     try { if (global.crypto && global.crypto.randomUUID) return global.crypto.randomUUID(); } catch (_) {}
@@ -101,6 +109,14 @@
       out.sleep.push(mergeCells(a.sleep[i], b.sleep[i]));
       out.weeklyCheckin.push(mergeCheckin(a.weeklyCheckin[i], b.weeklyCheckin[i]));
     }
+    out.cellEdits=Object.assign({},b.cellEdits||{},a.cellEdits||{});
+    Object.keys(out.cellEdits).forEach(key=>{
+      const m=/^(bw|steps|sleep)\|(\d+)\|([0-6])$/.exec(key);if(!m||+m[2]>=count) return;
+      const at=Number((a.cellEdits||{})[key])||0,bt=Number((b.cellEdits||{})[key])||0;
+      const chosen=bt>at?b:a;out.cellEdits[key]=Math.max(at,bt);
+      if(out.cellEdits[key]>0) out[m[1]][+m[2]][+m[3]]=chosen[m[1]][+m[2]]?.[+m[3]]??'';
+    });
+    if(!Object.keys(out.cellEdits).length&&!a.cellEdits&&!b.cellEdits) delete out.cellEdits;
     return normalizeProgram(out);
   }
   function timelineFromLegacy(doc) {
@@ -173,13 +189,24 @@
     const i=doc.programs.findIndex(p=>p.id===doc.activeProgramId);
     if(i<0) return doc;
     const old=doc.programs[i];
-    doc.programs[i]=normalizeProgram(Object.assign({},old,{
-      start:mondayYmd(doc.programStart||old.start), duration:positiveInt(doc.programDuration,old.duration),
+    const next=normalizeProgram(Object.assign({},old,{
+      // Existing program identities keep their calendar anchor. A new date
+      // requires startProgram(), rather than moving every previously logged day.
+      start:old.start, duration:positiveInt(doc.programDuration,old.duration),
       goal:value(doc.goal,''), goalType:value(doc.goalType,'loss'), startWeight:value(doc.startWeight,''),
       targetSteps:value(doc.targetSteps,''), targetSleep:value(doc.targetSleep,''),
       bw:doc.bw,steps:doc.steps,sleep:doc.sleep,weeklyCheckin:doc.weeklyCheckin,
-      updatedAt:stamp||new Date().toISOString()
+      updatedAt:old.updatedAt
     }));
+    const fields=['duration','goal','goalType','startWeight','targetSteps','targetSleep','bw','steps','sleep','weeklyCheckin'];
+    // A deliberate blank is an edit, not a gap for an old device to refill.
+    next.cellEdits=Object.assign({},old.cellEdits||{});
+    ['bw','steps','sleep'].forEach(key=>next[key].forEach((row,w)=>row.forEach((v,d)=>{
+      if(v!==(old[key]?.[w]?.[d]??'')) next.cellEdits[key+'|'+w+'|'+d]=Date.now();
+    })));
+    if(!Object.keys(next.cellEdits).length&&!old.cellEdits) delete next.cellEdits;
+    if(fields.some(k=>JSON.stringify(next[k])!==JSON.stringify(old[k]))) next.updatedAt=stamp||new Date().toISOString();
+    doc.programs[i]=next;
     return applyActive(doc);
   }
   function ensureTimeline(input, requiredWeeks) {
@@ -200,7 +227,7 @@
     doc.programs.push(p); doc.activeProgramId=p.id; doc.activeProgramChangedAt=now;
     return applyActive(doc);
   }
-  function mergeDocuments(preferredInput, fallbackInput) {
+  function mergeDocuments(preferredInput, fallbackInput, authoritativeInput) {
     const preferred=ensureDocument(clone(preferredInput||{})), fallback=ensureDocument(clone(fallbackInput||{}));
     const preferredReset=Date.parse(preferred.resetAt||'')||0, fallbackReset=Date.parse(fallback.resetAt||'')||0;
     // Account reset is the one intentional destructive operation. A signed,
@@ -211,9 +238,20 @@
     const byId=new Map();
     fallback.programs.forEach(p=>byId.set(p.id,normalizeProgram(p)));
     preferred.programs.forEach(p=>byId.set(p.id,byId.has(p.id)?mergeProgram(p,byId.get(p.id)):normalizeProgram(p)));
+    // An old local copy must not undo a server-side date correction.
+    const anchors=new Map(((authoritativeInput&&authoritativeInput.programs)||[]).map(p=>[p.id,p.start]));
+    byId.forEach(p=>{if(anchors.has(p.id)) p.start=anchors.get(p.id);});
     const out=Object.assign({},fallback,preferred);
     out.progressSchema=SCHEMA_VERSION; out.programs=Array.from(byId.values()).sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt)));
-    out.activeProgramId=preferred.activeProgramId;
+    const preferredActive=out.programs.find(p=>p.id===preferred.activeProgramId);
+    const fallbackActive=out.programs.find(p=>p.id===fallback.activeProgramId);
+    // A legacy normalization timestamp is not evidence of a user switching.
+    const fallbackChanged=Date.parse(fallbackInput&&fallbackInput.activeProgramChangedAt||'')||0;
+    const preferredChanged=Date.parse(preferredInput&&preferredInput.activeProgramChangedAt||'')||0;
+    const useFallback=fallbackChanged>preferredChanged||
+      (fallbackActive&&programHasData(fallbackActive)&&preferredActive&&String(preferredActive.id).startsWith('legacy-')&&!programHasData(preferredActive));
+    out.activeProgramId=useFallback?fallback.activeProgramId:preferred.activeProgramId;
+    out.activeProgramChangedAt=useFallback?fallback.activeProgramChangedAt:preferred.activeProgramChangedAt;
     const active=out.programs.find(p=>p.id===out.activeProgramId);
     out.programs.forEach(p=>{ if(active&&p.id!==active.id&&!p.archivedAt&&String(p.createdAt)<=String(active.createdAt)) p.archivedAt=active.createdAt; });
     return applyActive(out);
@@ -225,6 +263,6 @@
 
   global.DevFitProgress={
     version:SCHEMA_VERSION,ensureDocument,captureActive,ensureTimeline,startProgram,mergeDocuments,applyActive,
-    mondayYmd,programHasData,_normalizeProgram:normalizeProgram
+    mondayYmd,calendarWeekIndex,programHasData,_normalizeProgram:normalizeProgram
   };
 })(typeof window!=='undefined'?window:globalThis);

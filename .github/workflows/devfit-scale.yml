@@ -46,7 +46,7 @@ jobs:
             psql -h 127.0.0.1 -U postgres -d devfit_scale -v ON_ERROR_STOP=1 -f "$file"
           done
       - name: Rollback-only incremental SQL regression
-        run: psql -h 127.0.0.1 -U postgres -d devfit_scale -v ON_ERROR_STOP=1 -f tests/scaling/incremental-regression.sql
+        run: psql -h 127.0.0.1 -U postgres -d devfit_scale -v ON_ERROR_STOP=1 -f tests/scaling/incremental-regression.sql -f tests/scaling/program-integrity.sql
       - name: Real handler and PostgreSQL stress tests (no production credentials)
         run: node tests/scaling/scale.mjs
       - name: Preserve results even when the capacity gate fails

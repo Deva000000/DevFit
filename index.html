@@ -1093,8 +1093,8 @@ function ymd(dt){ return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2
 function programStartDate(){
   // explicit appData.programStart > account startDate > Monday of current week
   let base=null;
-  if(appData.programStart){ const d=new Date(appData.programStart); if(!isNaN(d)) base=d; }
-  if(!base){ try{ const u=JSON.parse(localStorage.getItem('devfit_user')||'{}'); if(u.startDate){ const d=new Date(u.startDate); if(!isNaN(d)) base=d; } }catch(e){} }
+  if(appData.programStart){ const d=new Date(appData.programStart.slice(0,10)+'T00:00:00'); if(!isNaN(d)) base=d; }
+  if(!base){ try{ const u=JSON.parse(localStorage.getItem('devfit_user')||'{}'); if(u.startDate){ const d=new Date(u.startDate.slice(0,10)+'T00:00:00'); if(!isNaN(d)) base=d; } }catch(e){} }
   if(!base) base=new Date();
   return mondayOf(base);
 }
@@ -1106,7 +1106,7 @@ function weekDayDate(w,d){ const s=programStartDate(); const dt=new Date(s); dt.
 function currentWeekIndex(){
   const start=programStartDate(), today=mondayOf(new Date());
   if(!start||!today) return 0;
-  const diff=Math.round((today-start)/(7*24*3600*1000));
+  const diff=DevFitProgress.calendarWeekIndex(start,today);
   return Math.max(0, Math.min(diff, totalWeeks-1));
 }
 function mon(dt){ return dt.toLocaleDateString('en-US',{month:'short'}); }
@@ -1166,7 +1166,7 @@ function isoWeekKey(d){
 function reconcileTierWeeks(){
   if(typeof DevFitProgress!=='undefined') appData=DevFitProgress.ensureDocument(appData);
   const start=programStartDate(), today=mondayOf(new Date());
-  const elapsed=(start&&today)?Math.max(0,Math.round((today-start)/(7*86400000))):0;
+  const elapsed=(start&&today)?Math.max(0,DevFitProgress.calendarWeekIndex(start,today)):0;
   const planned=Math.max(1,parseInt(appData.programDuration,10)||8);
   if(typeof DevFitProgress!=='undefined') appData=DevFitProgress.ensureTimeline(appData,Math.max(planned,elapsed+1));
   ensureShape();
@@ -1471,12 +1471,19 @@ function ensureShape(){
 // Writing a day's value. Creates the week row if it is missing rather than
 // throwing out of an inline onblur, where the error is invisible and the user
 // just sees their number fail to stick.
-function setDay(key,w,i,v){
-  if(!Array.isArray(appData[key])) appData[key]=[];
-  while(appData[key].length<=w) appData[key].push(Array(7).fill(''));
-  if(!Array.isArray(appData[key][w])) appData[key][w]=Array(7).fill('');
-  appData[key][w][i]=v;
-  save(); render();
+function setDay(key,w,i,v,programId,redraw){
+  const target=programId&&programId!==appData.activeProgramId
+    ? (appData.programs||[]).find(p=>p.id===programId):appData;
+  if(!target) return;
+  if(!Array.isArray(target[key])) target[key]=[];
+  while(target[key].length<=w) target[key].push(Array(7).fill(''));
+  if(!Array.isArray(target[key][w])) target[key][w]=Array(7).fill('');
+  target[key][w][i]=v;
+  if(target!==appData){
+    target.cellEdits=Object.assign({},target.cellEdits,{[key+'|'+w+'|'+i]:Date.now()});
+    target.updatedAt=new Date().toISOString();
+  }
+  save(); if(redraw!==false) render();
 }
 function clampWeek(){
   const n=(appData && appData.bw && appData.bw.length) || 1;
@@ -1489,6 +1496,7 @@ function buildGrid(id,key,dotFn){
   el.innerHTML='';
   clampWeek();
   const row=(appData[key]&&appData[key][currentWeek])||Array(7).fill('');
+  const programArg=esc(JSON.stringify(appData.activeProgramId));
   DAYS.forEach((d,i)=>{
     const val=row[i]===undefined?'':row[i];
     const dot=val!==''?dotFn(parseFloat(val)):'';
@@ -1497,13 +1505,13 @@ function buildGrid(id,key,dotFn){
     if(key==='steps'){
       let opts='<option value="">—</option>';
       for(let n=1000;n<=20000;n+=1000) opts+='<option value="'+n+'"'+(String(val)===String(n)?' selected':'')+'>'+n/1000+'k</option>';
-      control='<select aria-label="'+d+' steps" onchange="setDay(\'steps\','+currentWeek+','+i+',this.value)">'+opts+'</select>';
+      control='<select aria-label="'+d+' steps" onchange="setDay(\'steps\','+currentWeek+','+i+',this.value,'+programArg+')">'+opts+'</select>';
     }else if(key==='sleep'){
       let opts='<option value="">—</option>';
       for(let n=1;n<=12;n+=0.5){const label=(n%1?n.toFixed(1):n.toFixed(0))+'h';opts+='<option value="'+n+'"'+(String(val)===String(n)?' selected':'')+'>'+label+'</option>';}
-      control='<select aria-label="'+d+' sleep" onchange="setDay(\'sleep\','+currentWeek+','+i+',this.value)">'+opts+'</select>';
+      control='<select aria-label="'+d+' sleep" onchange="setDay(\'sleep\','+currentWeek+','+i+',this.value,'+programArg+')">'+opts+'</select>';
     }else{
-      control='<input aria-label="'+d+' bodyweight" type="number" value="'+val+'" placeholder="—" step="0.1" inputmode="decimal" onblur="setDay(\'bw\','+currentWeek+','+i+',this.value)">';
+      control='<input aria-label="'+d+' bodyweight" type="number" value="'+val+'" placeholder="—" step="0.1" inputmode="decimal" oninput="setDay(\'bw\','+currentWeek+','+i+',this.value,'+programArg+',false)" onblur="render()">';
     }
     el.innerHTML+='<div class="day-card"><div class="day-lbl">'+d+'</div><div class="day-date">'+dt.getDate()+' '+mon(dt)+'</div>'+control+'<div class="day-dot '+dot+'"></div></div>';
   });
@@ -2356,17 +2364,16 @@ function onbMarkDone(){
     localStorage.setItem('devfit_onboarded_'+e,'1'); localStorage.setItem('devfit_welcomed_'+e,'1'); }catch(e){}
 }
 function onbFinish(){
+  // Recovery may complete while the setup wizard is open. An existing program
+  // wins over this stale first-run form, including sleep/steps-only history.
+  if(localHasProgress()){applyRestoredProgress();return;}
   const sw=document.getElementById('onb-startw').value;
   const gw=document.getElementById('onb-goalw').value;
   const dur=document.getElementById('onb-dur').value;
   const start=document.getElementById('onb-start').value;
-  appData.goalType=onbGoal||'loss';
-  appData.startWeight=sw||'';
-  appData.goal=(onbGoal==='maintain')?(sw||''):(gw||'');
-  appData.programDuration=dur||'8';
-  appData.programStart=start||ymd(programStartDate());
-  // Seed week-1 day-1 bodyweight so trends + score have a starting point.
-  try{ if(sw && appData.bw[0] && (appData.bw[0][0]===''||appData.bw[0][0]==null)) appData.bw[0][0]=sw; }catch(e){}
+  appData=DevFitProgress.startProgram(appData,{goalType:onbGoal||'loss',startWeight:sw||'',
+    goal:onbGoal==='maintain'?(sw||''):(gw||''),duration:dur||'8',start:start||ymd(programStartDate())});
+  totalWeeks=appData.bw.length;currentWeek=0;
   // Mirror into the visible profile inputs so the Progress tab matches, then persist.
   try{
     const gi=document.getElementById('goalInput'); if(gi) gi.value=appData.goal;
@@ -2384,7 +2391,8 @@ function localHasProgress(){
   try{
     const raw=localStorage.getItem('progressLog2'); if(!raw) return false;
     const d=JSON.parse(raw);
-    return !!(d && (d.startWeight || (d.bw && d.bw[0] && d.bw[0].some(v=>v!==''&&v!=null))));
+    return !!(d && (d.startWeight || (d.programs||[]).some(DevFitProgress.programHasData) ||
+      ['bw','steps','sleep'].some(k=>(d[k]||[]).some(row=>(row||[]).some(v=>v!==''&&v!=null)))));
   }catch(e){ return false; }
 }
 var restoreAttempt=0;
@@ -2419,7 +2427,7 @@ function startFirstRun(isRetry){
   let email=''; try{ email=(JSON.parse(localStorage.getItem('devfit_user')||'{}').email)||''; }catch(e){}
   let done=false; try{ done=!!localStorage.getItem('devfit_onboarded_'+email); }catch(e){}
   // Existing users who already have data shouldn't be interrupted — mark done silently.
-  const hasData = appData.startWeight || (appData.bw && appData.bw[0] && appData.bw[0].some(v=>v!==''&&v!=null));
+  const hasData = appData.startWeight || (appData.programs||[]).some(DevFitProgress.programHasData);
   if(hasData){ onbMarkDone(); hideRestoreState(); showWelcomeScreen(); return Promise.resolve({ok:true}); }
 
   // No local data + not onboarded → this may be a RETURNING user on a new device
@@ -2564,11 +2572,13 @@ function runProgressSync(){
     // Re-apply the shared program model after every cloud replacement. Tier only
     // changes visibility; it never reshapes or moves the saved weeks.
     reconcileTierWeeks();
-    populateProgramInputs();
-    renderTabs();render();applyTierGates();
+    const draw=()=>{populateProgramInputs();renderTabs();render();applyTierGates();};
+    const focused=document.activeElement;
+    const busy=focused&&/^(INPUT|SELECT|TEXTAREA)$/.test(focused.tagName);
+    if(busy) focused.addEventListener('blur',draw,{once:true});else draw();
     // A separate background sync may complete before the first-run account check.
     // If it restored a program, dismiss every recovery/setup surface immediately.
-    if(localHasProgress()) applyRestoredProgress();
+    if(localHasProgress()&&!busy) applyRestoredProgress();
     // If we restored fields the cloud was missing, push the repaired copy back up
     // so the cloud (and other devices) stop serving the blanked version.
     if(healed){ try{ if(DevFitDB.cloudSave) DevFitDB.cloudSave('progress',appData); }catch(e){} }

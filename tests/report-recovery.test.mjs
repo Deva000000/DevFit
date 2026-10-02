@@ -18,7 +18,7 @@ function fixture(){
 function context(){
   const storage=new Map(),nodes=new Map();
   const node=()=>({value:'',textContent:'',disabled:false,children:[],appendChild(v){this.children.push(v);},set innerHTML(v){this.children=[];this.html=v;},get innerHTML(){return this.html||'';}});
-  for(const id of ['program-report-range','report-range-summary','week-report-title','week-report-desc','report-history-status','week-report-btn','program-report-btn']) nodes.set(id,node());
+  for(const id of ['report-program','program-report-range','report-range-summary','week-report-title','week-report-desc','report-history-status','week-report-btn','program-report-btn']) nodes.set(id,node());
   class Clock extends Date{constructor(...args){super(...(args.length?args:['2026-10-02T12:00:00']));}static now(){return new Date('2026-10-02T12:00:00').getTime();}}
   const c={console,Date:Clock,setTimeout,clearTimeout,Promise,localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,String(v))},document:{getElementById:k=>nodes.get(k)||null,createElement:node,activeElement:null},toast:()=>{},paintUsage:()=>{}};
   c.window=c;
@@ -28,10 +28,10 @@ function context(){
 }
 function settingsContext(){
   const state=context(),c=state.c,html=source('settings.html');
-  vm.runInContext('var appData={bw:[],steps:[],sleep:[],weeklyCheckin:[]},totalWeeks=4,currentWeek=0,REPORT_RANGES=[],reportSelectionKey=null,reportHistoryPending=null,reportHistoryCheckedAt=0;',c);
+  vm.runInContext('var appData={bw:[],steps:[],sleep:[],weeklyCheckin:[]},totalWeeks=4,currentWeek=0,REPORT_RANGES=[],reportSelectionKey=null,reportProgramId=null,reportHistoryPending=null,reportHistoryCheckedAt=0;',c);
   vm.runInContext(source('scoring.js'),c);
   vm.runInContext(source('report-engine.js'),c);
-  for(const name of ['loadReportData','reportRangeKey','reportableEndWeek','updateReportRangeSummary','buildRangeOptions','reportHistoryStatus','refreshReportHistory','exportProgramPDF','exportWeekPDF','saveClientName']) vm.runInContext(fn(html,name),c);
+  for(const name of ['loadReportData','reportRangeKey','reportableEndWeek','updateReportRangeSummary','buildReportProgramOptions','buildRangeOptions','reportHistoryStatus','refreshReportHistory','exportProgramPDF','exportWeekPDF','saveClientName']) vm.runInContext(fn(html,name),c);
   return state;
 }
 
@@ -110,4 +110,27 @@ test('a Settings profile edit preserves newer local program metadata',()=>{
   storage.set('progressLog2',JSON.stringify(fresh));const el=node();el.value='Synthetic User';nodes.set('clientNameInput',el);
   c.DevFitDB={cloudSave:()=>{}};c.saveClientName();
   const saved=JSON.parse(storage.get('progressLog2'));assert.equal(saved.activeProgramId,fresh.activeProgramId);assert.equal(saved.programStart,'2026-09-28');assert.equal(saved.programs.length,2);
+});
+
+test('archived program reports stay selected after recovery without changing the active program',async()=>{
+  const {c,storage,nodes,node}=settingsContext();
+  const old=c.DevFitProgress.ensureDocument(fixture());const archivedId=old.activeProgramId;
+  const fresh=c.DevFitProgress.startProgram(old,{start:'2026-09-28',duration:16,startWeight:'72'});
+  storage.set('progressLog2',JSON.stringify(fresh));c.loadReportData();c.buildRangeOptions();
+  const sel=nodes.get('report-program');assert.equal(sel.children.length,2);
+  sel.value=archivedId;sel.onchange();assert.equal(c.appData.programStart,'2026-07-13');
+  assert.equal(c.REPORT_RANGES[0].endW,11);
+  c.DevFitDB={restoreAccount:async()=>({ok:true}),cloudSave:(_,doc)=>assert.equal(doc.activeProgramId,fresh.activeProgramId)};
+  await c.refreshReportHistory(true);assert.equal(sel.value,archivedId);
+  const name=node();name.value='Updated name';nodes.set('clientNameInput',name);c.saveClientName();
+  const saved=JSON.parse(storage.get('progressLog2'));
+  assert.equal(saved.activeProgramId,fresh.activeProgramId);assert.equal(saved.programStart,'2026-09-28');
+  assert.equal(saved.clientName,'Updated name');assert.equal(c.appData.activeProgramId,archivedId);
+});
+
+test('report training includes archived cycles once and prefers the live version',()=>{
+  const {c,storage}=settingsContext();
+  storage.set('devfitTrainingV1',JSON.stringify({sessions:[{id:'live',date:'2026-08-01',workoutId:'upper',notes:'latest'}],
+    cycleArchive:[{sessions:[{id:'old',date:'2026-08-01',workoutId:'upper',notes:'old'},{id:'archived',date:'2026-07-20',workoutId:'lower'}]}]}));
+  const train=c.loadTraining();assert.equal(train.sessions.length,2);assert.equal(train.sessions[0].notes,'latest');
 });

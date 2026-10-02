@@ -651,6 +651,7 @@ let data=load();
 let _saveWarned=false;
 function save(){
   if(loadFailed) return;   // storage holds data we could not read — do not clobber it
+  if(data.days&&data.days[currentDate]) data.days[currentDate].mts=Math.max(Date.now(),data.days[currentDate].mts||0);
   try{
     localStorage.setItem(KEY,JSON.stringify(data));
   }catch(e){
@@ -909,12 +910,12 @@ function shiftDate(delta){
 
 function progStart(){
   let base=null;
-  try{ const pl=JSON.parse(localStorage.getItem('progressLog2')||'{}'); if(pl.programStart){const d=new Date(pl.programStart); if(!isNaN(d)) base=d;} }catch(e){}
-  if(!base){ try{ const u=JSON.parse(localStorage.getItem('devfit_user')||'{}'); if(u.startDate){const d=new Date(u.startDate); if(!isNaN(d)) base=d;} }catch(e){} }
+  try{ const pl=JSON.parse(localStorage.getItem('progressLog2')||'{}'); if(pl.programStart){const d=new Date(pl.programStart.slice(0,10)+'T00:00:00'); if(!isNaN(d)) base=d;} }catch(e){}
+  if(!base){ try{ const u=JSON.parse(localStorage.getItem('devfit_user')||'{}'); if(u.startDate){const d=new Date(u.startDate.slice(0,10)+'T00:00:00'); if(!isNaN(d)) base=d;} }catch(e){} }
   if(!base) return null;
   base.setHours(0,0,0,0); const day=base.getDay(); base.setDate(base.getDate()+(day===0?-6:1-day)); return base;
 }
-function weekOfDate(dateStr){ const s=progStart(); if(!s) return null; const d=new Date(dateStr+'T00:00:00'); if(isNaN(d)) return null; return Math.floor((d-s)/(7*86400000)); }
+function weekOfDate(dateStr){ const s=progStart(); if(!s) return null; const d=new Date(dateStr+'T00:00:00'); if(isNaN(d)) return null; return Math.floor((Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())-Date.UTC(s.getFullYear(),s.getMonth(),s.getDate()))/(7*86400000)); }
 
 function renderDay(){
   ensureDay(currentDate);
@@ -1052,6 +1053,7 @@ function escHtml(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/<
 
 function removeItem(mealId,itemId){
   const meal=findMeal(currentDate,mealId); if(!meal) return;
+  markNutritionDeleted(currentDate+'|meal:'+mealId+'|item:'+itemId);
   meal.items=meal.items.filter(it=>it.id!==itemId);
   save(); renderDay();
 }
@@ -1067,6 +1069,7 @@ function deleteMeal(mealId){
   const meal=day.meals.find(m=>m.id===mealId); if(!meal) return;
   const hasItems=(meal.items||[]).length>0;
   if(hasItems && !confirm('Delete "'+meal.name+'" and its '+meal.items.length+' item(s)?')) return;
+  markNutritionDeleted(currentDate+'|meal:'+mealId);
   day.meals=day.meals.filter(m=>m.id!==mealId);
   save(); renderDay();
 }
@@ -1078,11 +1081,18 @@ document.getElementById('add-meal-btn').addEventListener('click',()=>{
   save(); renderMeals();
 });
 
+function markNutritionDeleted(key){
+  const now=Date.now();
+  data._deleted=(data._deleted||[]).filter(t=>t.k!==key&&t.ts>now-180*86400000);
+  data._deleted.unshift({k:key,ts:now});data._deleted=data._deleted.slice(0,2000);
+  return now;
+}
 document.getElementById('diet-clear-btn').addEventListener('click',()=>{
   const dm=getDayMacros(currentDate);
   if(!(dm.cal>0||dm.p>0||dm.c>0||dm.f>0)) return;
   const label=new Date(currentDate+'T12:00:00').toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'});
   if(!confirm('Clear all food entries for '+label+'?')) return;
+  markNutritionDeleted('day|'+currentDate);
   data.days[currentDate]=blankDay();
   save(); renderDay();
 });
@@ -1139,7 +1149,8 @@ function loadDietPlan(id){
   const label=new Date(currentDate+'T12:00:00').toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'});
   if(!confirm('Load “'+p.name+'” onto '+label+'? This replaces the meals logged for that day.')) return;
   const meals=JSON.parse(JSON.stringify(p.meals)).map(m=>({id:uid(),name:m.name,items:(m.items||[]).map(it=>Object.assign({},it,{id:uid()}))}));
-  data.days[currentDate]={meals};
+  const replacedAt=markNutritionDeleted('day|'+currentDate);
+  data.days[currentDate]={meals,mts:replacedAt+1};
   if(p.targets){
     data.targets=Object.assign({cal:'',p:'',c:'',f:''},p.targets);
     ['cal','p','c','f'].forEach(k=>{ const elx=document.getElementById('t-'+k); if(elx) elx.value=(data.targets[k]===''||data.targets[k]==null)?'':data.targets[k]; });
@@ -2883,9 +2894,29 @@ body{padding-bottom:104px!important}
 <script>
 if(typeof DevFitDB!=='undefined'){
   DevFitDB.cloudSync('nutrition','devfitNutritionV2',function(d){
+    // Calculator listeners hold this object. Keep it linked to the restored
+    // document so subsequent edits are saved into the live account data.
+    const calc=data.calc;
+    if(calc){
+      if(d.calc&&d.calc!==calc){Object.keys(calc).forEach(k=>delete calc[k]);Object.assign(calc,d.calc);}
+      d.calc=calc;
+    }
     data=d;
-    if(typeof renderDay==='function') renderDay();
-    if(typeof renderTrend==='function') renderTrend();
+    const draw=()=>{
+      ['cal','p','c','f'].forEach(k=>{const el=document.getElementById('t-'+k);if(el&&document.activeElement!==el)el.value=data.targets[k]??'';});
+      if(data.calc) ['age','ht','wt','bf','sex','job','days','int','goal','adjust'].forEach(k=>{
+        const el=document.getElementById('c-'+k);if(el&&document.activeElement!==el)el.value=data.calc[k]??'';
+        if(el) el.querySelectorAll('.chip').forEach(ch=>ch.classList.toggle('active',String(data.calc[k])===ch.dataset.v));
+      });
+      if(typeof renderDay==='function') renderDay();
+      if(typeof renderTrend==='function') renderTrend();
+    };
+    const focused=document.activeElement;
+    if(focused&&/^(INPUT|SELECT|TEXTAREA)$/.test(focused.tagName)) focused.addEventListener('blur',draw,{once:true});
+    else draw();
+  });
+  document.addEventListener('visibilitychange',function(){
+    if(!document.hidden) DevFitDB.cloudSync('nutrition','devfitNutritionV2');
   });
 }
 </script>

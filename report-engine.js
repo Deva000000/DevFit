@@ -55,8 +55,8 @@ function mondayOf(d){
 // Unified anchor: appData.programStart > account startDate > null (unanchored).
 function programStartDate(){
   let base=null;
-  try{ const ad=AD(); if(ad.programStart){ const d=new Date(ad.programStart); if(!isNaN(d)) base=d; } }catch(e){}
-  if(!base){ try{ const u=JSON.parse(localStorage.getItem('devfit_user')||'{}'); if(u.startDate){ const d=new Date(u.startDate); if(!isNaN(d)) base=d; } }catch(e){} }
+  try{ const ad=AD(); if(ad.programStart){ const d=new Date(ad.programStart.slice(0,10)+'T00:00:00'); if(!isNaN(d)) base=d; } }catch(e){}
+  if(!base){ try{ const u=JSON.parse(localStorage.getItem('devfit_user')||'{}'); if(u.startDate){ const d=new Date(u.startDate.slice(0,10)+'T00:00:00'); if(!isNaN(d)) base=d; } }catch(e){} }
   if(!base) return null;
   return mondayOf(base);
 }
@@ -79,7 +79,16 @@ function weekRangeLabel(w){
 }
 
 function loadNutrition(){ try{ return JSON.parse(localStorage.getItem('devfitNutritionV2')||'null')||{targets:{},days:{}}; }catch(e){ return {targets:{},days:{}}; } }
-function loadTraining(){ try{ return JSON.parse(localStorage.getItem('devfitTrainingV1')||'null')||{plan:{workouts:[]},sessions:[]}; }catch(e){ return {plan:{workouts:[]},sessions:[]}; } }
+function loadTraining(){
+  try{
+    const data=JSON.parse(localStorage.getItem('devfitTrainingV1')||'null')||{plan:{workouts:[]},sessions:[]};
+    const sessions=new Map();
+    (data.sessions||[]).concat((data.cycleArchive||[]).flatMap(a=>a.sessions||[])).forEach(s=>{
+      const key=s.date+'|'+s.workoutId;if(!sessions.has(key))sessions.set(key,s);
+    });
+    data.sessions=Array.from(sessions.values());return data;
+  }catch(e){return {plan:{workouts:[]},sessions:[]};}
+}
 
 function dayMacros(day){
   if(!day) return null;

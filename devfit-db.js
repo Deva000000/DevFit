@@ -155,6 +155,14 @@
   function mergeLog(win, los) {
     const out = fillGaps(win, los);
     out.name = win.name || los.name || '';
+    // Structural changes (add/remove set) cannot be merged by old positions:
+    // doing so resurrects a removed set or assigns its numbers to another set.
+    if (num(win.setStructureAt) !== num(los.setStructureAt)) {
+      const structure = num(win.setStructureAt) > num(los.setStructureAt) ? win : los;
+      out.sets = clone(structure.sets || []);
+      out.setStructureAt = structure.setStructureAt;
+      return out;
+    }
     const a = Array.isArray(win.sets) ? win.sets : [];
     const b = Array.isArray(los.sets) ? los.sets : [];
     const n = Math.max(a.length, b.length);
@@ -199,7 +207,7 @@
   // Tombstones: `{k:'<date>|<workoutId>', ts}`. A delete only wins over a session
   // that has not been touched since the delete happened, so re-logging that day
   // afterwards is safe.
-  function mergeTombstones(a, b) {
+  function mergeTombstones(a, b, limit) {
     const by = new Map();
     (a || []).concat(b || []).forEach(function (t) {
       if (!t || !t.k) return;
@@ -210,7 +218,7 @@
     return Array.from(by.values())
       .filter(function (t) { return t.ts > cutoff; })
       .sort(function (x, y) { return y.ts - x.ts; })
-      .slice(0, 400);
+      .slice(0, limit || 400);
   }
 
   function mergeSessionArrays(winArr, losArr, tombs) {
@@ -248,8 +256,7 @@
       if (!by.has(k)) by.set(k, x);
     });
     return Array.from(by.values())
-      .sort(function (x, y) { return num(y.savedAt) - num(x.savedAt); })
-      .slice(0, 8);
+      .sort(function (x, y) { return num(y.savedAt) - num(x.savedAt); });
   }
 
   function mergeWorkouts(win, los) {
@@ -265,24 +272,47 @@
 
   // ── nutrition ───────────────────────────────────────────────────────────
   // `days` is a calendar-keyed map, so a plain key union is exactly right. For a
-  // day both sides logged, keep the fuller one — a device that recorded four
-  // meals should never be beaten by one that recorded none.
-  function dayWeight(d) {
-    if (!d) return 0;
-    if (Array.isArray(d.foods)) return d.foods.length;
-    if (Array.isArray(d.meals)) return d.meals.reduce(function (n, m) {
-      return n + ((m && m.items && m.items.length) || 0);
-    }, 0);
-    return Object.keys(d).length;
-  }
+  // day both sides logged, merge stable meal/item identities and explicit
+  // deletion markers. "More foods wins" resurrected intentional deletions.
   function mergeNutrition(win, los) {
     const out = fillGaps(win, los);
-    const days = Object.assign({}, los.days || {});
+    const tombs = mergeTombstones(win._deleted, los._deleted, 2000);
+    const deleted = new Map(tombs.map(t=>[t.k,num(t.ts)]));
+    const days = clone(los.days || {});
     Object.keys(win.days || {}).forEach(function (k) {
-      const w = win.days[k], l = days[k];
-      days[k] = (!l || dayWeight(w) >= dayWeight(l)) ? w : l;
+      let w = win.days[k], l = days[k];
+      const cleared = deleted.get('day|'+k) || 0;
+      if (cleared && num(w && w.mts) <= cleared) w = null;
+      if (cleared && num(l && l.mts) <= cleared) l = null;
+      if (!w || !l || !Array.isArray(w.meals) || !Array.isArray(l.meals)) {
+        days[k] = clone(w || l || {meals:[],mts:cleared}); return;
+      }
+      // First render creates blank default meals with fresh IDs. They are not
+      // user-created meals to union into an already populated account diary.
+      if(!num(w.mts)&&!w.meals.some(m=>(m.items||[]).length)){days[k]=clone(l);return;}
+      if(!num(l.mts)&&!l.meals.some(m=>(m.items||[]).length)){days[k]=clone(w);return;}
+      if(w.meals.concat(l.meals).some(m=>!m.id||(m.items||[]).some(it=>!it.id))){days[k]=clone(w);return;}
+      const meals = new Map();
+      (w.meals || []).concat(l.meals || []).forEach(function (meal) {
+        if (!meal || deleted.has(k+'|meal:'+meal.id)) return;
+        const prev = meals.get(meal.id);
+        if (!prev) { meals.set(meal.id,clone(meal)); return; }
+        const items = new Map((prev.items || []).map(it=>[it.id,it]));
+        (meal.items || []).forEach(it=>{if(!items.has(it.id)) items.set(it.id,clone(it));});
+        prev.items = Array.from(items.values());
+      });
+      meals.forEach(meal=>{meal.items=(meal.items||[]).filter(it=>!deleted.has(k+'|meal:'+meal.id+'|item:'+it.id));});
+      days[k] = Object.assign({},l,w,{meals:Array.from(meals.values()),mts:Math.max(num(w.mts),num(l.mts))});
+    });
+    // Deletions may arrive without the deleting device carrying that whole day.
+    Object.keys(days).forEach(k=>{
+      const day=days[k],cleared=deleted.get('day|'+k)||0;
+      if(cleared&&num(day&&day.mts)<=cleared){days[k]={meals:[],mts:cleared};return;}
+      if(day&&Array.isArray(day.meals)) day.meals=day.meals.filter(m=>!deleted.has(k+'|meal:'+m.id)).map(m=>
+        Object.assign({},m,{items:(m.items||[]).filter(it=>!deleted.has(k+'|meal:'+m.id+'|item:'+it.id))}));
     });
     out.days = days;
+    out._deleted = tombs;
     return out;
   }
 
@@ -307,13 +337,13 @@
   // Normalize each visible/archive week to its Monday before merging. This lets
   // two devices edit different weeks or different days without confusing index 0
   // from programs with different start dates.
-  function mergeProgress(win, los) {
+  function mergeProgress(win, los, authoritative) {
     // v2 programs carry immutable ids. Two programs may cover the same Monday,
     // so calendar date alone is no longer an identity and must never re-anchor a
     // new Week 1 onto an older program. The model also migrates both legacy docs
     // before merging, preserving every old week as a recoverable program.
     if (global.DevFitProgress && typeof global.DevFitProgress.mergeDocuments === 'function') {
-      return global.DevFitProgress.mergeDocuments(win, los);
+      return global.DevFitProgress.mergeDocuments(win, los, authoritative);
     }
     // Fail closed if the model script was unavailable: preserving the preferred
     // complete document is safer than combining distinct programs by date. A
@@ -373,14 +403,14 @@
     return out;
   }
 
-  function mergeDoc(dataType, winner, loser) {
+  function mergeDoc(dataType, winner, loser, authoritative) {
     const w = winner || {}, l = loser || {};
     if (!winner) return l;
     if (!loser) return w;
     try {
       if (dataType === 'workouts') return mergeWorkouts(w, l);
       if (dataType === 'nutrition') return mergeNutrition(w, l);
-      if (dataType === 'progress') return mergeProgress(w, l);
+      if (dataType === 'progress') return mergeProgress(w, l, authoritative || cloudSnapshot.progress);
     } catch (e) {
       console.warn('[DevFit Cloud] merge failed (' + dataType + '), keeping winner:', e);
     }
@@ -926,6 +956,16 @@
   }
   try {
     global.addEventListener('online', resumeDirtySaves);
+    global.addEventListener('storage', function (event) {
+      Object.keys(LOCAL_KEY).forEach(function (type) {
+        const key=LOCAL_KEY[type], owner=getEmail();
+        if(event.key!==key && event.key!==key+'::'+owner) return;
+        const latest=readLocal(type);
+        if(latest && typeof notify[type]==='function') {
+          try{notify[type](latest);}catch(e){}
+        }
+      });
+    });
     document.addEventListener('visibilitychange', function () {
       if (!document.hidden) resumeDirtySaves();
       else Object.keys(pendingSave).forEach(function (t) { if (pendingSave[t]) flushSave(t); });

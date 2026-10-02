@@ -525,6 +525,8 @@ html.nosplash #devfit-splash{display:none!important}
   <div class="group-title" id="reports-group">Reports</div>
   <div class="card" id="card-reports">
     <div class="section-label">Export PDF</div>
+    <label class="range-picker-label" for="report-program">Program history</label>
+    <select id="report-program" style="width:100%;font:inherit;font-size:16px;padding:12px;border-radius:12px;margin-bottom:12px"><option>Loading programs…</option></select>
 
     <button class="setting-btn" id="week-report-btn" type="button">
       <div class="icon">W</div>
@@ -666,7 +668,7 @@ html.nosplash #devfit-splash{display:none!important}
 
   <div class="footer">
     DevFit · Dominance Through Discipline<br>
-    <a href="#support-group-title" id="footer-support-link">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.94.1
+    <a href="#support-group-title" id="footer-support-link">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.94.2
   </div>
 
 
@@ -806,6 +808,7 @@ let currentWeek = 0;
 // vanish into the render's try/catch, leaving the dropdown silently empty.
 let REPORT_RANGES = [];
 let reportSelectionKey = null;
+let reportProgramId = null;
 function reportRangeKey(range){
   if(!range) return null;
   const program=appData.activeProgramId||appData.programStart||'';
@@ -830,6 +833,10 @@ function loadReportData(){
     if(s){
       appData = JSON.parse(s);
       if(window.DevFitProgress) appData=DevFitProgress.ensureDocument(appData);
+      const selected=(appData.programs||[]).find(p=>p.id===reportProgramId);
+      reportProgramId=selected?selected.id:appData.activeProgramId;
+      // Report selection is a read-only view, never a change to the active plan.
+      if(selected){appData.activeProgramId=selected.id;appData=DevFitProgress.applyActive(appData);}
       totalWeeks = appData.bw.length || 4;
     }
     currentWeek=0;
@@ -842,14 +849,14 @@ function loadReportData(){
       if(hasData){ currentWeek = w; break; }
     }
     // Training/nutrition may be logged without any bodyweight entries.
-    const workouts=JSON.parse(localStorage.getItem('devfitTrainingV1')||'{}');
+    const workouts=loadTraining();
     const nutrition=JSON.parse(localStorage.getItem('devfitNutritionV2')||'{}');
     const start=programStartDate();
     if(start){
       const dates=(workouts.sessions||[]).map(s=>s.date).concat(Object.keys(nutrition.days||{}));
       dates.forEach(date=>{
         if(!/^\d{4}-\d{2}-\d{2}$/.test(date||'')) return;
-        const week=Math.floor((new Date(date+'T00:00:00')-start)/(7*86400000));
+        const week=DevFitProgress.calendarWeekIndex(start,date);
         if(week>=0&&week<totalWeeks) currentWeek=Math.max(currentWeek,week);
       });
     }
@@ -1131,7 +1138,7 @@ function reportableEndWeek(){
   const start=programStartDate();
   if(!start) return Math.max(0,Math.min(totalWeeks-1,currentWeek));
   const now=mondayOf(new Date());
-  const elapsed=Math.max(0,Math.floor((now-start)/(7*86400000)));
+  const elapsed=Math.max(0,DevFitProgress.calendarWeekIndex(start,now));
   return Math.max(0,Math.min(totalWeeks-1,elapsed));
 }
 
@@ -1149,6 +1156,7 @@ function updateReportRangeSummary(){
 }
 
 function buildRangeOptions(){
+  buildReportProgramOptions();
   const sel = document.getElementById('program-report-range');
   if(!sel) return;
   const spanLabel=(w1,w2)=>{
@@ -1209,6 +1217,19 @@ function buildRangeOptions(){
   }
 }
 
+function buildReportProgramOptions(){
+  const sel=document.getElementById('report-program');if(!sel) return;
+  const canonical=DevFitProgress.ensureDocument(JSON.parse(localStorage.getItem('progressLog2')||'{}'));
+  sel.innerHTML='';
+  (canonical.programs||[]).filter(p=>p.id===canonical.activeProgramId||DevFitProgress.programHasData(p)).forEach(p=>{
+    const opt=document.createElement('option');opt.value=p.id;
+    opt.textContent=(p.id===canonical.activeProgramId?'Current':'Archived')+' · '+p.start+' · '+Math.max(p.duration,(p.bw||[]).length)+' weeks';
+    sel.appendChild(opt);
+  });
+  sel.value=reportProgramId||canonical.activeProgramId;
+  sel.onchange=function(){reportProgramId=sel.value;reportSelectionKey=null;loadReportData();buildRangeOptions();};
+}
+
 // ---------- CLIENT NAME ----------
 (function populateClientName(){
   try{
@@ -1222,10 +1243,13 @@ function saveClientName(){
     if(!el) return;
     // Other tabs/account recovery may have replaced the program since page load.
     // A name edit must never write this page's stale program metadata back.
-    if(!loadReportData()){ toast('Your program is still loading. Please retry.',true); return; }
-    appData.clientName=el.value.trim();
-    localStorage.setItem('progressLog2',JSON.stringify(appData));
-    if(typeof DevFitDB!=='undefined') DevFitDB.cloudSave('progress',appData);
+    const raw=localStorage.getItem('progressLog2');
+    if(!raw){ toast('Your program is still loading. Please retry.',true); return; }
+    const canonical=DevFitProgress.ensureDocument(JSON.parse(raw));
+    canonical.clientName=el.value.trim();
+    localStorage.setItem('progressLog2',JSON.stringify(canonical));
+    if(typeof DevFitDB!=='undefined') DevFitDB.cloudSave('progress',canonical);
+    loadReportData();
     // refresh display name in profile
     document.getElementById('profile-name').textContent=appData.clientName||'Client';
     document.getElementById('profile-avatar').textContent=(appData.clientName[0]||'D').toUpperCase();

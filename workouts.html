@@ -900,9 +900,8 @@ function loadPlanMeta(){
 ['plan-name','plan-client','plan-notes'].forEach(id=>{
   const el=document.getElementById(id); if(!el) return;
   el.addEventListener('input',()=>{
-    data.plan.name  =document.getElementById('plan-name').value;
-    data.plan.client=document.getElementById('plan-client').value;
-    data.plan.notes =document.getElementById('plan-notes').value;
+    const field={'plan-name':'name','plan-client':'client','plan-notes':'notes'}[id];
+    data.plan[field]=el.value;
     save();
   });
 });
@@ -1561,12 +1560,12 @@ function dateNavLocked(){ return !isPro(); }
 // Unified date anchor (shared with Progress page via progressLog2.programStart).
 function progStart(){
   let base=null;
-  try{ const pl=JSON.parse(localStorage.getItem('progressLog2')||'{}'); if(pl.programStart){const d=new Date(pl.programStart); if(!isNaN(d)) base=d;} }catch(e){}
-  if(!base){ try{ const u=JSON.parse(localStorage.getItem('devfit_user')||'{}'); if(u.startDate){const d=new Date(u.startDate); if(!isNaN(d)) base=d;} }catch(e){} }
+  try{ const pl=JSON.parse(localStorage.getItem('progressLog2')||'{}'); if(pl.programStart){const d=new Date(pl.programStart.slice(0,10)+'T00:00:00'); if(!isNaN(d)) base=d;} }catch(e){}
+  if(!base){ try{ const u=JSON.parse(localStorage.getItem('devfit_user')||'{}'); if(u.startDate){const d=new Date(u.startDate.slice(0,10)+'T00:00:00'); if(!isNaN(d)) base=d;} }catch(e){} }
   if(!base) return null;
   base.setHours(0,0,0,0); const day=base.getDay(); base.setDate(base.getDate()+(day===0?-6:1-day)); return base;
 }
-function weekOfDate(dateStr){ const s=progStart(); if(!s) return null; const d=new Date(dateStr+'T00:00:00'); if(isNaN(d)) return null; return Math.floor((d-s)/(7*86400000)); }
+function weekOfDate(dateStr){ const s=progStart(); if(!s) return null; const d=new Date(dateStr+'T00:00:00'); if(isNaN(d)) return null; return Math.floor((Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())-Date.UTC(s.getFullYear(),s.getMonth(),s.getDate()))/(7*86400000)); }
 
 // Which workout is loaded in the log view (replaces the old dropdown).
 let selectedWorkoutId='';
@@ -1641,15 +1640,6 @@ function getCycleArchive(){ if(!Array.isArray(data.cycleArchive)) data.cycleArch
 function readProgramStart(){
   try{ return JSON.parse(localStorage.getItem('progressLog2')||'{}').programStart||null; }catch(e){ return null; }
 }
-function writeProgramStart(val){
-  try{
-    const pl=JSON.parse(localStorage.getItem('progressLog2')||'{}');
-    if(val) pl.programStart=val; else delete pl.programStart;
-    localStorage.setItem('progressLog2',JSON.stringify(pl));
-    if(typeof DevFitDB!=='undefined') DevFitDB.cloudSave('progress',pl);
-    return true;
-  }catch(e){ return false; }
-}
 function renderMesoCard(){
   const st=document.getElementById('meso-state');
   const wrap=document.getElementById('meso-restore-wrap');
@@ -1679,14 +1669,6 @@ document.getElementById('new-meso-btn').addEventListener('click',()=>{
   )) return;
 
   const oldStart=readProgramStart();
-  let newStart=null;
-  if(confirm(
-    'Also restart the week counter at Week 1 from today?\n\n'+
-    'OK = today becomes week 1 everywhere (Training, Progress, Nutrition all share one date anchor, so your existing weight & nutrition weeks get re-numbered too).\n\n'+
-    'Cancel = keep the current program dates and only clear the workout logs.'
-  )){
-    newStart=todayStr();
-  }
 
   const arch=getCycleArchive();
   arch.unshift({
@@ -1695,19 +1677,18 @@ document.getElementById('new-meso-btn').addEventListener('click',()=>{
     savedAt:Date.now(),
     from:dates[0], to:dates[dates.length-1], count:n,
     programStart:oldStart,
-    restartedWeeks:!!newStart,
+    restartedWeeks:false,
     sessions:JSON.parse(JSON.stringify(data.sessions))
   });
-  data.cycleArchive=arch.slice(0,5);   // keep storage sane
+  data.cycleArchive=arch;   // Never silently discard a customer's older sessions.
   tombstone(data.sessions);
   data.sessions=[];
   currentSession=null;
-  if(newStart) writeProgramStart(newStart);
   save();
   renderLog();
   renderMesoCard();
   if(currentMode==='progress') renderProgressView();
-  toast(newStart?'New mesocycle — week 1 starts today':'New mesocycle started');
+  toast('New mesocycle started — program dates preserved');
 });
 document.getElementById('restore-meso-btn').addEventListener('click',()=>{
   const arch=getCycleArchive();
@@ -1718,7 +1699,6 @@ document.getElementById('restore-meso-btn').addEventListener('click',()=>{
   const back=(a.sessions||[]).filter(s=>!have.has(s.id));
   back.forEach(s=>{ s.mts=Date.now(); data.sessions.push(s); });
   untombstone(back);   // undo the archive's delete markers, or sync re-removes them
-  if(a.restartedWeeks) writeProgramStart(a.programStart);
   data.cycleArchive=arch.slice(1);
   currentSession=null;
   save();
@@ -1926,8 +1906,8 @@ function renderLog(jumpToLast){
       row.style.marginTop='4px';
       row.innerHTML=`
         <div class="set-num">${i+1}</div>
-        <input type="number" inputmode="decimal" step="0.5" placeholder="···" value="${set.reps??''}" data-ex="${ex.id}" data-i="${i}" data-f="reps">
-        <input type="number" inputmode="decimal" step="0.5" placeholder="···" value="${set.weight??''}" data-ex="${ex.id}" data-i="${i}" data-f="weight">
+        <input type="number" inputmode="decimal" step="0.5" placeholder="···" value="${set.reps??''}" data-ex="${ex.id}" data-i="${i}" data-f="reps" data-structure="${Number(log.setStructureAt)||0}">
+        <input type="number" inputmode="decimal" step="0.5" placeholder="···" value="${set.weight??''}" data-ex="${ex.id}" data-i="${i}" data-f="weight" data-structure="${Number(log.setStructureAt)||0}">
         <div class="last-cell">${lastTxt}</div>
         <button class="del-mini" data-del-set="${ex.id}|${i}" aria-label="Delete set">×</button>`;
       setsDiv.appendChild(row);
@@ -1968,7 +1948,9 @@ function renderLog(jumpToLast){
     inp.addEventListener('input',e=>{
       const exId=e.target.dataset.ex,i=Number(e.target.dataset.i),f=e.target.dataset.f;
       const log=currentSession.sess.logs.find(l=>l.exId===exId);
-      if(!log||!log.sets[i]) return;
+      if(!log||!log.sets[i]||(Number(log.setStructureAt)||0)!==(Number(e.target.dataset.structure)||0)){
+        toast('Sets changed on another screen. Check the refreshed workout before editing.');renderLog();return;
+      }
       log.sets[i][f]=e.target.value===''?'':Number(e.target.value);
       if(currentSession.isNew){data.sessions.push(currentSession.sess);currentSession.isNew=false;}
       save();
@@ -1997,6 +1979,7 @@ function renderLog(jumpToLast){
       const log=currentSession.sess.logs.find(l=>l.exId===b.dataset.addSet);
       if(!log) return;
       log.sets.push({reps:'',weight:''});
+      log.setStructureAt=Date.now();
       if(currentSession.isNew){data.sessions.push(currentSession.sess);currentSession.isNew=false;}
       save(); renderLog();
     });
@@ -2007,6 +1990,7 @@ function renderLog(jumpToLast){
       const log=currentSession.sess.logs.find(l=>l.exId===exId);
       if(!log) return;
       log.sets.splice(Number(iStr),1);
+      log.setStructureAt=Date.now();
       save(); renderLog();
     });
   });
@@ -2794,7 +2778,12 @@ body{padding-bottom:104px!important}
 <script>
 if(typeof DevFitDB!=='undefined'){
   DevFitDB.cloudSync('workouts','devfitTrainingV1',function(d){
+    const previous=currentSession&&currentSession.sess;
     data=d;
+    if(previous){
+      const restored=data.sessions.find(s=>s.id===previous.id||(s.date===previous.date&&s.workoutId===previous.workoutId));
+      currentSession={sess:restored||previous,isNew:!restored};
+    }
     if(typeof invalidateExNames==='function') invalidateExNames();
     // The merged copy can contain sessions this device has never rendered, so
     // re-link them by name before anything reads them.
@@ -2802,14 +2791,18 @@ if(typeof DevFitDB!=='undefined'){
     // Re-rendering yanks the keyboard away and drops a half-typed number, so if
     // the user is in a field we wait until they are out of it. Their input is
     // already saved and already in the merged copy — this is only about redraw.
-    const busy=document.activeElement && document.activeElement.tagName==='INPUT';
+    const busy=document.activeElement && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
     const draw=()=>{
       if(typeof renderLog==='function') renderLog();
       if(typeof renderMesoCard==='function') renderMesoCard();
+      if(currentMode==='plan'){renderPlan();loadPlanMeta();renderPlanLibrary();}
       if(typeof currentMode!=='undefined' && currentMode==='progress' && typeof renderProgressView==='function') renderProgressView();
     };
     if(busy) document.activeElement.addEventListener('blur',draw,{once:true});
     else draw();
+  });
+  document.addEventListener('visibilitychange',function(){
+    if(!document.hidden) DevFitDB.cloudSync('workouts','devfitTrainingV1');
   });
 }
 </script>

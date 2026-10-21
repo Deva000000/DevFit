@@ -27,6 +27,9 @@ const gateUsers = Number(process.env.DEVFIT_SCALE_GATE_USERS || count);
 assert.ok(Number.isInteger(gateUsers) && gateUsers > 0 && gateUsers <= count);
 const poolSize = Number(process.env.DEVFIT_SCALE_POOL_SIZE || 10);
 assert.ok(Number.isInteger(poolSize) && poolSize >= 1 && poolSize <= 40);
+const httpConnections=Number(process.env.DEVFIT_SCALE_HTTP_CONNECTIONS||128);
+assert.ok(Number.isInteger(httpConnections)&&httpConnections>=16&&httpConnections<=1024);
+const loadAgent=new http.Agent({keepAlive:true,maxSockets:httpConnections,maxTotalSockets:httpConnections,scheduling:'fifo'});
 const pool = new pg.Pool({ connectionString, max: poolSize, connectionTimeoutMillis: 15000,
   query_timeout: 20000, options: '-c role=service_role -c statement_timeout=15000' });
 const owner = new pg.Pool({ connectionString, max: 2 });
@@ -34,7 +37,7 @@ assert.equal((await owner.query('select count(*)::int n from public.devfit_scale
 const label = process.env.DEVFIT_SCALE_LABEL || (baseline ? 'baseline' : 'fixed');
 assert.match(label,/^[a-z0-9-]{1,50}$/);
 const report = { label, at: new Date().toISOString(), topology: `local HTTP handlers → local PostgREST adapter → PostgreSQL 17, pool=${poolSize}`,
-  cloudCapacityVerified: false, complete:false, users: count, scenarios: [], checks: [], errors: [], poolMaxWaiting: 0,
+  cloudCapacityVerified: false, complete:false, users: count, httpConnections, scenarios: [], checks: [], errors: [], poolMaxWaiting: 0,
   latencyTargetMs:{p95:2000,p99:5000},
   host:{cpus:os.cpus().length,cpu:os.cpus()[0]?.model,memoryBytes:os.totalmem()},rpcLatency:{},transportErrors:{} };
 const loopDelay = monitorEventLoopDelay({ resolution: 20 });
@@ -162,10 +165,16 @@ try {
   const call = async (user,route,bodyValue,expected=200) => {
     const t = performance.now();
     try {
-      const r = await fetch(`${base}/api/${route}`, {method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+user.token,
-        'X-Forwarded-For':'198.51.100.42','User-Agent':'DevFit scale test'},body:JSON.stringify({deviceId:user.deviceId,...bodyValue}),signal:AbortSignal.timeout(25000)});
-      const value=await r.json();
-      return {status:r.status,expected,value,ms:performance.now()-t};
+      // Keep 1,000 logical users concurrent, but reuse a disclosed HTTP/1.1
+      // connection pool. Unbounded fresh loopback sockets caused ECONNREFUSED
+      // on Windows, which is a generator/listen-backlog limit, not lost data.
+      // Latency still starts before queueing and uses the unchanged SLOs.
+      return await new Promise((resolve,reject)=>{
+        const r=http.request(`${base}/api/${route}`,{agent:loadAgent,method:'POST',signal:AbortSignal.timeout(25000),headers:{
+          'Content-Type':'application/json',Authorization:'Bearer '+user.token,'X-Forwarded-For':'198.51.100.42','User-Agent':'DevFit scale test'}},async res=>{
+          try{const chunks=[];for await(const chunk of res)chunks.push(chunk);resolve({status:res.statusCode,expected,value:JSON.parse(Buffer.concat(chunks).toString()),ms:performance.now()-t});}catch(e){reject(e);}
+        });r.on('error',reject);r.end(JSON.stringify({deviceId:user.deviceId,...bodyValue}));
+      });
     } catch(e){const code=e.cause?.code||e.code||e.name;report.transportErrors[code]=(report.transportErrors[code]||0)+1;
       return{status:0,expected,value:{error:code},ms:performance.now()-t};}
   };
@@ -345,6 +354,7 @@ finally{
   await fs.writeFile(output,JSON.stringify(report,null,2));
   console.log(JSON.stringify({report:output.pathname,passed:report.passed}));
   apiServer?.closeAllConnections();gateway?.closeAllConnections();apiServer?.close();gateway?.close();
+  loadAgent.destroy();
   await Promise.all([pool.end(),owner.end()]);
   if(!report.passed)process.exitCode=1;
 }

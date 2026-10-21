@@ -7,7 +7,7 @@
 // Get a free key in ~30s: https://fdc.nal.usda.gov/api-key-signup.html
 //
 // Until USDA_KEY is set it falls back to DEMO_KEY (works, just rate-limited),
-// so food search keeps working from day one. OpenFoodFacts (client-side, no key)
+// with a small public demo quota. OpenFoodFacts (through the authenticated proxy)
 // remains the primary source for branded/Malaysian products + barcodes.
 
 import { foodSearchIdentity, recordServerEvent } from './_lib.js';
@@ -60,10 +60,14 @@ export default async function handler(req, res) {
     }
     const j = await r.json();
     if (!Array.isArray(j.foods)) throw new Error('invalid_food_response');
-    return j.foods;
-    });
+    return j.foods.slice(0,pageSize).map(f=>({description:f.description,fdcId:f.fdcId,brandOwner:f.brandOwner||f.brandName||'',
+      servingSize:f.servingSize,servingSizeUnit:f.servingSizeUnit,
+      foodNutrients:(f.foodNutrients||[]).filter(n=>['208','957','958','203','205','204'].includes(String(n.nutrientNumber??n.nutrient?.number)))
+        .map(n=>({nutrientNumber:n.nutrientNumber??n.nutrient?.number,value:n.value??n.amount}))}));
+    },{shared:true,provider:'usda',limit:key==='DEMO_KEY'?24:900,windowSeconds:3600});
     res.status(200).json({ foods });
   } catch (e) {
+    if(e.message==='food_search_busy'){res.setHeader('Retry-After',String(e.retryAfter||2));res.status(200).json({foods:[],error:'food_search_busy'});return;}
     await recordServerEvent('food_timeout', String(e && e.message || e), { page: '/api/usda', status: 502 });
     res.status(200).json({ foods: [], error: 'food_provider_unavailable' });
   }

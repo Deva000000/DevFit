@@ -668,7 +668,7 @@ html.nosplash #devfit-splash{display:none!important}
 
   <div class="footer">
     DevFit · Dominance Through Discipline<br>
-    <a href="#support-group-title" id="footer-support-link">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.94.2
+    <a href="#support-group-title" id="footer-support-link">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.95.0
   </div>
 
 
@@ -882,12 +882,11 @@ function toast(msg, err){
 // Access runs through the whole expiry day, so we count to the start of the next day.
 function acctDaysLeft(expiry){
   if(!expiry) return null;
-  const today = new Date(); today.setHours(0,0,0,0);
-  const exp = new Date(expiry); if(isNaN(exp)) return null;
-  const accessEnd = new Date(exp); accessEnd.setDate(accessEnd.getDate()+1);
-  return Math.round((accessEnd - today)/(1000*60*60*24));
+  const today=new Date().toISOString().slice(0,10);
+  const end=new Date(String(expiry).slice(0,10)+'T00:00:00Z');if(isNaN(end))return null;
+  return Math.round((end-new Date(today+'T00:00:00Z'))/86400000)+1;
 }
-function fmtDate(d){ try{ const x=new Date(d); if(isNaN(x)) return '—'; return x.toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'}); }catch(e){ return '—'; } }
+function fmtDate(d){ try{ const x=new Date(/^\d{4}-\d{2}-\d{2}$/.test(d)?d+'T12:00:00':d); if(isNaN(x)) return '—'; return x.toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'}); }catch(e){ return '—'; } }
 
 (function renderAccount(){
   try{
@@ -2017,15 +2016,7 @@ async function exportProgramPDF(){
 // Auto-revert: a Pro plan whose paid period has ended is treated as Free,
 // so access reverts the moment the end date passes (no trainer action needed).
 function getUserTier(){
-  try {
-    const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
-    let t = (u.tier || 'free').toLowerCase();
-    if(t === 'pro' && u.expiry){
-      const dl = acctDaysLeft(u.expiry);
-      if(dl !== null && dl <= 0) t = 'free';
-    }
-    return t;
-  } catch(e){ return 'free'; }
+  return window.DevFitAuth&&DevFitAuth.getUserTier?DevFitAuth.getUserTier():'free';
 }
 function isPro(){ return getUserTier() === 'pro'; }
 

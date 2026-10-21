@@ -29,6 +29,9 @@ export default async function handler(req, res) {
     if (identity.retryAfter) res.setHeader('Retry-After', String(identity.retryAfter));
     res.status(identity.status).json({ data: [], error: identity.error }); return;
   }
+  // Confirmed ERR_TLS_CERT_ALTNAME_INVALID on this optional provider. Never
+  // disable TLS verification. Re-enable only after the provider fixes its cert.
+  if(process.env.KALORI_ENABLED!=='true'){unavailable(res,'source_disabled');return;}
 
   const q = String((req.query && req.query.q) || '').replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').slice(0, 100).trim();
   if (!q) { res.status(200).json({ data: [] }); return; }

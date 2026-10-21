@@ -108,8 +108,7 @@ test('food proxy never calls an upstream source for unsigned or rate-limited tra
 
     const valid = signToken({ email: 'food@example.com' });
     globalThis.fetch = async (url) => {
-      if (String(url).includes('devfit_subscribers?')) return { ok: true, json: async () => [{ approved: true }] };
-      if (String(url).includes('consume_devfit_rate_limit')) return { ok: true, json: async () => [{ allowed: false, retry_after: 60 }] };
+      if (String(url).includes('authorize_devfit_food_search')) return { ok: true, json: async () => ({status:'rate_limited',retryAfter:60}) };
       upstreamCalls++; return { ok: true, json: async () => ({ hits: [] }) };
     };
     const limited = responseCapture();
@@ -125,9 +124,9 @@ test('food access is equal for free and pro and blocks deleted or revoked accoun
   const req = { headers: { authorization: 'Bearer ' + signToken({ email: 'food@example.com', tier: 'pro' }) } };
   let sub = { approved: true, tier: 'free' }, quotaCalls = 0;
   globalThis.fetch = async (url) => {
-    if (String(url).includes('devfit_subscribers?')) return { ok: true, json: async () => sub ? [sub] : [] };
+    assert.match(String(url),/authorize_devfit_food_search/);
     quotaCalls++;
-    return { ok: true, json: async () => [{ allowed: true }] };
+    return { ok: true, json: async () => ({status:sub&&sub.approved?'ok':'account_unavailable'}) };
   };
   try {
     assert.equal((await foodSearchIdentity(req)).ok, true);
@@ -145,7 +144,9 @@ test('cached food results still require authorization and responses prohibit sha
   const original = globalThis.fetch;
   let calls = 0;
   globalThis.fetch = async (url) => {
-    if (String(url).includes('devfit_subscribers?')) return { ok: true, json: async () => [{ approved: true, tier: 'free' }] };
+    if (String(url).includes('authorize_devfit_food_search')) return { ok: true, json: async () => ({status:'ok'}) };
+    if (String(url).includes('claim_devfit_food_cache')) return {ok:true,json:async()=>({status:'fetch',lease:'00000000-0000-4000-8000-000000000001'})};
+    if (String(url).includes('finish_devfit_food_cache')) return {ok:true,json:async()=>({ok:true})};
     if (String(url).includes('consume_devfit_rate_limit')) return { ok: true, json: async () => [{ allowed: true }] };
     calls++;
     return { ok: true, json: async () => ({ hits: [{ product_name: 'QA food', nutriments: { 'energy-kcal_100g': 100 } }] }) };

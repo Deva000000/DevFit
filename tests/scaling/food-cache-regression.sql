@@ -1,0 +1,41 @@
+-- Rollback-only correctness checks; use the disposable local scale database.
+begin;
+do $$
+declare v_key text:='food-qa-cache';v_result jsonb;v_lease uuid;v_checks integer:=0;v_i integer;
+  v_email text:='food-qa@example.invalid';v_device text:='food-qa-device-installation';v_ip text:=repeat('c',64);
+begin
+  assert current_database() like 'devfit_scale%','Refusing non-test database';
+  assert exists(select 1 from public.devfit_scale_environment),'Missing local marker';
+  insert into public.devfit_subscribers(email,name,tier,approved) values(v_email,'Food rollback QA','free',true);
+  insert into public.devfit_logins(email,device_id,user_agent) values(v_email,v_device,'Food QA');
+  v_result:=public.authorize_devfit_food_search(v_email,v_device,v_ip,true,'Food QA');assert v_result->>'status'='ok','Free food access';v_checks:=v_checks+1;
+  update public.devfit_subscribers set tier='pro' where email=v_email;
+  v_result:=public.authorize_devfit_food_search(v_email,v_device,v_ip,true,'Food QA');assert v_result->>'status'='ok','Pro food access';v_checks:=v_checks+1;
+  update public.devfit_subscribers set approved=false where email=v_email;
+  v_result:=public.authorize_devfit_food_search(v_email,v_device,v_ip,true,'Food QA');assert v_result->>'status'='account_unavailable','Revoked access';v_checks:=v_checks+1;
+  update public.devfit_subscribers set approved=true where email=v_email;
+  v_result:=public.authorize_devfit_food_search(v_email,'unknown-device-invalid',v_ip,true,'Food QA');assert v_result->>'status'='account_unavailable','Unknown device access';v_checks:=v_checks+1;
+  for v_i in 1..90 loop v_result:=public.authorize_devfit_food_search(v_email,v_device,v_ip,true,'Food QA');end loop;
+  assert v_result->>'status'='rate_limited','Account quota';v_checks:=v_checks+1;
+  delete from public.devfit_rate where id='food_provider:off';
+  v_result:=public.claim_devfit_food_cache(v_key,'off',9,60);assert v_result->>'status'='fetch','First lease';v_lease:=(v_result->>'lease')::uuid;v_checks:=v_checks+1;
+  v_result:=public.claim_devfit_food_cache(v_key,'off',9,60);assert v_result->>'status'='busy','Duplicate fetch lease';v_checks:=v_checks+1;
+  v_result:=public.finish_devfit_food_cache(v_key,gen_random_uuid(),'[{"name":"wrong lease"}]',true);assert v_result->>'ok'='false','Stale lease accepted';v_checks:=v_checks+1;
+  v_result:=public.finish_devfit_food_cache(v_key,v_lease,'[{"name":"QA food"}]',true);assert v_result->>'ok'='true','Store result';v_checks:=v_checks+1;
+  v_result:=public.claim_devfit_food_cache(v_key,'off',9,60);assert v_result->>'status'='cached' and v_result#>>'{items,0,name}'='QA food','Shared cache hit';v_checks:=v_checks+1;
+  update public.devfit_food_cache set fresh_until=now()-interval '1 minute' where cache_key=v_key;
+  v_result:=public.claim_devfit_food_cache(v_key,'off',9,60);v_lease:=(v_result->>'lease')::uuid;
+  perform public.finish_devfit_food_cache(v_key,v_lease,null,false);
+  v_result:=public.claim_devfit_food_cache(v_key,'off',9,60);assert v_result->>'status'='busy' and v_result#>>'{items,0,name}'='QA food','Outage stale fallback';v_checks:=v_checks+1;
+  update public.devfit_food_cache set fetched_at=now()-interval '31 days' where cache_key=v_key;
+  v_result:=public.claim_devfit_food_cache(v_key,'off',9,60);assert v_result->'items'='null'::jsonb,'Expired stale food served';v_checks:=v_checks+1;
+  update public.devfit_rate set hits=9 where id='food_provider:off';
+  v_result:=public.claim_devfit_food_cache('food-qa-limited','off',9,60);assert v_result->>'status'='limited','Provider budget';v_checks:=v_checks+1;
+  v_result:=public.claim_devfit_food_cache('food-qa-zero','kalori',9,60);v_lease:=(v_result->>'lease')::uuid;
+  perform public.finish_devfit_food_cache('food-qa-zero',v_lease,'[]',true);
+  v_result:=public.claim_devfit_food_cache('food-qa-zero','kalori',9,60);assert v_result->>'status'='cached' and v_result->'items'='[]'::jsonb,'Negative cache';v_checks:=v_checks+1;
+  assert not has_table_privilege('anon','public.devfit_food_cache','SELECT'),'Public cache data';
+  assert not has_function_privilege('authenticated','public.claim_devfit_food_cache(text,text,integer,integer)','EXECUTE'),'Public cache RPC';v_checks:=v_checks+2;
+  raise notice '% food-cache correctness checks passed; rolling back all fixtures',v_checks;
+end;$$;
+rollback;

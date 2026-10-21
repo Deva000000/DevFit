@@ -551,20 +551,7 @@ if(window.DevFitAuth){
 
 // TIER HELPERS
 function getUserTier(){
-  try {
-    const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
-    let t = (u.tier || 'free').toLowerCase();
-    // Auto-revert to Free the moment the paid period ends (access runs through the expiry day).
-    if(t === 'pro' && u.expiry){
-      const today = new Date(); today.setHours(0,0,0,0);
-      const exp = new Date(u.expiry);
-      if(!isNaN(exp)){
-        const accessEnd = new Date(exp); accessEnd.setDate(accessEnd.getDate()+1);
-        if(accessEnd <= today) t = 'free';
-      }
-    }
-    return t;
-  } catch(e){ return 'free'; }
+  return window.DevFitAuth&&DevFitAuth.getUserTier?DevFitAuth.getUserTier():'free';
 }
 function isPro(){ return getUserTier() === 'pro'; }
 
@@ -2157,7 +2144,8 @@ applyNutritionTierGates();
   // Normalize both sources to one shape: {name,brand,cal100,p100,c100,f100,sq,serving_size,source}
   function parseOFF(p){
     const n=p.nutriments||{};
-    const cal100=Math.max(0,Number(n['energy-kcal_100g']||n['energy-kcal']||0)||(Number(n['energy_100g']||0)/4.184));
+    const kcal=n['energy-kcal_100g']??n['energy-kcal'];
+    const cal100=Math.max(0,kcal!=null?Number(kcal):Number(n['energy_100g']||0)/4.184);
     return{
       name:String(p.product_name||'').trim()||'Unknown',
       brand:String(p.brands||'').split(',')[0].trim(),
@@ -2205,9 +2193,9 @@ applyNutritionTierGates();
     const r=await tFetch(OFF_PROXY+'?query='+encodeURIComponent(q)+'&pageSize=40',9000);
     if(!r.ok) throw new Error('off '+r.status);
     const j=await r.json();
-    if(j.error) throw new Error('off unavailable');
+    if(j.error) throw new Error(j.error==='food_search_busy'?'off 429':'off unavailable');
     return(j.products||[])
-      .filter(p=>p.product_name&&p.nutriments&&(p.nutriments['energy-kcal_100g']||p.nutriments['energy-kcal']||p.nutriments['energy_100g']))
+      .filter(p=>p.product_name&&p.nutriments&&['energy-kcal_100g','energy-kcal','energy_100g'].some(k=>p.nutriments[k]!=null))
       .map(parseOFF);
   }
 
@@ -2216,7 +2204,7 @@ applyNutritionTierGates();
     const r=await tFetch(url,7000);
     if(!r.ok) throw new Error('usda '+r.status);
     const j=await r.json();
-    if(j.error) throw new Error('usda unavailable');
+    if(j.error) throw new Error(j.error==='food_search_busy'?'usda 429':'usda unavailable');
     return(j.foods||[]).map(parseUSDA).filter(f=>f.cal100>0);
   }
 
@@ -2401,7 +2389,7 @@ applyNutritionTierGates();
     const chipG=active?_svChips[parseInt(active.dataset.idx)].g:100;
     const qEl=document.getElementById('sv-qty');
     const q=Math.max(0.25,parseFloat(qEl.value||1)-0.5);
-    qEl.value=q%1===0?q:q.toFixed(1);
+    qEl.value=String(q);
     document.getElementById('serving-grams').value=Math.round(chipG*q);
     calcPreview();
   });
@@ -2410,7 +2398,7 @@ applyNutritionTierGates();
     const chipG=active?_svChips[parseInt(active.dataset.idx)].g:100;
     const qEl=document.getElementById('sv-qty');
     const q=parseFloat(qEl.value||1)+0.5;
-    qEl.value=q%1===0?q:q.toFixed(1);
+    qEl.value=String(q);
     document.getElementById('serving-grams').value=Math.round(chipG*q);
     calcPreview();
   });
@@ -2641,7 +2629,9 @@ applyNutritionTierGates();
     let pool=instant.slice();
     let anyResolved=false;                         // a network source returned (even if empty)
     let rateLimited=false, searchUnavailable=false;
-    const sources=[usdaSearch(q),kaloriSearch(q),offSearch(q)];
+    // Kalori's certificate currently fails validation. Local Malaysian foods,
+    // USDA and OFF remain available; do not call a known-broken source per search.
+    const sources=[usdaSearch(q),offSearch(q)];
     await Promise.all(sources.map(pr=>pr.then(res=>{
       if(token!==_searchToken) return;            // a newer search started — discard
       anyResolved=true;
@@ -2658,7 +2648,7 @@ applyNutritionTierGates();
     }
     if(!pool.length){
       el.innerHTML=rateLimited
-        ? '<div class="food-empty">Search is busy. Please wait a minute, then try again. You can still add food manually.</div>'
+        ? '<div class="food-empty">Search is busy. Try again shortly. You can still add food manually.</div>'
         : searchUnavailable
           ? '<div class="food-empty">Food search is temporarily unavailable. Please try again shortly, or add food manually.</div>'
         : anyResolved
@@ -2679,7 +2669,7 @@ applyNutritionTierGates();
     if(!q){ ++_searchToken; el.innerHTML=''; return; }
     _liveTimer=setTimeout(()=>{
       const instant=renderInstant(q,el);
-      if(!instant.length) el.innerHTML='<div class="food-loading">Searching food databases…</div>';
+      if(!instant.length) el.innerHTML='<div class="food-empty" role="status">Press Search or Enter to search online.</div>';
     },110);
     // Local matches stay instant. Online providers are queried on Search/Enter;
     // OFF explicitly disallows search-as-you-type on its public search API.

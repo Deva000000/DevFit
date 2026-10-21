@@ -1132,20 +1132,7 @@ let appData = {
 
 // ---------- TIER HELPERS ----------
 function getUserTier(){
-  try {
-    const u = JSON.parse(localStorage.getItem('devfit_user')||'{}');
-    let t = (u.tier || 'free').toLowerCase();
-    // Auto-revert to Free the moment the paid period ends (access runs through the expiry day).
-    if(t === 'pro' && u.expiry){
-      const today = new Date(); today.setHours(0,0,0,0);
-      const exp = new Date(u.expiry);
-      if(!isNaN(exp)){
-        const accessEnd = new Date(exp); accessEnd.setDate(accessEnd.getDate()+1);
-        if(accessEnd <= today) t = 'free';
-      }
-    }
-    return t;
-  } catch(e){ return 'free'; }
+  return window.DevFitAuth&&DevFitAuth.getUserTier?DevFitAuth.getUserTier():'free';
 }
 function isPro(){ return getUserTier() === 'pro'; }
 
@@ -2490,7 +2477,7 @@ function showWelcomeScreen(){
     let statsHtml = '';
     if(user.plan) statsHtml += '<div class="welcome-stat">Plan: <span>'+user.plan+'</span></div>';
     if(user.expiry){
-      const exp = new Date(user.expiry);
+      const exp = new Date(String(user.expiry).slice(0,10)+'T12:00:00');
       statsHtml += '<div class="welcome-stat">Ends: <span>'+exp.toLocaleDateString('en-MY',{day:'2-digit',month:'short',year:'numeric'})+'</span></div>';
     }
     wstats.innerHTML = statsHtml;

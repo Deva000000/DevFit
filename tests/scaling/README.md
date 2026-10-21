@@ -63,6 +63,18 @@ is asserted only for accepted saves. Expected security rejections are not failur
 The capacity gate also requires p95 below 2 s and p99 below 5 s; a correctness-only
 pass is not sufficient. `cloudCapacityVerified` is always false in this harness.
 
+The HTTP adapter uses at most 128 reusable HTTP/1.1 connections for the logical
+users. Timing starts before this connection queue, so queue latency remains in
+the reported SLO. This avoids confusing a local TCP backlog refusal with a
+PostgreSQL capacity failure; it does not emulate Vercel's distributed topology.
+
+`food-cache-regression.sql` adds 16 rollback-only checks for private cache access,
+account revocation, leases, provider quotas, negative caching and stale fallback.
+`node tests/scaling/food-cache-concurrency.mjs` creates its own disposable local
+fixtures and checks 1,000 contenders produce one fetch lease, 1,000 cache hits,
+1,000 separate accounts sharing one IP, and the 512-key disk bound. It makes no
+external provider calls and does not establish managed-cloud capacity.
+
 `results/*.json` is ignored by Git. Preserve a selected result in release evidence
 after inspecting it for synthetic-only contents.
 

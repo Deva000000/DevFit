@@ -142,8 +142,11 @@ export default async function handler(req, res) {
     }
 
     if (action === 'errors') {
-      const rows = await sbSelect('devfit_errors', 'select=*&order=at.desc&limit=100');
-      res.status(200).json({ errors: rows || [] });
+      const days=[1,7,30].includes(Number(body.days))?Number(body.days):7;
+      const since=new Date(Date.now()-days*86400000).toISOString();
+      const rows = await sbSelect('devfit_errors', 'select=id,type,message,page,status,at&at=gte.'+encodeURIComponent(since)+'&order=at.desc&limit=500');
+      if(!Array.isArray(rows)){res.status(503).json({error:'monitoring_unavailable'});return;}
+      res.status(200).json({ errors: rows,days,foodSources:{usdaKeyConfigured:!!process.env.USDA_KEY&&process.env.USDA_KEY!=='DEMO_KEY',kaloriEnabled:process.env.KALORI_ENABLED==='true'} });
       return;
     }
 

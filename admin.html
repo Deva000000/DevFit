@@ -235,7 +235,9 @@
     <div id="view-errors" class="hide">
       <div class="card">
         <h2>Recent production alerts <span class="tap" id="refresh-errors">refresh</span></h2>
-        <div class="hint" style="margin-top:0;margin-bottom:10px">Latest 100 login, verification, data, food-service, backup and client-crash events.</div>
+        <label for="error-days" class="hint">Show alerts from </label><select id="error-days"><option value="1">Last 24 hours</option><option value="7" selected>Last 7 days</option><option value="30">Last 30 days</option></select>
+        <div class="hint" id="food-provider-health" style="margin:12px 0"></div>
+        <div class="hint" style="margin-top:0;margin-bottom:10px">Up to 500 events in the selected period. Repeated messages are grouped; counts reflect these loaded events.</div>
         <div class="list" id="errors"><div class="hint">Loading…</div></div>
       </div>
     </div>
@@ -503,10 +505,9 @@ async function doLogin(){
 /* ---------- subscribers ---------- */
 function statusPill(s){
   if(!s.approved) return '<span class="pill exp">REVOKED</span>';
-  var today=new Date(); today.setHours(0,0,0,0);
-  var started = !s.start_date || new Date(s.start_date) <= today;
-  var exp = s.expiry ? new Date(s.expiry) : null;
-  var expired = exp && (new Date(new Date(exp).setHours(24,0,0,0)) <= today);
+  var today=new Date().toISOString().slice(0,10);
+  var started = !s.start_date || String(s.start_date).slice(0,10) <= today;
+  var expired = s.expiry && String(s.expiry).slice(0,10) < today;
   if(String(s.tier).toLowerCase()==='pro' && started && !expired) return '<span class="pill pro">PRO</span>';
   if(String(s.tier).toLowerCase()==='pro' && !started) return '<span class="pill soon">STARTS SOON</span>';
   if(expired) return '<span class="pill exp">EXPIRED</span>';
@@ -838,16 +839,24 @@ async function refreshLogins(){
 function renderErrors(rows){
   var box=$('errors');
   if(!rows.length){ box.innerHTML='<div class="hint">No production alerts recorded.</div>'; return; }
-  box.innerHTML=rows.map(function(r){
+  const groups=new Map();
+  rows.forEach(r=>{const key=[r.type,r.page,r.status,r.message].join('|');const prev=groups.get(key);if(prev)prev.count++;else groups.set(key,Object.assign({count:1},r));});
+  box.innerHTML=Array.from(groups.values()).map(function(r){
     var detail=[r.page,r.status?'HTTP '+r.status:'',timeAgo(r.at)].filter(Boolean).join(' · ');
-    return '<div class="sub-row" style="display:block"><b style="color:#fca5a5">'+safeText(r.type||'error')+'</b> '+
+    const external=r.type==='food_timeout';
+    return '<div class="sub-row" style="display:block"><b style="color:'+(external?'#fbbf24':'#fca5a5')+'">'+(external?'External food provider':safeText(r.type||'error'))+'</b> '+
+      '<span class="hint">'+r.count+' occurrence'+(r.count===1?'':'s')+' · </span>'+
       '<span style="color:#ddd">'+safeText(r.message||'')+'</span><br><span class="hint">'+safeText(detail)+'</span></div>';
   }).join('');
 }
 async function refreshErrors(){
   $('errors').innerHTML='<div class="hint">Loading…</div>';
-  var r=await call('errors');
-  if(r.status===200) renderErrors(r.data.errors||[]);
+  var r=await call('errors',{days:Number($('error-days').value)});
+  if(r.status===200){
+    renderErrors(r.data.errors||[]);
+    const sources=r.data.foodSources||{};
+    $('food-provider-health').textContent=(sources.usdaKeyConfigured?'USDA: dedicated key configured. ':'USDA: demo key only — add USDA_KEY before a broad launch. ')+(sources.kaloriEnabled?'Kalori: enabled.':'Kalori: disabled due to provider TLS certificate failure.');
+  }
   else $('errors').innerHTML='<div class="hint">Failed: '+safeText(r.data.error||r.status)+'</div>';
 }
 
@@ -1117,6 +1126,7 @@ $('refresh-security').addEventListener('click', refreshSecurity);
 $('security-block-account').addEventListener('click',function(){var email=($('security-email').value||'').trim().toLowerCase();if(!email||email.indexOf('@')<0){msg($('security-msg'),'Enter a valid account Gmail.',false);return;}securityBlock('account','',email);});
 $('security-reset-devices').addEventListener('click',function(){securityResetDevices();});
 $('refresh-errors').addEventListener('click', refreshErrors);
+$('error-days').addEventListener('change',refreshErrors);
 $('refresh-payments').addEventListener('click', refreshPayments);
 $('refresh-support').addEventListener('click', refreshSupport);
 $('payment-proof-close').addEventListener('click',function(){$('payment-proof-image').removeAttribute('src');$('payment-proof-panel').classList.add('hide');});

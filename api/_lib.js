@@ -387,23 +387,10 @@ export async function getSubscriber(email, timeoutMs = 8000) {
 export function computeTier(sub) {
   if (!sub || !sub.approved) return 'free';
   const t = String(sub.tier || 'free').toLowerCase();
-  if (t !== 'pro') return t;
-
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-
-  // Not started yet → still Free until the start date arrives.
-  if (sub.start_date) {
-    const st = new Date(sub.start_date);
-    if (!isNaN(st)) { st.setHours(0, 0, 0, 0); if (st > today) return 'free'; }
-  }
-  // Past the end (expiry) day → expired. accessEnd = expiry + 1 day (inclusive end).
-  if (sub.expiry) {
-    const exp = new Date(sub.expiry);
-    if (!isNaN(exp)) {
-      const accessEnd = new Date(exp); accessEnd.setHours(0, 0, 0, 0); accessEnd.setDate(accessEnd.getDate() + 1);
-      if (accessEnd <= today) return 'free';
-    }
-  }
+  if (t !== 'pro') return 'free';
+  const today=new Date().toISOString().slice(0,10);
+  if(sub.start_date&&String(sub.start_date).slice(0,10)>today)return 'free';
+  if(sub.expiry&&String(sub.expiry).slice(0,10)<today)return 'free';
   return 'pro';
 }
 
@@ -559,43 +546,29 @@ export async function foodSearchIdentity(req) {
       ? { ok: false, status: invalid.unavailable ? 503 : 429, error: invalid.unavailable ? 'food_search_unavailable' : 'rate_limited', retryAfter: invalid.retryAfter }
       : { ok: false, status: 401, error: 'sign_in_required' };
   }
-  const subscriber = await getSubscriber(email, 3000);
-  if (subscriber === undefined) return { ok: false, status: 503, error: 'food_search_unavailable' };
-  if (!subscriber || !subscriber.approved) return { ok: false, status: 403, error: 'account_unavailable' };
-
   const deviceId = String((req.headers && req.headers['x-devfit-device']) || '');
   if (payload.did) {
     if (!tokenDeviceMatches(payload, deviceId)) {
       await recordDeviceMismatch(req, email, deviceId, '/api/food-search');
       return { ok: false, status: 401, error: 'invalid_device' };
     }
-    const security = await checkSecurityAccess(req, email, deviceId, {
-      route: '/api/food-search', requireKnown: true, timeoutMs: 3000
-    });
-    if (security.status === 'unavailable') return { ok: false, status: 503, error: 'food_search_unavailable' };
-    if (security.status !== 'ok') return { ok: false, status: 403, error: 'account_unavailable' };
   }
-
-  const strict = { failClosed: true, timeoutMs: 3000 };
-  const [account, ip] = await Promise.all([
-    rateLimit('food_account:' + crypto.createHash('sha256').update(email).digest('hex'), 90, 60, strict),
-    rateLimit('food_ip:' + clientIp(req), 900, 60, strict)
-  ]);
-  if (account.unavailable || ip.unavailable) return { ok: false, status: 503, error: 'food_search_unavailable' };
-  if (!account.ok || !ip.ok) return {
+  const access = await sbRpc('authorize_devfit_food_search', {
+    p_email:email,p_device_id:deviceId,p_ip_hash:sha256Hex(clientIp(req)),
+    p_bound:!!payload.did,p_user_agent:String(req.headers&&req.headers['user-agent']||'').slice(0,300)
+  },4000);
+  if (!access || !['ok','rate_limited','account_unavailable'].includes(access.status)) return { ok:false,status:503,error:'food_search_unavailable' };
+  if (access.status==='account_unavailable') return {ok:false,status:403,error:'account_unavailable'};
+  if (access.status==='rate_limited') return {
     ok: false, status: 429, error: 'search_rate_limited',
-    retryAfter: Math.max(account.retryAfter || 0, ip.retryAfter || 0)
+    retryAfter: Math.max(access.retryAfter || 1,1)
   };
   return { ok: true, email };
 }
 
-// ── Same-origin guard for the public food-search proxies ─────────────────────
-// The USDA/OFF/Kalori proxies take no auth (they must work for logged-out users
-// on the pricing/landing pages too), so they were wide-open — anyone could script
-// them and run up Vercel invocations + upstream quota. A legit in-app fetch is
-// always same-origin, so its Referer/Origin host equals this deployment's own Host.
-// A scripted curl from elsewhere has a foreign host or none → blocked. Zero added
-// latency (header check only), so it stays off the hot search path's critical path.
+// Same-origin CSRF barrier for browser-only owner actions. Headers can be forged
+// by a script: this is never authentication or standalone bot protection. Food
+// routes use signed account/device checks and durable quotas above.
 export function sameSiteOnly(req) {
   try {
     const host = String((req.headers && req.headers['host']) || '').toLowerCase();

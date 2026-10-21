@@ -575,7 +575,7 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
   assert.match(settings, /<div class="title">Install DevFit App<\/div>/);
   assert.match(settings, /if\(!deferredInstallPrompt\)\{\s*showIosHint\(\)/);
   assert.equal(manifest.display, 'standalone');
-  assert.match(worker, /devfit-v4\.94\.2/);
+  assert.match(worker, /devfit-v4\.95\.0/);
   assert.doesNotMatch(worker, /\.then\(\(\) => self\.skipWaiting\(\)\)/);
 
   for (const html of [index, settings]) {
@@ -604,8 +604,10 @@ test('analytics survive a Chart CDN failure and nutrition initializes in order',
 
 test('an unhealthy optional Kalori source enters cooldown without blocking every search', async () => {
   process.env.DEVFIT_JWT_SECRET = 'test-secret';
+  process.env.KALORI_ENABLED='true';
   let upstreamCalls = 0;
   globalThis.fetch = async (url) => {
+    if (String(url).includes('authorize_devfit_food_search')) return {ok:true,json:async()=>({status:'ok'})};
     if (String(url).includes('devfit_subscribers?')) return { ok: true, json: async () => [{ approved: true }] };
     if (String(url).includes('consume_devfit_rate_limit')) {
       return { ok: true, json: async () => [{ allowed: true, retry_after: 0 }] };
@@ -639,11 +641,12 @@ test('an unhealthy optional Kalori source enters cooldown without blocking every
   assert.equal(second.body.error, 'kalori temporarily unavailable');
   assert.match(second.cache, /private, no-store/);
   assert.equal(upstreamCalls, 1);
+  delete process.env.KALORI_ENABLED;
 });
 
 test('food-search protection communicates limits without hiding manual entry', () => {
   const nutrition = fs.readFileSync(new URL('../nutrition.html', import.meta.url), 'utf8');
-  assert.match(nutrition, /Search is busy\. Please wait a minute/);
+  assert.match(nutrition, /Search is busy\. Try again shortly/);
   assert.match(nutrition, /add food manually/);
   assert.match(nutrition, /DevFitFoodSearch.search\(url\)/);
 });

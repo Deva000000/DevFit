@@ -30,9 +30,11 @@ function normalise(products) {
     brands: Array.isArray(p.brands) ? p.brands.join(', ') : (p.brands || ''),
     serving_size: p.serving_size || '',
     serving_quantity: p.serving_quantity || '',
-    nutriments: p.nutriments || {}
+    nutriments: Object.fromEntries(['energy-kcal_100g','energy-kcal','energy_100g','proteins_100g','carbohydrates_100g','fat_100g']
+      .filter(k=>p.nutriments&&p.nutriments[k]!=null&&Number.isFinite(Number(p.nutriments[k])))
+      .map(k=>[k,Number(p.nutriments[k])]))
   })).filter((p) => p.product_name && p.nutriments &&
-    (p.nutriments['energy-kcal_100g'] || p.nutriments['energy-kcal'] || p.nutriments['energy_100g']));
+    ['energy-kcal_100g','energy-kcal','energy_100g'].some(k=>p.nutriments[k]!=null));
 }
 
 // Modern engine (search-a-licious). Returns [] on any failure so the caller
@@ -93,11 +95,12 @@ export default async function handler(req, res) {
     const products = await cachedFood('off:' + q.toLowerCase() + ':' + pageSize, async () => {
       const first = await searchModern(q, pageSize);
       return first.length ? first : await searchLegacy(q, pageSize);
-    });
+    },{shared:true,provider:'off',limit:9,windowSeconds:60});
 
     // HTTP response stays private so every new request passes authorization.
     res.status(200).json({ products });
   } catch (e) {
+    if(e.message==='food_search_busy'){res.setHeader('Retry-After',String(e.retryAfter||2));res.status(200).json({products:[],error:'food_search_busy'});return;}
     await recordServerEvent('food_timeout', String(e && e.message || e), { page: '/api/off', status: 502 });
     res.status(200).json({ products: [], error: 'food_provider_unavailable' });
   }

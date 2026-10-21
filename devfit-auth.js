@@ -191,22 +191,13 @@
       var u = getUser();
       var t = (u.tier || 'free').toLowerCase();
       if (t === 'pro') {
-        var today = new Date(); today.setHours(0, 0, 0, 0);
-        // Not started yet → Free until the plan's start date.
-        if (u.startDate) {
-          var st = new Date(u.startDate);
-          if (!isNaN(st)) { st.setHours(0, 0, 0, 0); if (st > today) t = 'free'; }
-        }
-        // Past the end (expiry) day → Free.
-        if (t === 'pro' && u.expiry) {
-          var exp = new Date(u.expiry);
-          if (!isNaN(exp)) {
-            var end = new Date(exp); end.setHours(0, 0, 0, 0); end.setDate(end.getDate() + 1);
-            if (end <= today) t = 'free';
-          }
-        }
+        // Match the server's inclusive UTC calendar window, independently of
+        // the phone's timezone and daylight-saving changes.
+        var today=new Date().toISOString().slice(0,10);
+        if(u.startDate&&String(u.startDate).slice(0,10)>today)t='free';
+        if(u.expiry&&String(u.expiry).slice(0,10)<today)t='free';
       }
-      return t;
+      return t==='pro'?'pro':'free';
     } catch (e) { return 'free'; }
   }
   function isPro() { return getUserTier() === 'pro'; }

@@ -1,4 +1,4 @@
-/* DevFit Service Worker — v4.96.0
+/* DevFit Service Worker — v4.96.1
    - Shell assets: one content-verified release, served from its own cache.
    - Installation fails closed if ANY required asset is missing or mismatched.
    - Switching a release is deliberate and requires other DevFit tabs to close.
@@ -7,9 +7,7 @@
    - /api/*: network-only (never cached).
 */
 
-const VERSION = 'devfit-v4.96.0';
-const APP_SHELL = 'devfit-shell-' + VERSION;
-const RUNTIME = 'devfit-runtime-' + VERSION;
+const VERSION = 'devfit-v4.96.1';
 
 const SHELL_FILES = [
   // ── Core HTML pages — precached so the whole app works offline ──────
@@ -57,11 +55,11 @@ const SHELL_FILES = [
 // Generated after source edits. An incomplete/mixed deploy cannot install.
 // RELEASE_HASHES_START
 const SHELL_HASHES = {
-  "./login.html": "74e6366e7aaf6da530e5e43be129f99f7454f1df32fc137f0748f182613209a4",
+  "./login.html": "ac20c415ecc0dd9b77bdc14f0602880afde5c976744bbb44994de44aff70090d",
   "./index.html": "3dc47eb62017123ce0b95c0f923426d4e87836960d96a43086b5d24f67192c66",
   "./nutrition.html": "ee697ac9fb1813467fded11893cd87c9bef12b8f6f1e4ca1a6e6be362e4be4c1",
   "./workouts.html": "2c005f4decf7a05ecfbf600bcbde31f3ae13eaae8fdb15e77f4a9a0177f28b22",
-  "./settings.html": "188628f5b22582aefcb72be4ff3cb3bd94f731b29b829124de24d2fbdcbd28da",
+  "./settings.html": "4fa959cd24790b47350675251e1e953262d944ed25b19f84c58976eb78d29111",
   "./admin.html": "2de32546f6069338daf56e11bdf7b92aa2c3a9e64d41c01fd15fe3cbd309074e",
   "./landing.html": "dc773d097643a8c435cbe99d0db99dc0ab69aa415e60dff152190f2744ddf7b4",
   "./pricing.html": "2861c7fc61b1afe6719a818f8d0eaea0f9f6e7830645a9a51d375eb88286f835",
@@ -95,11 +93,16 @@ const SHELL_HASHES = {
   "./theme.css": "e63bd16a33952266e2479f34c746df45b4fdd25ca0f72b35f1288a951746f0fc",
   "./theme.js": "e3f8156550f06bc900432207523dc0ef2b0e7cbc75f95b1939e1d739910688ef"
 };
+const RELEASE_ID = "7ffe3dbcb2246966628d92a78b44f981a6af5ac754e7148d46cc2cd7212b24d3";
 // RELEASE_HASHES_END
 
 // Keep this list aligned with CSP connect-src: intercepted CDN requests are
 // fetched by the worker, so script-src alone is not enough to let them through.
 const CDN_HOSTS = ['cdnjs.cloudflare.com','fonts.googleapis.com','fonts.gstatic.com','cdn.jsdelivr.net','unpkg.com'];
+// Content identity, not merely a human version label, owns each cache. A future
+// forgotten version bump cannot write new assets into the currently active cache.
+const APP_SHELL = 'devfit-shell-' + VERSION + '-' + RELEASE_ID;
+const RUNTIME = 'devfit-runtime-' + VERSION + '-' + RELEASE_ID;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

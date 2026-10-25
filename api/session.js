@@ -89,7 +89,7 @@ export default async function handler(req, res) {
   if (security.status !== 'ok') {
     const limited = security.status === 'device_limit';
     res.status(403).json({
-      error: limited ? 'device_limit' : 'account_blocked',
+      error: limited ? 'device_limit' : security.status === 'invalid_device' ? 'device_storage_unavailable' : 'account_blocked',
       maxDevices: limited ? 3 : undefined
     });
     return;

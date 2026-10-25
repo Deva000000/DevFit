@@ -34,3 +34,19 @@ test('install instructions support Chrome iOS and do not erase storage',()=>{
     assert.doesNotMatch(fs.readFileSync(new URL('../'+file,import.meta.url),'utf8'),/only works in <strong>Safari|only from Safari|CANNOT add to the home screen/);
   }
 });
+
+test('temporary login failures are retryable and never shown as inactive membership',async()=>{
+  for(const error of ['account_store_unavailable','session_store_unavailable','login_temporarily_unavailable']){
+    const h=harness();h.context.DevFitAuth={startSession:async()=>({error})};
+    await h.context.finishLogin('google_id','synthetic');
+    assert.match(h.node('status-denied').textContent,/temporarily unavailable/);
+    assert.equal(h.node('status-pending').style.display,'none');
+  }
+});
+
+test('unavailable browser storage provides recovery guidance, not a false block message',async()=>{
+  const h=harness();h.context.DevFitAuth={startSession:async()=>({error:'device_storage_unavailable'})};
+  await h.context.finishLogin('google_id','synthetic');
+  assert.match(h.node('status-denied').textContent,/Enable website storage/);
+  assert.doesNotMatch(h.node('status-denied').textContent,/restricted|blocked|inactive/);
+});

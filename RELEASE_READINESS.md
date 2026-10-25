@@ -1,4 +1,4 @@
-# DevFit v4.96.0 — release evidence and remaining gates
+# DevFit v4.96.1 — release evidence and remaining gates
 
 Reviewed 26 October 2026. This is not a guarantee of zero defects or a certificate
 for 1,000/2,000 concurrent production users.
@@ -30,6 +30,7 @@ for 1,000/2,000 concurrent production users.
   frontend and API validation, and safe set allocation. Duration metadata cannot
   allocate millions of weeks. Existing recorded rows are not truncated.
 - Content-verified PWA shell: a missing/mismatched required file aborts installation.
+  Cache identities are derived from content as well as the human version label.
   Shell navigation uses one cached release, not independently refreshed HTML/JS.
   Manual updates preserve local queues and require other DevFit tabs to close.
 - Public health requests use CDN caching and a coalesced database probe.
@@ -41,7 +42,7 @@ boundaries. Do not promise console-proof UI or ban people merely for debugging.
 
 ## Verification
 
-- 134 automated tests; all pass. CI uses Node 24 and checks release hashes.
+- 137 automated tests; all pass. CI uses Node 24 and checks release hashes.
 - Fresh disposable PostgreSQL: all migrations apply. Rollback-only incremental,
   program, food-cache and new session/revocation tests pass.
 - Actual local handlers plus PostgreSQL, desktop 1280px and mobile-width 390px:

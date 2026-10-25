@@ -1,6 +1,6 @@
 // Private scheduled worker. Job credentials authorize only bounded delivery of
 // existing owner notifications, never admin actions, exports or Pro activation.
-import { sbRpc, sbSelect, recordServerEvent } from './_lib.js';
+import { sbRpc, sbSelect, recordServerEvent, rateLimit, clientIp, sha256Hex } from './_lib.js';
 import { sendPaymentNotification } from './_payments.js';
 import { sendSupportNotification } from './_support.js';
 
@@ -8,6 +8,15 @@ export async function runNotificationWorker(req, res) {
   const token = String(req.headers?.['x-devfit-job'] || '');
   if (req.headers?.origin || req.headers?.cookie || !/^[0-9a-f]{64}$/.test(token)) {
     res.status(401).json({ error: 'job_unauthorized' }); return;
+  }
+  // Separate from customer/admin quotas. A guessed, correctly-shaped capability
+  // must not create an unlimited stream of privileged claim queries.
+  const limit = await rateLimit('notification_job:' + sha256Hex(clientIp(req)), 30, 60,
+    { failClosed: true, timeoutMs: 2000 });
+  if (limit.unavailable) { res.status(503).json({ error: 'job_store_unavailable' }); return; }
+  if (!limit.ok) {
+    res.setHeader('Retry-After', String(Math.max(1,limit.retryAfter||60)));
+    res.status(429).json({ error: 'job_rate_limited' }); return;
   }
   const claimed = await sbRpc('claim_devfit_notifications', { p_job_token: token }, 4000);
   if (!claimed) { res.status(503).json({ error: 'job_store_unavailable' }); return; }

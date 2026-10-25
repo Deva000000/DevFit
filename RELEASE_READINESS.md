@@ -59,7 +59,7 @@ boundaries. Do not promise console-proof UI or ban people merely for debugging.
 
 ## Verification
 
-- 146 automated tests; all pass. CI uses Node 24 and checks release hashes.
+- 147 automated tests; all pass. CI uses Node 24 and checks release hashes.
 - Fresh disposable PostgreSQL: all migrations apply. Rollback-only incremental,
   program, food-cache, session/revocation, outbox and scheduler tests pass.
   Scheduler SQL tests use explicit local Vault/net/cron doubles; this is not a

@@ -28,10 +28,12 @@ test('job capability cannot bypass owner authentication or accept browser cookie
 });
 
 test('well-formed wrong scheduler key cannot read tickets or send emails',async()=>{
-  const old=globalThis.fetch,calls=[];globalThis.fetch=async(u)=>{calls.push(String(u));return response({status:'unauthorized'});};
+  const old=globalThis.fetch,calls=[];globalThis.fetch=async(u)=>{calls.push(String(u));
+    if(String(u).endsWith('/consume_devfit_rate_limit'))return response({allowed:true,retry_after:0});
+    return response({status:'unauthorized'});};
   try {
     assert.equal((await request({'x-devfit-job':token})).status,401);
-    assert.equal(calls.length,1);assert.match(calls[0],/claim_devfit_notifications$/);
+    assert.equal(calls.length,2);assert.match(calls[1],/claim_devfit_notifications$/);
   } finally {globalThis.fetch=old;}
 });
 
@@ -39,6 +41,7 @@ test('worker only sends existing notifications to the fixed owner, and returns c
   const old=globalThis.fetch,calls=[];let finished;
   globalThis.fetch=async(u,o={})=>{
     const url=String(u);calls.push(url);
+    if(url.endsWith('/consume_devfit_rate_limit'))return response({allowed:true,retry_after:0});
     if(url.endsWith('/claim_devfit_notifications'))return response({status:'ok',jobs:[job]});
     if(url.includes('/devfit_support_requests?'))return response([{id,email:'synthetic@example.invalid',whatsapp:'60123456789',
       category:'feedback',message:'Synthetic local test only',created_at:'2026-10-26T00:00:00Z',email_status:'failed'}]);
@@ -54,7 +57,7 @@ test('worker only sends existing notifications to the fixed owner, and returns c
     const r=await request({'x-devfit-job':token},{action:'activate',email:'victim@example.invalid',to:'attacker@example.invalid'});
     assert.equal(r.status,200);assert.deepEqual(r.value,{ok:true,claimed:1,sent:1,pending:0});
     assert.equal(finished.p_ok,true);assert.equal(finished.p_lease_id,job.lease_id);
-    assert.equal(JSON.stringify(r.value).includes('@'),false);assert.equal(calls.length,4);
+    assert.equal(JSON.stringify(r.value).includes('@'),false);assert.equal(calls.length,5);
   } finally {globalThis.fetch=old;}
 });
 
@@ -62,6 +65,7 @@ test('provider outage records retry state without leaking the provider error',as
   const old=globalThis.fetch;let finished;
   globalThis.fetch=async(u,o={})=>{
     const url=String(u);
+    if(url.endsWith('/consume_devfit_rate_limit'))return response({allowed:true,retry_after:0});
     if(url.endsWith('/claim_devfit_notifications'))return response({status:'ok',jobs:[job]});
     if(url.includes('/devfit_support_requests?'))return response([{id,email:'synthetic@example.invalid',category:'feedback',message:'QA',email_status:'failed'}]);
     if(url==='https://api.resend.com/emails')throw Error('private diagnostic details');
@@ -78,10 +82,21 @@ test('provider outage records retry state without leaking the provider error',as
 test('missing storage leaves the durable lease retryable and never emails invented content',async()=>{
   const old=globalThis.fetch;let providerCalls=0;
   globalThis.fetch=async u=>{
+    if(String(u).endsWith('/consume_devfit_rate_limit'))return response({allowed:true,retry_after:0});
     if(String(u).endsWith('/claim_devfit_notifications'))return response({status:'ok',jobs:[job]});
     if(String(u).includes('/devfit_support_requests?'))return response([]);
     providerCalls++;throw Error('must not send');
   };
   try {assert.equal((await request({'x-devfit-job':token})).value.pending,1);assert.equal(providerCalls,0);}
+  finally {globalThis.fetch=old;}
+});
+
+test('job burst quota fails closed before claim queries or provider traffic',async()=>{
+  const old=globalThis.fetch;let calls=0;
+  globalThis.fetch=async u=>{
+    calls++;assert.match(String(u),/consume_devfit_rate_limit$/);
+    return response({allowed:false,retry_after:60});
+  };
+  try {assert.equal((await request({'x-devfit-job':token})).status,429);assert.equal(calls,1);}
   finally {globalThis.fetch=old;}
 });

@@ -246,7 +246,7 @@
     <div id="view-backups" class="hide">
       <div class="card">
         <h2>Encrypted owner backup</h2>
-        <div class="hint" style="margin-top:0;margin-bottom:12px">Downloads subscribers, saved account records, recovery versions, device records and app configuration. The file is encrypted on this device before it is saved.</div>
+        <div class="hint" style="margin-top:0;margin-bottom:12px">Downloads account records and metadata, encrypted on this device. This manual export does not include receipt image files, database schema or a full database restore. It is not an automatic offsite backup.</div>
         <label>New backup password</label>
         <input type="password" id="backup-pass" autocomplete="new-password" placeholder="At least 12 characters">
         <label>Confirm backup password</label>
@@ -856,6 +856,8 @@ async function refreshErrors(){
     renderErrors(r.data.errors||[]);
     const sources=r.data.foodSources||{};
     $('food-provider-health').textContent=(sources.usdaKeyConfigured?'USDA: dedicated key configured. ':'USDA: demo key only — add USDA_KEY before a broad launch. ')+(sources.kaloriEnabled?'Kalori: enabled.':'Kalori: disabled due to provider TLS certificate failure.');
+    const jobs=r.data.notifications;
+    $('food-provider-health').textContent+=' '+(jobs?'Email retries: '+(jobs.enabled?'enabled':'not scheduled')+' · '+Number(jobs.pending||0)+' waiting · '+Number(jobs.needsReview||0)+' need review.':'Email retry status unavailable.');
   }
   else $('errors').innerHTML='<div class="hint">Failed: '+safeText(r.data.error||r.status)+'</div>';
 }

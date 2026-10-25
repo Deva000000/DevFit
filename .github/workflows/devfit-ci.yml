@@ -29,6 +29,36 @@ jobs:
       - name: Reliability regression suite
         run: node --test tests/*.test.mjs
 
+  sql-regressions:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: synthetic-local-only
+          POSTGRES_DB: devfit_scale_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGPASSWORD: synthetic-local-only
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fresh schema and rollback-only database regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql -h 127.0.0.1 -U postgres -d devfit_scale_ci -v ON_ERROR_STOP=1 -f tests/scaling/bootstrap.sql
+          for file in supabase/migrations/*.sql; do
+            psql -h 127.0.0.1 -U postgres -d devfit_scale_ci -v ON_ERROR_STOP=1 -f "$file"
+          done
+          for file in incremental-regression program-integrity food-cache-regression session-regression notification-regression notification-scheduler-regression; do
+            psql -h 127.0.0.1 -U postgres -d devfit_scale_ci -v ON_ERROR_STOP=1 -f "tests/scaling/$file.sql"
+          done
+
   production-smoke:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest

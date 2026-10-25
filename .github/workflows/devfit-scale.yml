@@ -47,9 +47,11 @@ jobs:
             psql -h 127.0.0.1 -U postgres -d devfit_scale -v ON_ERROR_STOP=1 -f "$file"
           done
       - name: Rollback-only incremental SQL regression
-        run: psql -h 127.0.0.1 -U postgres -d devfit_scale -v ON_ERROR_STOP=1 -f tests/scaling/incremental-regression.sql -f tests/scaling/program-integrity.sql -f tests/scaling/food-cache-regression.sql -f tests/scaling/session-regression.sql
+        run: psql -h 127.0.0.1 -U postgres -d devfit_scale -v ON_ERROR_STOP=1 -f tests/scaling/incremental-regression.sql -f tests/scaling/program-integrity.sql -f tests/scaling/food-cache-regression.sql -f tests/scaling/session-regression.sql -f tests/scaling/notification-regression.sql -f tests/scaling/notification-scheduler-regression.sql
       - name: Cross-instance food cache and shared-network authorization
         run: node tests/scaling/food-cache-concurrency.mjs
+      - name: Cross-instance notification leases and late-worker recovery
+        run: node tests/scaling/notification-concurrency.mjs
       - name: Real handler and PostgreSQL stress tests (no production credentials)
         run: node tests/scaling/scale.mjs
       - name: Preserve results even when the capacity gate fails

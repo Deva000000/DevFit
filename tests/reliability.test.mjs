@@ -348,7 +348,7 @@ test('security contracts stay closed and shared networks use account-first limit
   const db = fs.readFileSync(new URL('../devfit-db.js', import.meta.url), 'utf8');
   assert.match(db, /SAVE_DEBOUNCE_MS = 850/);
   assert.match(db, /devfit_sync_dirty/);
-  assert.match(db, /Saved on device · waiting for connection/);
+  assert.match(db, /Offline · account sync waiting/);
 });
 
 test('owner backup API only exposes fixed tables in bounded non-cacheable pages', async () => {
@@ -577,7 +577,9 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
   assert.match(settings, /<div class="title">Install DevFit App<\/div>/);
   assert.match(settings, /if\(!deferredInstallPrompt\)\{\s*showIosHint\(\)/);
   assert.equal(manifest.display, 'standalone');
-  assert.match(worker, /devfit-v4\.96\.1/);
+  const version=worker.match(/const VERSION = 'devfit-(v\d+\.\d+\.\d+)'/);
+  assert.ok(version,'worker has a release version');
+  assert.ok(settings.includes(version[1]),'settings and worker release labels agree');
   assert.doesNotMatch(worker, /\.then\(\(\) => self\.skipWaiting\(\)\)/);
 
   for (const html of [index, settings]) {

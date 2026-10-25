@@ -22,6 +22,7 @@ import {
 } from './_lib.js';
 import { getSupportRequest, sendSupportNotification } from './_support.js';
 import { notifySavedPayment } from './_payments.js';
+import { runNotificationWorker } from './_notification-worker.js';
 
 const ADMIN_PW = process.env.DEVFIT_ADMIN_PASSWORD || '';
 const BACKUP_TABLES = {
@@ -82,7 +83,12 @@ async function deletionCounts(email) {
 export default async function handler(req, res) {
   setApiSecurityHeaders(res);
   if (req.method !== 'POST') { res.status(405).json({ error: 'method' }); return; }
-  if (!haveServerConfig() || !ADMIN_PW) { res.status(501).json({ error: 'not_configured' }); return; }
+  if (!haveServerConfig()) { res.status(501).json({ error: 'not_configured' }); return; }
+  if (req.headers?.['x-devfit-job'] !== undefined) {
+    // Dedicated non-browser capability; it never falls through to owner actions.
+    await runNotificationWorker(req, res); return;
+  }
+  if (!ADMIN_PW) { res.status(501).json({ error: 'not_configured' }); return; }
 
   // Admin requests are browser-only and same-origin. This is a second barrier
   // against cross-site requests in addition to SameSite=Strict on the cookie.
@@ -146,7 +152,8 @@ export default async function handler(req, res) {
       const since=new Date(Date.now()-days*86400000).toISOString();
       const rows = await sbSelect('devfit_errors', 'select=id,type,message,page,status,at&at=gte.'+encodeURIComponent(since)+'&order=at.desc&limit=500');
       if(!Array.isArray(rows)){res.status(503).json({error:'monitoring_unavailable'});return;}
-      res.status(200).json({ errors: rows,days,foodSources:{usdaKeyConfigured:!!process.env.USDA_KEY&&process.env.USDA_KEY!=='DEMO_KEY',kaloriEnabled:process.env.KALORI_ENABLED==='true'} });
+      const notifications = await sbRpc('devfit_notification_status', {}, 4000);
+      res.status(200).json({ errors: rows,days,notifications,foodSources:{usdaKeyConfigured:!!process.env.USDA_KEY&&process.env.USDA_KEY!=='DEMO_KEY',kaloriEnabled:process.env.KALORI_ENABLED==='true'} });
       return;
     }
 
@@ -308,8 +315,8 @@ export default async function handler(req, res) {
     }
 
     // Password-gated, whitelisted and paged. The server never accepts an
-    // arbitrary table name, and the admin page encrypts every page into one
-    // off-site backup before it is downloaded.
+    // arbitrary table name. The admin page encrypts this metadata export before
+    // download; it is not a full DB/Storage backup or an offsite schedule.
     if (action === 'backupPage') {
       const table = String(body.table || '');
       const order = BACKUP_TABLES[table];

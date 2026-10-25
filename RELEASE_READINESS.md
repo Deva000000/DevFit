@@ -1,4 +1,4 @@
-# DevFit v4.96.1 — release evidence and remaining gates
+# DevFit v4.96.2 — release evidence and remaining gates
 
 Reviewed 26 October 2026. This is not a guarantee of zero defects or a certificate
 for 1,000/2,000 concurrent production users.
@@ -34,6 +34,23 @@ for 1,000/2,000 concurrent production users.
   Shell navigation uses one cached release, not independently refreshed HTML/JS.
   Manual updates preserve local queues and require other DevFit tabs to close.
 - Public health requests use CDN caching and a coalesced database probe.
+- Healthy page-load sync and ordinary edits are silent. Only delayed/offline
+  account sync shows a warning, cleared on recovery; unrelated preference sync
+  cannot hide a failed workout upload. Acknowledged no-op page loads do not mark
+  a new edit, bias conflict timestamps or wait for an unnecessary debounce.
+  JSONB object-key ordering is not mistaken for a user edit.
+- Receipt/support inserts atomically create a durable notification job. Inline
+  sends still work; saved-but-undelivered notifications retry on a five-minute
+  private scheduler, with leases, bounded backoff and provider idempotency keys.
+  Automatic retries stop within 23 hours / six worker attempts; unresolved items
+  are visible in Admin and manual retry remains available. No Pro activation is
+  performed by the worker. Existing historical tickets are not backfilled.
+- Bounded cleanup of expired sessions, sent retry-job metadata (30 days) and this
+  scheduler's diagnostics (seven days). Diaries, receipts, support messages,
+  customer activation and unrelated job logs are not pruned by this maintenance.
+- Fresh-schema SQL regression tests now run on every CI push, not just the manual
+  stress workflow. The owner's manual export is explicitly labeled metadata-only;
+  it does not claim to include private image bytes or replace offsite backups.
 
 Previously downloaded renderer code or personal cached data cannot be remotely
 made uncopyable. Browser developer tools are not a security boundary. The new
@@ -42,9 +59,12 @@ boundaries. Do not promise console-proof UI or ban people merely for debugging.
 
 ## Verification
 
-- 137 automated tests; all pass. CI uses Node 24 and checks release hashes.
+- 146 automated tests; all pass. CI uses Node 24 and checks release hashes.
 - Fresh disposable PostgreSQL: all migrations apply. Rollback-only incremental,
-  program, food-cache and new session/revocation tests pass.
+  program, food-cache, session/revocation, outbox and scheduler tests pass.
+  Scheduler SQL tests use explicit local Vault/net/cron doubles; this is not a
+  managed-extension stress test. 100 independent SQL contenders claimed eight
+  jobs exactly once; late failures could not downgrade committed successful sends.
 - Actual local handlers plus PostgreSQL, desktop 1280px and mobile-width 390px:
   public pages, all four app pages, save/readback, offline reload/retry, nutrition
   search/portion save, workout save, all three PDFs, archived-program PDF, receipt
@@ -55,10 +75,11 @@ boundaries. Do not promise console-proof UI or ban people merely for debugging.
 - 2,000-account local run: mixed bursts at 100/250/500/1,000/2,000 had no failed
   requests or incorrect accepted-write readbacks. 2,000 current Free/Pro decisions
   were correct. 100 incremental patch/conditional-read checks were correct.
-- 120-second staggered workload: 2,000 logical users, one edit per user per 30s,
-  16,002 requests, all successful; p95 59ms, p99 720ms, no missed arrival slots.
+- Final-schema retest: 120-second staggered workload, 2,000 logical users, one edit
+  per user per 30s, 16,004 requests, all successful; p95 15ms, p99 25ms, no missed
+  arrival slots. This is a local topology result, not a hosted capacity guarantee.
 - Capacity gate **FAILS**: the 2,000-user synchronized whole-document burst had
-  p95 approximately 10.9s read / 12.3s write / 11.6s readback, exceeding 2s p95
+  final-schema p95 approximately 7.0s read / 8.3s write / 8.0s readback, exceeding 2s p95
   and 5s p99 targets. The single local Node API/generator and local PostgreSQL pool
   do not reproduce Vercel's distributed runtime or Supabase's managed capacity.
   Do not reinterpret correctness as a production capacity pass.
@@ -70,9 +91,10 @@ Raw synthetic-only results remain under ignored `tests/scaling/results/`.
 1. Confirm a dedicated USDA API key and a commercially suitable hosting plan.
    Upstream OFF/USDA quotas and availability cannot be removed by frontend code.
    Do not disable provider budgets to create the appearance of availability.
-2. Configure a durable scheduled notification retry worker/outbox. Receipt/support
-   records are saved before email and manual owner retry exists, but automatic
-   delivery retry after process crashes is not yet guaranteed.
+2. Observe the newly installed notification worker in production. Automatic retry
+   code and private scheduler are installed; an authenticated rollout probe must
+   succeed after API deployment. Local provider failure/recovery is tested, but
+   actual mailbox delivery still depends on valid Resend configuration and limits.
 3. Configure encrypted offsite database **and private Storage-object** backups;
    run an isolated restore drill. The owner export is manual and metadata alone
    is not a backup of receipt image bytes. Customer import/export stays removed.
@@ -91,10 +113,13 @@ Raw synthetic-only results remain under ignored `tests/scaling/results/`.
 The current small customer cohort and gradual rollout are materially different
 from an unrestricted large launch. Continue checking failed saves, p95 latency,
 provider limits, database/storage usage, pending receipts and delivery failures.
+Before this release's additive migrations, production held 24 accounts, 90
+documents and a 33 MB database. Do not treat that current size as proof that a
+multi-year 2,000-account history will fit a free database plan.
 
 ## Rollout
 
-Apply the additive session migration before deploying API/client code. It does
+Apply additive session/outbox migrations before deploying API/client code. It does
 not rewrite progress, nutrition, workouts, subscriptions or receipt data. Existing
 users should use the Update ready banner; no uninstall or data reset is needed.
 Inactive legacy sessions may need one fresh Google sign-in. Keep the migration

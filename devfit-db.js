@@ -421,12 +421,23 @@
     return w;
   }
 
-  // Small, non-blocking save state. It is created here so every page gets the
-  // same feedback without changing Claude's established layouts.
-  let indicatorTimer = null;
-  function setIndicator(state) {
+  // Healthy background sync is silent. Only actionable failures need a floating
+  // warning; navigation and every keystroke must not announce successful saves.
+  // Track failures separately so a successful prefs read cannot hide a failed
+  // workout upload that is still waiting in the durable queue.
+  const syncWarnings = {};
+  function setIndicator(state, scope) {
     try {
+      if (state === 'err' && global.navigator && global.navigator.onLine === false) state = 'offline';
+      scope = scope || 'account';
+      if (state === 'offline' || state === 'err') syncWarnings[scope] = state;
+      else if (state === 'ok') delete syncWarnings[scope];
+      const warnings = Object.keys(syncWarnings);
       let el = document.getElementById('devfit-save-state');
+      if (!warnings.length) {
+        if (el) { el.textContent = ''; el.style.opacity = '0'; el.style.transform = 'translateY(4px)'; }
+        return;
+      }
       if (!el) {
         el = document.createElement('div');
         el.id = 'devfit-save-state';
@@ -435,18 +446,12 @@
         el.style.cssText = 'position:fixed;right:12px;bottom:92px;z-index:2147482000;padding:7px 10px;border:1px solid rgba(255,255,255,.13);border-radius:999px;background:rgba(17,17,20,.94);color:#d8d8dd;box-shadow:0 5px 18px rgba(0,0,0,.3);font:600 11px/1.2 system-ui,sans-serif;opacity:0;transform:translateY(4px);transition:opacity .18s,transform .18s;pointer-events:none';
         (document.body || document.documentElement).appendChild(el);
       }
-      if (indicatorTimer) clearTimeout(indicatorTimer);
-      const labels = {
-        device: 'Saved on device', syncing: 'Saving to account…', ok: 'Saved to account',
-        offline: 'Saved on device · waiting for connection', err: 'Saved on device · sync pending'
-      };
-      el.textContent = labels[state] || '';
-      el.style.color = state === 'ok' ? '#71df9b' : (state === 'err' || state === 'offline' ? '#f0c36a' : '#d8d8dd');
-      el.style.opacity = labels[state] ? '1' : '0';
-      el.style.transform = labels[state] ? 'translateY(0)' : 'translateY(4px)';
-      if (state === 'ok' || state === 'device') {
-        indicatorTimer = setTimeout(function () { el.style.opacity = '0'; el.style.transform = 'translateY(4px)'; }, 1600);
-      }
+      const message = warnings.some(function (key) { return syncWarnings[key] === 'offline'; })
+        ? 'Offline · account sync waiting' : 'Account sync delayed · retrying';
+      if (el.textContent !== message) el.textContent = message;
+      el.style.color = '#f0c36a';
+      el.style.opacity = '1';
+      el.style.transform = 'translateY(0)';
     } catch (_) {}
   }
 
@@ -562,7 +567,7 @@
 
   // Raw upload. Everything that decides WHETHER to upload lives in cloudSave.
   async function push(dataType, data) {
-    setIndicator('syncing');
+    setIndicator('syncing', dataType);
     try {
       let candidate = clone(data);
       for (let attempt = 0; attempt < 3; attempt++) {
@@ -570,7 +575,7 @@
         // while this request is in flight; that newer edit needs its own ACK.
         candidate = clone(candidate);
         const changes = cloudSnapshot[dataType] ? changesBetween(cloudSnapshot[dataType], candidate) : null;
-        if (changes && changes.length === 0) { setIndicator('ok'); return true; }
+        if (changes && changes.length === 0) { setIndicator('ok', dataType); return true; }
         const encoded = changes && JSON.stringify(changes);
         const incremental = patchSupported[dataType] && cloudVersion[dataType] && encoded
           && encoded.length < 32768 && encoded.length < JSON.stringify(candidate).length * 0.6;
@@ -580,7 +585,7 @@
           baseUpdatedAt: cloudVersion[dataType] || '',
           deviceId: localStorage.getItem('devfit_device_id') || 'unknown'
         });
-        if (r && r.skip) { setIndicator('offline'); return false; }
+        if (r && r.skip) { setIndicator('offline', dataType); return false; }
         if (r && r.conflict && r.row) {
           rememberCloud(dataType, r.row.data, r.row.updated_at, patchSupported[dataType] ? 2 : 1);
           const serverTs = new Date(r.row.updated_at).getTime();
@@ -603,14 +608,14 @@
         if (LOCAL_KEY[dataType]) writeLocal(dataType, pendingSave[dataType]
           ? mergeDoc(dataType, pendingSave[dataType], candidate) : candidate);
         localStorage.setItem('devfit_cloud_ts_' + dataType, String(Date.now()));
-        setIndicator('ok');
+        setIndicator('ok', dataType);
         return true;
       }
       throw new Error('save conflict did not converge');
     } catch (e) {
       if (e.retryAfter) retryNotBefore[dataType] = Date.now() + Number(e.retryAfter) * 1000;
       console.warn('[DevFit Cloud] save failed (' + dataType + '):', e.message || e);
-      setIndicator('err');
+      setIndicator('err', dataType);
       return false;
     }
   }
@@ -630,7 +635,7 @@
         await seedAcknowledged(dataType);
         const r = await apiCall('get', { dataType: dataType,
           ...(cloudSnapshot[dataType] && cloudVersion[dataType] ? { knownVersions: { [dataType]: cloudVersion[dataType] } } : {}) });
-        if (r && r.skip) { setIndicator('offline'); return merged; }
+        if (r && r.skip) { setIndicator('offline', dataType); return merged; }
         const rows = (r && r.rows) || [];
         const row = rows.filter(function (x) { return x.data_type === dataType; })[0];
 
@@ -656,10 +661,10 @@
           }
         } else { cloudVersion[dataType] = ''; delete cloudSnapshot[dataType]; }
         syncOutcome[dataType] = true;
-        setIndicator('ok');
+        if (!readDirty()[dataType]) setIndicator('ok', dataType);
       } catch (e) {
         console.warn('[DevFit Cloud] sync failed (' + dataType + '):', e.message || e);
-        setIndicator('err');
+        setIndicator('err', dataType);
       }
       return merged;
     })();
@@ -721,7 +726,7 @@
     }
     if (debounceTimer[dataType]) { clearTimeout(debounceTimer[dataType]); debounceTimer[dataType] = null; }
     saveWorker[dataType] = (async function () {
-      if (!getToken()) { setIndicator('offline'); return false; }
+      if (!getToken()) { setIndicator('offline', dataType); return false; }
       if (!pulled[dataType] && LOCAL_KEY[dataType]) await reconcile(dataType);
       if (LOCAL_KEY[dataType] && syncOutcome[dataType] !== true) {
         pulled[dataType] = false;
@@ -767,12 +772,19 @@
   }
 
   function cloudSave(dataType, data) {
+    // Page initializers and preference backups call save even when unchanged.
+    // An acknowledged no-op must not start a debounce, mark a fresh local edit,
+    // or bias later conflict resolution toward a document nobody edited.
+    if (cloudSnapshot[dataType] && !pendingSave[dataType] && !saveWorker[dataType]
+        && !readDirty()[dataType] && JSON.stringify(data) === JSON.stringify(cloudSnapshot[dataType])) {
+      return Promise.resolve(true);
+    }
     // Record the local-modified time synchronously, BEFORE any async work — the
     // source of truth for "local has unsynced edits newer than the cloud copy",
     // so an edit is never clobbered even if the user navigates away mid-upload.
     try { localStorage.setItem('devfit_local_ts_' + dataType, String(Date.now())); } catch (_) {}
     markDirty(dataType);
-    setIndicator('device');
+    setIndicator('device', dataType);
     pendingSave[dataType] = data;
     if (debounceTimer[dataType]) clearTimeout(debounceTimer[dataType]);
     const promise = new Promise(function (resolve) {
@@ -795,11 +807,19 @@
     if (localKey && !LOCAL_KEY[dataType]) LOCAL_KEY[dataType] = localKey;
     if (typeof onNewData === 'function') notify[dataType] = onNewData;
     if (!getToken()) return;
-    setIndicator('syncing');
+    setIndicator('syncing', dataType);
     const merged = await reconcile(dataType);
     // Local had edits the cloud has not seen (offline logging, or a first run) —
     // send the reconciled copy up so the other devices converge on it.
-    if (merged) await cloudSave(dataType, merged);
+    if (merged && !acknowledgedNoChange(dataType, merged)) await cloudSave(dataType, merged);
+  }
+
+  function acknowledgedNoChange(dataType, data) {
+    if (!cloudSnapshot[dataType] || readDirty()[dataType]) return false;
+    // JSONB reorders object keys. Compare fields, not serialized key order, on
+    // startup/export; keep this deep comparison off the keystroke hot path.
+    const changes = changesBetween(cloudSnapshot[dataType], data);
+    return changes && changes.length === 0;
   }
 
   // Read the account once and restore every durable document without writing
@@ -871,7 +891,7 @@
         if (syncOutcome[t] !== true) return { ok: false, updated: updated, reason: 'Saved on device; account sync unavailable' };
         if (merged) {
           if (JSON.stringify(merged) !== before) updated++;
-          if (!(await cloudSave(t, merged))) return { ok: false, updated: updated, reason: 'Latest edits are saved on device; account upload is pending' };
+          if (!acknowledgedNoChange(t, merged) && !(await cloudSave(t, merged))) return { ok: false, updated: updated, reason: 'Latest edits are saved on device; account upload is pending' };
         }
       }
       setIndicator('ok');

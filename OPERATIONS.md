@@ -7,10 +7,16 @@ without the owner's explicit decision. Never paste secrets into tickets or chat.
 ## Notifications
 
 The private `devfit-notification-retries` pg_cron job runs every five minutes.
-Vault stores the high-entropy capability; only its hash is in `devfit_job_auth`.
+Each dispatch issues a fresh two-minute, single-use random capability; only its
+hash is in `devfit_job_auth`, and successful authorization atomically consumes it.
 The callback is the existing `/api/admin` route, but that capability cannot access
 normal admin actions. Browser cookies/Origin are rejected on the job branch.
 Source IDs and lease IDs are read from the service-only outbox, never the caller.
+No reusable Vault key, service-role key, owner password or customer token is sent
+in HTTP job headers. Managed net-schema ACLs are platform-owned; do not assume a
+project-role REVOKE changed them. The schema is outside the exposed Data API
+(verified 406), and the two private public-schema tables deny anonymous reads
+(verified 401). None of the worker responses contains ticket/receipt contents.
 
 Normal uploads still try inline delivery. The worker retries two due failures per
 tick, serially, with three-minute leases. A crashed worker is reclaimable. Six
@@ -38,10 +44,11 @@ order by start_time desc limit 10;
 
 Emergency disable: an authorized database operator can set this job's `enabled`
 flag false and unschedule its named cron job. Preserve the durable queue, source
-records and Vault secret. Do not drop customer tables to stop notifications.
+records. Do not drop customer tables to stop notifications.
 
-New hosted staging must disable this production-callback scheduler immediately
-after migration, and must use separate email/JWT/database credentials. Disposable
+New hosted staging must provision its scheduler disabled, with a separate
+nonproduction callback, rather than blindly replaying production-specific
+scheduler activation/probe blocks. Use separate email/JWT/database credentials. Disposable
 local CI uses the explicit isolation marker and never installs managed extensions.
 
 ## Offsite backup — not yet operational
@@ -71,7 +78,7 @@ Production is PostgreSQL 17.6. Apply the provider's supported security upgrade
 only after the independent backup/restore check and an agreed maintenance window.
 The provider's upgrade includes downtime. Check extension compatibility and job
 schedules afterwards; pg_cron may be recreated during an upgrade. Verify private
-worker grants, Vault references, health, login, saves, Pro reports and receipt
+worker grants, single-use capabilities, health, login, saves, Pro reports and receipt
 readback. Never use an unannounced pause/restore as a shortcut for maintenance.
 
 ## Capacity — open release gate

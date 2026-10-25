@@ -45,6 +45,12 @@ for 1,000/2,000 concurrent production users.
   Automatic retries stop within 23 hours / six worker attempts; unresolved items
   are visible in Admin and manual retry remains available. No Pro activation is
   performed by the worker. Existing historical tickets are not backfilled.
+- Scheduled callbacks use two-minute, single-use capabilities, consumed atomically
+  on authorization, with an independent burst quota. No reusable key is placed in
+  managed HTTP queue headers. Managed net-schema grants cannot be presumed revoked
+  by the project role; the actual public Data API rejects net (406), and rejects
+  anonymous outbox/job-auth reads (401). The authenticated production rollout
+  callback returned 200 with no customer work, confirming the deployed round trip.
 - Bounded cleanup of expired sessions, sent retry-job metadata (30 days) and this
   scheduler's diagnostics (seven days). Diaries, receipts, support messages,
   customer activation and unrelated job logs are not pruned by this maintenance.
@@ -62,9 +68,10 @@ boundaries. Do not promise console-proof UI or ban people merely for debugging.
 - 147 automated tests; all pass. CI uses Node 24 and checks release hashes.
 - Fresh disposable PostgreSQL: all migrations apply. Rollback-only incremental,
   program, food-cache, session/revocation, outbox and scheduler tests pass.
-  Scheduler SQL tests use explicit local Vault/net/cron doubles; this is not a
-  managed-extension stress test. 100 independent SQL contenders claimed eight
-  jobs exactly once; late failures could not downgrade committed successful sends.
+  Scheduler SQL tests use explicit local net/cron doubles; this is not a managed
+  extension stress test. Of 100 concurrent nonce replays, exactly one was accepted
+  and 99 denied. Eight jobs across four fresh-nonce batches were claimed once;
+  late failures could not downgrade committed successful sends.
 - Actual local handlers plus PostgreSQL, desktop 1280px and mobile-width 390px:
   public pages, all four app pages, save/readback, offline reload/retry, nutrition
   search/portion save, workout save, all three PDFs, archived-program PDF, receipt
@@ -91,10 +98,10 @@ Raw synthetic-only results remain under ignored `tests/scaling/results/`.
 1. Confirm a dedicated USDA API key and a commercially suitable hosting plan.
    Upstream OFF/USDA quotas and availability cannot be removed by frontend code.
    Do not disable provider budgets to create the appearance of availability.
-2. Observe the newly installed notification worker in production. Automatic retry
-   code and private scheduler are installed; an authenticated rollout probe must
-   succeed after API deployment. Local provider failure/recovery is tested, but
-   actual mailbox delivery still depends on valid Resend configuration and limits.
+2. Confirm Resend mailbox delivery/configuration and provider limits. The durable
+   worker, schedule and authenticated production callback are verified; a callback
+   with no queued work does not prove actual email inbox delivery. Provider
+   failure/recovery and duplicate protection were tested with simulated delivery.
 3. Configure encrypted offsite database **and private Storage-object** backups;
    run an isolated restore drill. The owner export is manual and metadata alone
    is not a backup of receipt image bytes. Customer import/export stays removed.

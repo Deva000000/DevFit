@@ -1,16 +1,14 @@
--- Rollback-only LOCAL test doubles for managed Vault / pg_net / pg_cron.
+-- Rollback-only LOCAL test doubles for managed pg_net / pg_cron.
 -- Verifies dispatch and housekeeping logic; not a managed-extension load test.
 begin;
 do $$ begin
   assert current_database() like 'devfit_scale%';
   assert exists(select 1 from public.devfit_scale_environment);
 end;$$;
-create schema vault;
 create schema net;
 create schema cron;
 create table cron.job(jobid bigint primary key,jobname text);
 create table cron.job_run_details(runid bigint primary key,jobid bigint,end_time timestamptz);
-create view vault.decrypted_secrets as select 'devfit_notification_job'::text name,repeat('d',64) decrypted_secret;
 create table public.devfit_scale_http_capture(url text,headers jsonb,body jsonb,timeout_ms integer);
 create function net.http_post(url text,body jsonb default '{}',params jsonb default '{}',headers jsonb default '{}',timeout_milliseconds integer default 2000)
 returns bigint language plpgsql as $$ begin
@@ -34,7 +32,7 @@ do $$ declare v_ticket uuid:=gen_random_uuid();begin
   update public.devfit_notification_outbox set next_attempt_at=now()-interval '1 second' where support_id=v_ticket;
   perform public.dispatch_devfit_notifications();
   assert (select count(*)=1 from public.devfit_scale_http_capture);
-  assert (select url='https://devfitportal.vercel.app/api/admin' and headers->>'x-devfit-job'=repeat('d',64)
+  assert (select url='https://devfitportal.vercel.app/api/admin' and headers->>'x-devfit-job' ~ '^[0-9a-f]{64}$'
     and body='{}'::jsonb and timeout_ms=60000 from public.devfit_scale_http_capture),'Fixed destination, credential, no customer payload';
   perform public.dispatch_devfit_notifications();
   assert (select count(*)=1 from public.devfit_scale_http_capture),'No overlapping callback';
@@ -42,6 +40,7 @@ do $$ declare v_ticket uuid:=gen_random_uuid();begin
   perform public.dispatch_devfit_notifications();
   assert (select count(*)=1 from public.devfit_scale_http_capture),'Kill switch prevents dispatch';
   assert not has_function_privilege('service_role','public.dispatch_devfit_notifications()','EXECUTE');
-  raise notice 'Scheduler destination, Vault capability, bounded diagnostics cleanup and kill switch checks passed';
+  assert (select token_expires_at<=now()+interval '2 minutes' from public.devfit_job_auth),'Short-lived capability';
+  raise notice 'Scheduler destination, single-use capability, bounded diagnostics cleanup and kill switch checks passed';
 end;$$;
 rollback;

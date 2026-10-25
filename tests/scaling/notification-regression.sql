@@ -1,4 +1,7 @@
 begin;
+create function pg_temp.rearm_notification_probe() returns void language sql as $$
+  update public.devfit_job_auth set token_expires_at=clock_timestamp()+interval '2 minutes' where name='notifications';
+$$;
 do $$
 declare v_email text:='notification-probe@example.invalid';v_secret text:=repeat('d',64);
   v_ticket uuid:=gen_random_uuid();v_payment uuid:=gen_random_uuid();v_id uuid;v_lease uuid;v jsonb;
@@ -14,10 +17,14 @@ begin
   select id into v_id from public.devfit_notification_outbox where support_id=v_ticket;
   assert v_id is not null,'Source insert and retry job are atomic';
   v:=public.claim_devfit_notifications(repeat('e',64));assert v->>'status'='unauthorized';
+  perform pg_temp.rearm_notification_probe();
   v:=public.claim_devfit_notifications(v_secret);assert jsonb_array_length(v->'jobs')=0,'No race with immediate inline delivery';
+  v:=public.claim_devfit_notifications(v_secret);assert v->>'status'='unauthorized','A consumed nonce cannot be replayed';
   update public.devfit_notification_outbox set next_attempt_at=now()-interval '1 minute' where id=v_id;
+  perform pg_temp.rearm_notification_probe();
   v:=public.claim_devfit_notifications(v_secret);assert jsonb_array_length(v->'jobs')=1;
   v_lease:=(v->'jobs'->0->>'lease_id')::uuid;
+  perform pg_temp.rearm_notification_probe();
   v:=public.claim_devfit_notifications(v_secret);assert jsonb_array_length(v->'jobs')=0,'No overlapping lease';
   v:=public.finish_devfit_notification(v_id,gen_random_uuid(),true,'wrong-worker',null);
   assert v->>'status'='stale_lease';
@@ -26,10 +33,12 @@ begin
   assert (select email_status='failed' from public.devfit_support_requests where id=v_ticket);
   assert (select next_attempt_at>=now()+interval '5 minutes' from public.devfit_notification_outbox where id=v_id);
   update public.devfit_notification_outbox set next_attempt_at=now()-interval '1 minute' where id=v_id;
+  perform pg_temp.rearm_notification_probe();
   v:=public.claim_devfit_notifications(v_secret);v_lease:=(v->'jobs'->0->>'lease_id')::uuid;
   -- Simulate worker termination before finishing. Another worker can reclaim
   -- only after its lease expires; the previous worker may not overwrite it.
   update public.devfit_notification_outbox set lease_until=now()-interval '1 second' where id=v_id;
+  perform pg_temp.rearm_notification_probe();
   v:=public.claim_devfit_notifications(v_secret);
   assert (v->'jobs'->0->>'lease_id')::uuid<>v_lease;
   v:=public.finish_devfit_notification(v_id,v_lease,true,'stale-worker',null);assert v->>'status'='stale_lease';
@@ -45,11 +54,15 @@ begin
   assert (select state='sent' from public.devfit_notification_outbox where payment_id=v_payment),'Inline/manual delivery closes retry job';
   assert (select tier='free' from public.devfit_subscribers where email=v_email),'Sending receipt email never grants Pro';
   update public.devfit_notification_outbox set state='pending',created_at=now()-interval '24 hours',next_attempt_at=now()-interval '1 minute' where id=v_id;
+  perform pg_temp.rearm_notification_probe();
   v:=public.claim_devfit_notifications(v_secret);
   assert jsonb_array_length(v->'jobs')=0;
   assert (select state='exhausted' from public.devfit_notification_outbox where id=v_id),'No duplicate outside provider deduplication window';
   update public.devfit_notification_outbox set state='leased',attempts=6,created_at=now(),lease_until=now()-interval '1 second' where id=v_id;
+  perform pg_temp.rearm_notification_probe();
   v:=public.claim_devfit_notifications(v_secret);assert (select state='exhausted' from public.devfit_notification_outbox where id=v_id),'A crashed final attempt cannot retry forever';
+  update public.devfit_job_auth set token_expires_at=clock_timestamp()-interval '1 second';
+  v:=public.claim_devfit_notifications(v_secret);assert v->>'status'='unauthorized','Expired nonces fail closed';
   assert not has_table_privilege('anon','public.devfit_notification_outbox','SELECT');
   assert not has_table_privilege('authenticated','public.devfit_job_auth','SELECT');
   assert not has_function_privilege('anon','public.claim_devfit_notifications(text)','EXECUTE');

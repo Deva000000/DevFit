@@ -12,15 +12,25 @@ try {
   assert.equal((await db.query('select count(*)::int n from devfit_scale_environment')).rows[0].n,1);
   assert.equal((await db.query("select count(*)::int n from devfit_notification_outbox where state in ('pending','leased')")).rows[0].n,0,
     'Use a fresh isolated schema; do not claim jobs belonging to another local QA run');
-  await db.query("insert into devfit_job_auth(name,token_hash,enabled)values('notifications',$1,true)",[crypto.createHash('sha256').update(token).digest('hex')]);
+  await db.query("insert into devfit_job_auth(name,token_hash,enabled,token_expires_at)values('notifications',$1,true,clock_timestamp()+interval '2 minutes')",[crypto.createHash('sha256').update(token).digest('hex')]);
   await db.query("insert into devfit_subscribers(email,approved,tier)values($1,true,'free')",[email]);
   for(let i=0;i<8;i++)await db.query("insert into devfit_support_requests(email,whatsapp,category,message)values($1,'60123456789','feedback','Synthetic concurrency probe')",[email]);
   await db.query("update devfit_notification_outbox set next_attempt_at=now()-interval '1 second' where support_id in(select id from devfit_support_requests where email=$1)",[email]);
   const contenders=await Promise.all(Array.from({length:100},async()=>{
     const {rows}=await db.query('select claim_devfit_notifications($1) result',[token]);
-    assert.equal(rows[0].result.status,'ok');return rows[0].result.jobs;
+    return rows[0].result;
   }));
-  const jobs=contenders.flat();assert.equal(jobs.length,8);assert.equal(new Set(jobs.map(j=>j.id)).size,8);
+  assert.equal(contenders.filter(c=>c.status==='ok').length,1,'Only one concurrent request can consume a nonce');
+  assert.equal(contenders.filter(c=>c.status==='unauthorized').length,99);
+  const jobs=contenders.flatMap(c=>c.jobs||[]);assert.equal(jobs.length,2);
+  for(let i=0;i<3;i++){
+    // A subsequent scheduler tick issues a fresh nonce. Re-arming the synthetic
+    // nonce here exercises the next batch without waiting five real minutes.
+    await db.query("update devfit_job_auth set token_expires_at=clock_timestamp()+interval '2 minutes' where name='notifications'");
+    const r=await db.query('select claim_devfit_notifications($1) result',[token]);
+    assert.equal(r.rows[0].result.status,'ok');jobs.push(...r.rows[0].result.jobs);
+  }
+  assert.equal(jobs.length,8);assert.equal(new Set(jobs.map(j=>j.id)).size,8);
   const outcomes=await Promise.all(jobs.map(async j=>{
     const result=await db.query("select finish_devfit_notification($1,$2,true,'synthetic-message',null) result",[j.id,j.lease_id]);
     assert.equal(result.rows[0].result.status,'sent');
@@ -31,7 +41,7 @@ try {
   }));
   assert.ok(outcomes.every(s=>s==='sent'));
   assert.equal((await db.query("select count(*)::int n from devfit_support_requests where email=$1 and email_status='sent'",[email])).rows[0].n,8);
-  console.log(JSON.stringify({contenders:100,jobs:8,duplicateClaims:0,acceptedCompletions:8,lateFailuresCannotDowngrade:true,externalEmailCalls:0}));
+  console.log(JSON.stringify({contenders:100,nonceConsumers:1,replayedNoncesRejected:99,jobsAcrossFourBatches:8,duplicateClaims:0,acceptedCompletions:8,lateFailuresCannotDowngrade:true,externalEmailCalls:0}));
 } finally {
   await db.query('select delete_devfit_account($1)',[email]);
   await db.query("delete from devfit_job_auth where name='notifications' and token_hash=$1",[crypto.createHash('sha256').update(token).digest('hex')]);

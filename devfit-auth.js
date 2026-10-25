@@ -25,9 +25,17 @@
   var PRO_API = '/api/pro-access';
   var STRICT = true; // backend live + verified — forged/absent tokens are now rejected
   var proRequest = null;
+  var verifyRequest = null;
   // Capture the real browser fetch before page code or a later console command
   // can replace window.fetch and forge a successful authorization response.
   var requestFetch = typeof global.fetch === 'function' ? global.fetch.bind(global) : null;
+  async function authFetch(url, options) {
+    if (!requestFetch) throw new Error('fetch_unavailable');
+    var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var timer = controller ? setTimeout(function () { controller.abort(); }, 12000) : null;
+    try { return await requestFetch(url, Object.assign({}, options, controller ? { signal: controller.signal } : {})); }
+    finally { if (timer) clearTimeout(timer); }
+  }
 
   function getUser() {
     try { return JSON.parse(localStorage.getItem('devfit_user') || '{}'); } catch (e) { return {}; }
@@ -220,7 +228,7 @@
       if (!proRequest) {
         proRequest = (async function () {
           if (!requestFetch) throw new Error('fetch_unavailable');
-          var response = await requestFetch(PRO_API, {
+          var response = await authFetch(PRO_API, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
             cache: 'no-store',
@@ -272,7 +280,7 @@
   // Returns { approved, ... } or throws on transport error.
   async function startSession(provider, providerToken, name) {
     if (!requestFetch) throw new Error('fetch_unavailable');
-    var res = await requestFetch(SESSION_API, {
+    var res = await authFetch(SESSION_API, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store',
       body: JSON.stringify({ provider: provider, token: providerToken, deviceId: deviceId() })
     });
@@ -290,12 +298,16 @@
 
   // Re-verify the persistent session against the server. Updates the cached tier.
   // Returns 'ok' | 'reload' | 'kick' | 'skip' (skip = offline/not-configured).
-  async function reverify() {
+  function reverify() {
+    if (!verifyRequest) verifyRequest = verifySession().finally(function () { verifyRequest = null; });
+    return verifyRequest;
+  }
+  async function verifySession() {
     var u = getUser();
     if (!u.email) return 'kick';
     try {
       if (!requestFetch) return 'skip';
-      var res = await requestFetch(VERIFY_API, {
+      var res = await authFetch(VERIFY_API, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store',
         body: JSON.stringify({ token: getToken(), email: u.email, deviceId: deviceId() })
       });
@@ -322,6 +334,53 @@
     }
   }
 
+  async function logout() {
+    // Keep cached logs AND the signed-in identity if revocation cannot reach the
+    // server. Never falsely claim that an offline bearer token was revoked.
+    try {
+      var res = await authFetch(SESSION_API, {
+        method: 'POST', cache: 'no-store',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+        body: JSON.stringify({ op: 'logout', deviceId: deviceId() })
+      });
+      if (!res.ok && res.status !== 401) throw new Error('logout_unavailable');
+      clearSession(); return true;
+    } catch (_) {
+      try { global.alert('Connect to the internet to sign out securely. Your logs are still saved on this device.'); } catch (_) {}
+      return false;
+    }
+  }
+
+  var pdfRequests = new Map();
+  function exportPdf(action, selection) {
+    if (pdfRequests.has(action)) return pdfRequests.get(action);
+    var task = (async function () {
+      if (!global.DevFitDB || !global.DevFitDB.forceSyncAll) throw new Error('Account sync is not ready. Reopen DevFit and retry.');
+      var synced = await global.DevFitDB.forceSyncAll();
+      if (!synced || !synced.ok) throw new Error('Your latest edits are saved on this device. Reconnect and sync before exporting.');
+      var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      var timer = controller ? setTimeout(function () { controller.abort(); }, 30000) : null;
+      try {
+        var response = await requestFetch(PRO_API, {
+          method: 'POST', cache: 'no-store', ...(controller ? { signal: controller.signal } : {}),
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+          body: JSON.stringify({ action: action, selection: selection || {}, deviceId: deviceId() })
+        });
+        var result = await response.json();
+        if (!response.ok) {
+          if (result.error === 'pro_required') { global.location.href='pricing.html'; return false; }
+          throw new Error(result.message || (response.status === 429 ? 'Please wait a minute and try again.' : 'Report service is temporarily unavailable. Your logs are safe.'));
+        }
+        if (!result.pdf || !/^[a-zA-Z0-9_-]+\.pdf$/.test(result.filename || '')) throw new Error('Invalid report response. Please retry.');
+        var binary = global.atob(result.pdf), bytes = new Uint8Array(binary.length);
+        for (var i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+        global.devfitDownloadBlob(new Blob([bytes],{type:'application/pdf'}),result.filename);
+        return true;
+      } finally { if (timer) clearTimeout(timer); }
+    })().finally(function () { pdfRequests.delete(action); });
+    pdfRequests.set(action, task); return task;
+  }
+
   // Page entry point. Redirects to login when there's no session, otherwise
   // reverifies in the background and applies tier changes.
   function gate(onReady) {
@@ -342,7 +401,7 @@
   var authApi = {
     getUser: getUser, getToken: getToken, setSession: setSession, clearSession: clearSession,
     getUserTier: getUserTier, isPro: isPro, requirePro: requirePro,
-    startSession: startSession, reverify: reverify, gate: gate,
+    startSession: startSession, reverify: reverify, gate: gate, logout: logout, exportPdf: exportPdf,
     wipeLocalData: wipeLocalData, enforceDataOwner: enforceDataOwner, DATA_KEYS: DATA_KEYS,
     get strict() { return STRICT; }
   };

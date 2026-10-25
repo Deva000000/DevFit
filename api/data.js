@@ -6,10 +6,12 @@ import crypto from 'crypto';
 import {
   haveServerConfig, verifyToken, sbRpc, readJsonBody, recordServerEvent,
   clientIp, bearerToken, setApiSecurityHeaders, sameOriginIfPresent,
-  checkSecurityAccess, tokenDeviceMatches, guardInvalidAuth, recordDeviceMismatch
+  guardInvalidAuth,
+  authorizeSession, denySession
 } from './_lib.js';
 import { handlePaymentOperation } from './_payments.js';
 import { handleSupportOperation } from './_support.js';
+import '../input-limits.js';
 
 const TYPES = ['progress', 'nutrition', 'workouts', 'prefs'];
 const MAX_DATA_BYTES = {
@@ -44,30 +46,14 @@ export default async function handler(req, res) {
   }
   const email = String(payload.email).trim().toLowerCase();
   const op = String(body.op || '');
+  const access = await authorizeSession(req, payload, body.deviceId, '/api/data');
+  if (denySession(res, access)) return;
 
-  // Existing signed sessions are accepted during rollout, then /api/verify
-  // replaces them with a device-bound token. Bound tokens cannot be replayed
-  // from a different browser installation.
-  if (payload.did) {
-    if (!tokenDeviceMatches(payload, body.deviceId)) {
-      await recordDeviceMismatch(req, email, body.deviceId, '/api/data');
-      res.status(401).json({ error: 'invalid_device' }); return;
-    }
-    // Document RPCs check security in the same transaction as the read/save.
-    // Receipt/support operations still use their existing independent gate.
-    if (op !== 'get' && op !== 'set' && op !== 'patch') {
-      const security = await checkSecurityAccess(req, email, body.deviceId, {
-        route: '/api/data', requireKnown: true
-      });
-      if (security.status === 'unavailable') { res.status(503).json({ error: 'security_store_unavailable' }); return; }
-      if (security.status !== 'ok') { res.status(403).json({ error: security.status }); return; }
-    }
-  }
-  const securityArgs = payload.did ? { p_security_context: {
+  const securityArgs = { p_security_context: {
     deviceId: String(body.deviceId || ''),
     ipHash: crypto.createHash('sha256').update(clientIp(req)).digest('hex'),
     userAgent: String((req.headers && req.headers['user-agent']) || '').slice(0, 300)
-  } } : {};
+  } };
 
   try {
     if (op === 'paymentHistory' || op === 'submitPayment') {
@@ -131,6 +117,12 @@ export default async function handler(req, res) {
         }
       }
 
+      const input = op === 'patch' ? body.changes : body.data;
+      if (!globalThis.DevFitLimits.validTree(input) || (op === 'patch' && body.changes.some(c => c.op === 'set'
+        && Object.hasOwn(globalThis.DevFitLimits.ranges, c.path[c.path.length - 1])
+        && !globalThis.DevFitLimits.valid(c.path[c.path.length - 1], c.value)))) {
+        res.status(400).json({ error: 'invalid_numeric_input', message: 'Check workout set, rep, duration and distance limits.' }); return;
+      }
       const ipHash = crypto.createHash('sha256').update(clientIp(req)).digest('hex');
       const result = await sbRpc(op === 'patch' ? 'patch_devfit_data_atomic' : 'save_devfit_data_atomic', {
         p_email: email,

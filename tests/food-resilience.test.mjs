@@ -1,11 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {domainHandler,sessionClaims} from './session-fixture.mjs';
 process.env.SUPABASE_SERVICE_KEY='synthetic';process.env.DEVFIT_JWT_SECRET='food-qa';
-const {signToken}=await import('../api/_lib.js');
+const {signToken:baseSignToken}=await import('../api/_lib.js');
+const signToken=p=>baseSignToken(sessionClaims(p));
 const {cachedFood}=await import('../api/_food-cache.js');
-const {default:off}=await import('../api/off.js');
-const {default:kalori}=await import('../api/kalori.js');
+const off=domainHandler((await import('../api/off.js')).default);
+const kalori=domainHandler((await import('../api/kalori.js')).default);
 const capture=()=>({headers:{},setHeader(k,v){this.headers[k]=v;},status(v){this.code=v;return this;},json(v){this.body=v;}});
 const req=query=>({method:'GET',headers:{authorization:'Bearer '+signToken({email:'qa@example.invalid'})},query:{query,q:query}});
 test('disabled unhealthy provider never calls its upstream or bypasses account authorization',async()=>{

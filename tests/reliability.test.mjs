@@ -3,11 +3,13 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import {domainHandler,sessionClaims} from './session-fixture.mjs';
 
 const ROOT = new URL('../', import.meta.url);
 const CLIENT_ID = '94871311791-ql8k9lo0q9e1uq3ri98ghnfr1m187chh.apps.googleusercontent.com';
 
 function b64(value) {
+  if(value && value.email && !value.iss) value=sessionClaims(value);
   return Buffer.from(typeof value === 'string' ? value : JSON.stringify(value)).toString('base64url');
 }
 
@@ -43,20 +45,20 @@ test('Google ID tokens require a valid signature, audience and lifetime', async 
   assert.equal(await identityFromGoogleIdToken(valid[0] + '.' + changedClaims + '.' + valid[2]), null);
 });
 
-test('DevFit sessions persist until logout and legacy expiring tokens upgrade safely', async () => {
+test('DevFit sessions have finite expiry and expired tokens are never accepted', async () => {
   process.env.DEVFIT_JWT_SECRET = 'persistent-session-test-secret';
   const { signToken, verifyToken } = await import(new URL('../api/_lib.js?persistent-session-test', import.meta.url));
   const persistent = signToken({ email: 'person@gmail.com', tier: 'free' });
   const persistentPayload = verifyToken(persistent);
   assert.equal(persistentPayload.email, 'person@gmail.com');
-  assert.equal(Object.hasOwn(persistentPayload, 'exp'), false);
+  assert.equal(persistentPayload.exp-persistentPayload.iat, 30*24*60*60);
 
   // A correctly signed legacy session that crossed its former seven-day expiry
   // remains acceptable once, allowing /api/verify to rotate it transparently.
   const header = b64({ alg: 'HS256', typ: 'JWT' });
   const oldPayload = b64({ email: 'person@gmail.com', exp: Math.floor(Date.now() / 1000) - 3600 });
   const signature = crypto.createHmac('sha256', 'persistent-session-test-secret').update(header + '.' + oldPayload).digest().toString('base64url');
-  assert.equal(verifyToken(header + '.' + oldPayload + '.' + signature).email, 'person@gmail.com');
+  assert.equal(verifyToken(header + '.' + oldPayload + '.' + signature), null);
 });
 
 test('workout merge keeps sessions recorded independently on two devices', () => {
@@ -215,7 +217,7 @@ test('data API rejects a stale whole-document write with the current row', async
     if (String(url).includes('/rpc/save_devfit_data_atomic')) return { ok: true, json: async () => ({ status: 'conflict', row: current }) };
     throw new Error('A stale write must only reach the atomic RPC');
   };
-  const { default: handler } = await import(new URL('../api/data.js?conflict-test', import.meta.url));
+const handler = domainHandler((await import(new URL('../api/data.js?conflict-test', import.meta.url))).default);
   const header = b64({ alg: 'HS256', typ: 'JWT' });
   const payload = b64({ email: 'person@gmail.com', exp: Math.floor(Date.now() / 1000) + 300 });
   const signature = crypto.createHmac('sha256', 'test-secret').update(header + '.' + payload).digest().toString('base64url');
@@ -237,7 +239,7 @@ test('data API does not grow history for unchanged data and archives one previou
   const payload = b64({ email: 'person@gmail.com' });
   const signature = crypto.createHmac('sha256', 'test-secret').update(header + '.' + payload).digest().toString('base64url');
   const token = header + '.' + payload + '.' + signature;
-  const { default: handler } = await import(new URL('../api/data.js?history-growth-test', import.meta.url));
+const handler = domainHandler((await import(new URL('../api/data.js?history-growth-test', import.meta.url))).default);
   const run = async (data) => {
     let status = 0, responseBody;
     const rpcBodies = [];
@@ -253,7 +255,7 @@ test('data API does not grow history for unchanged data and archives one previou
       }
       throw new Error('unexpected request ' + method + ' ' + target);
     };
-    const req = { method: 'POST', headers: { 'x-forwarded-for': '127.0.0.1' }, body: { token, op: 'set', dataType: 'workouts', data, baseUpdatedAt: current.updated_at, deviceId: 'test-device' } };
+    const req = { method: 'POST', headers: { 'x-forwarded-for': '127.0.0.1' }, body: { token, op: 'set', dataType: 'workouts', data, baseUpdatedAt: current.updated_at } };
     const res = { setHeader() {}, status(value) { status = value; return this; }, json(value) { responseBody = value; } };
     await handler(req, res);
     return { status, responseBody, rpcBodies };
@@ -279,7 +281,7 @@ test('data API rejects oversized account documents before any data mutation', as
     dataStoreTouched = true;
     throw new Error('oversized data must be rejected before storage calls');
   };
-  const { default: handler } = await import(new URL('../api/data.js?size-limit-test', import.meta.url));
+const handler = domainHandler((await import(new URL('../api/data.js?size-limit-test', import.meta.url))).default);
   const header = b64({ alg: 'HS256', typ: 'JWT' });
   const payload = b64({ email: 'person@gmail.com' });
   const signature = crypto.createHmac('sha256', 'test-secret').update(header + '.' + payload).digest().toString('base64url');
@@ -341,7 +343,7 @@ test('security contracts stay closed and shared networks use account-first limit
   assert.doesNotMatch(allApi, /Access-Control-Allow-Origin[^\n]*\*/i);
   assert.doesNotMatch(allApi, /SUPABASE_SERVICE_KEY\s*[:=]\s*['"][^'"]+['"]/);
   const session = fs.readFileSync(new URL('../api/session.js', import.meta.url), 'utf8');
-  assert.match(session, /session_ip:[\s\S]*300, 15 \* 60/);
+  assert.match(session, /session_ip:[\s\S]*3000, 15 \* 60/);
   assert.match(session, /session_account:[\s\S]*20, 15 \* 60/);
   const db = fs.readFileSync(new URL('../devfit-db.js', import.meta.url), 'utf8');
   assert.match(db, /SAVE_DEBOUNCE_MS = 850/);
@@ -430,11 +432,11 @@ test('release infrastructure enforces security headers and monitors production h
     assert.match(csp, new RegExp('connect-src[^;]*' + escaped));
   }
   const workflow = fs.readFileSync(new URL('../.github/workflows/devfit-ci.yml', import.meta.url), 'utf8');
-  assert.match(workflow, /node --test tests\/reliability\.test\.mjs/);
+  assert.match(workflow, /node --test tests\/\*\.test\.mjs/);
   assert.match(workflow, /\/api\/health/);
   const health = fs.readFileSync(new URL('../api/health.js', import.meta.url), 'utf8');
   assert.match(health, /database: 'unavailable'/);
-  assert.match(health, /Cache-Control', 'no-store'/);
+  assert.match(health, /s-maxage=15/);
 });
 
 test('owner backup encryption round-trips and detects tampering', async () => {
@@ -514,7 +516,7 @@ test('persistent session cannot access cloud data after account revocation', asy
     if (String(url).includes('/rpc/load_devfit_account')) return { ok: true, json: async () => ({ status: 'revoked' }) };
     throw new Error('Revoked sessions must only reach the authorization RPC');
   };
-  const { default: handler } = await import(new URL('../api/data.js?revocation-test', import.meta.url));
+const handler = domainHandler((await import(new URL('../api/data.js?revocation-test', import.meta.url))).default);
   const header = b64({ alg: 'HS256', typ: 'JWT' });
   const payload = b64({ email: 'person@gmail.com' });
   const signature = crypto.createHmac('sha256', 'test-secret').update(header + '.' + payload).digest().toString('base64url');
@@ -575,7 +577,7 @@ test('PWA install control supports Android prompt and honest iPhone fallback', (
   assert.match(settings, /<div class="title">Install DevFit App<\/div>/);
   assert.match(settings, /if\(!deferredInstallPrompt\)\{\s*showIosHint\(\)/);
   assert.equal(manifest.display, 'standalone');
-  assert.match(worker, /devfit-v4\.95\.0/);
+  assert.match(worker, /devfit-v4\.96\.0/);
   assert.doesNotMatch(worker, /\.then\(\(\) => self\.skipWaiting\(\)\)/);
 
   for (const html of [index, settings]) {
@@ -618,7 +620,7 @@ test('an unhealthy optional Kalori source enters cooldown without blocking every
     }
     throw new Error('monitoring is best-effort in this isolated test');
   };
-  const { default: handler } = await import(new URL('../api/kalori.js?cooldown-test', import.meta.url));
+const handler = domainHandler((await import(new URL('../api/kalori.js?cooldown-test', import.meta.url))).default);
   const run = async (q) => {
     let status = 0, body, cache = '';
     const header = b64({ alg: 'HS256', typ: 'JWT' });
@@ -653,10 +655,10 @@ test('food-search protection communicates limits without hiding manual entry', (
 
 test('all PDF exports share a multi-CDN integrity-checked loader and wait for it', async () => {
   const loader = fs.readFileSync(new URL('../pdf-loader.js', import.meta.url), 'utf8');
-  assert.match(loader, /unpkg\.com\/jspdf@2\.5\.1/);
-  assert.match(loader, /cdn\.jsdelivr\.net\/npm\/jspdf@2\.5\.1/);
-  assert.match(loader, /cdnjs\.cloudflare\.com\/ajax\/libs\/jspdf\/2\.5\.1/);
-  assert.match(loader, /sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56/);
+  assert.match(loader, /unpkg\.com\/jspdf@4\.2\.1/);
+  assert.match(loader, /cdn\.jsdelivr\.net\/npm\/jspdf@4\.2\.1/);
+  assert.match(loader, /cdnjs\.cloudflare\.com\/ajax\/libs\/jspdf\/4\.2\.1/);
+  assert.match(loader, /sha384-qovJwSBbRDPP5cEjCp8S0UP66/);
 
   const requested = [];
   const state = {};
@@ -681,15 +683,16 @@ test('all PDF exports share a multi-CDN integrity-checked loader and wait for it
 
   for (const name of ['admin.html', 'nutrition.html', 'workouts.html', 'settings.html']) {
     const html = fs.readFileSync(new URL('../' + name, import.meta.url), 'utf8');
-    assert.match(html, /<script src="pdf-loader\.js"><\/script>/);
+    if(name==='admin.html') assert.match(html, /<script src="pdf-loader\.js"><\/script>/);
+    else assert.doesNotMatch(html, /<script src="pdf-loader\.js"><\/script>/,'customer PDFs must not depend on a browser CDN');
     assert.doesNotMatch(html, /<script[^>]+src="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/jspdf/);
   }
   const nutrition = fs.readFileSync(new URL('../nutrition.html', import.meta.url), 'utf8');
   const workouts = fs.readFileSync(new URL('../workouts.html', import.meta.url), 'utf8');
   const settings = fs.readFileSync(new URL('../settings.html', import.meta.url), 'utf8');
-  assert.match(nutrition, /async function generateNutritionPDF\(\)[\s\S]*await DevFitPDF\.get\(\)/);
-  assert.match(workouts, /async function exportPlanPDF\(\)[\s\S]*await DevFitPDF\.get\(\)/);
-  assert.match(settings, /async function generateReport\(range\)[\s\S]*await DevFitPDF\.get\(\)/);
+  assert.match(nutrition, /async function generateNutritionPDF\(\)[\s\S]*DevFitAuth\.exportPdf\('nutrition_pdf'/);
+  assert.match(workouts, /async function exportPlanPDF\(\)[\s\S]*DevFitAuth\.exportPdf\('workout_pdf'/);
+  assert.match(settings, /async function generateReport\(range\)[\s\S]*DevFitAuth\.exportPdf\('progress_pdf'/);
 });
 
 test('sensitive APIs are never cached and public routes accept only intended methods', () => {
@@ -829,7 +832,7 @@ test('settings install guide is device-focused and exposes real platform actions
 
 test('verification records only the signed token email', () => {
   const source = fs.readFileSync(new URL('../api/verify.js', import.meta.url), 'utf8');
-  const verifiedAt = source.indexOf('const payload = verifyToken(bearerToken(req) || body.token)');
+  const verifiedAt = source.indexOf('const payload = verifyToken(bearerToken(req) || body.token,');
   const recordedAt = source.indexOf('checkSecurityAccess(req, payload.email');
   assert.ok(verifiedAt >= 0 && recordedAt > verifiedAt);
   assert.doesNotMatch(source, /checkSecurityAccess\(req, body\.email/);
@@ -837,21 +840,22 @@ test('verification records only the signed token email', () => {
 
 test('paid reports use the adaptive premium renderer and never plot missing values as zero', () => {
   const settings = fs.readFileSync(new URL('../settings.html', import.meta.url), 'utf8');
-  const reportPdf = fs.readFileSync(new URL('../report-pdf.js', import.meta.url), 'utf8');
-  const reportEngine = fs.readFileSync(new URL('../report-engine.js', import.meta.url), 'utf8');
+  const reportPdf = fs.readFileSync(new URL('../api/_report-pdf.js', import.meta.url), 'utf8');
+  const reportEngine = fs.readFileSync(new URL('../api/_report-engine.js', import.meta.url), 'utf8');
+  const service = fs.readFileSync(new URL('../api/_premium-pdf.js', import.meta.url), 'utf8');
   const worker = fs.readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
 
   new Function(reportPdf);
-  assert.match(settings, /<script src="report-pdf\.js"><\/script>/);
-  assert.match(settings, /DevFitPremiumPDF\.paint\(A,N\)/);
-  assert.match(worker, /'\.\/report-pdf\.js'/);
+  assert.doesNotMatch(settings, /<script src="report-pdf\.js"><\/script>/);
+  assert.match(settings, /DevFitAuth\.exportPdf\('progress_pdf'/);
+  assert.doesNotMatch(worker, /'\.\/report-pdf\.js'/);
   assert.match(reportPdf, /if\(A\.weight\.daysLogged>=2\)/);
   assert.match(reportPdf, /if\(A\.training\.sessions>0\)/);
   assert.match(reportPdf, /if\(A\.nutrition\.daysLogged>0\)/);
   assert.match(reportPdf, /if\(A\.score\.weeksScored>=2\)/);
   assert.match(reportPdf, /A\.meta\.single/);
-  assert.match(settings, /A\.history=DevFitReport\.analyze\(0,range\.endW/);
-  assert.match(settings, /A\.meta\.single&&A\.history&&A\.history\.rows/);
+  assert.match(service, /A\.history=DevFitReport\.analyze\(0,selection\.endW/);
+  assert.match(service, /single&&A\.history\?A\.history\.rows/);
   assert.match(reportPdf, /function weeklyArchive\(\)/);
   assert.match(reportPdf, /function scoreBreakdown\(row\)/);
   assert.match(reportPdf, /function detailedSessions\(sessions\)/);

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import parser from '../receipt-amount.js';
+import '../receipt-amount.js';
+const parser=globalThis.DevFitReceiptAmount;
 
 test('prefers paid total to available balance and fees',()=>{
   const result=parser.parseReceiptAmount('Amount Paid: RM 200.00\nTransaction Fee RM 0.00\nAvailable Balance RM 3,500.00');

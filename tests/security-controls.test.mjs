@@ -13,7 +13,7 @@ test('device-bound tokens cannot be replayed with a different installation id', 
   const payload = { email: 'owner@example.com', did: lib.sha256Hex(first) };
   assert.equal(lib.tokenDeviceMatches(payload, first), true);
   assert.equal(lib.tokenDeviceMatches(payload, second), false);
-  assert.equal(lib.tokenDeviceMatches({ email: payload.email }, second), true, 'legacy tokens remain compatible until verify upgrades them');
+  assert.equal(lib.tokenDeviceMatches({ email: payload.email }, second), false, 'unbound tokens are not authorized outside the controlled verify upgrade');
 });
 
 test('security migration enforces private blocklists, a bounded device policy and owner-only RPCs', () => {

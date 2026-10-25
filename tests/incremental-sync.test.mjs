@@ -88,7 +88,9 @@ test('failed initial reconciliation stays local and does not claim a successful 
 });
 
 process.env.DEVFIT_JWT_SECRET='sync-tests-only';process.env.SUPABASE_SERVICE_KEY='sync-tests-only';
-const {default:handler}=await import('../api/data.js');const {signToken}=await import('../api/_lib.js');
+const {domainHandler,sessionClaims}=await import('./session-fixture.mjs');
+const handler=domainHandler((await import('../api/data.js')).default);const {signToken:baseSignToken}=await import('../api/_lib.js');
+const signToken=p=>baseSignToken(sessionClaims(p));
 async function api(body){let status,result;await handler({method:'POST',headers:{},body:{token:signToken({email:'owner@example.invalid'}),...body}},
   {setHeader(){},status(s){status=s;return this;},json(r){result=r;}});return{status,result};}
 test('patch contract rejects unsafe paths, invalid operations and excess payload before any DB access',async()=>{
@@ -104,6 +106,6 @@ test('conditional reads and patches derive identity only from signed account and
   try{assert.equal((await api({op:'get',dataType:'workouts',email:'victim@example.invalid',knownVersions:{workouts:'v'}})).status,200);
     assert.equal((await api({op:'patch',dataType:'workouts',email:'victim@example.invalid',changes:[{op:'set',path:['x'],value:0}]})).status,200);
     assert.ok(calls[0].url.endsWith('/load_devfit_account_delta'));assert.ok(calls[1].url.endsWith('/patch_devfit_data_atomic'));
-    assert.ok(calls.every(c=>c.body.p_email==='owner@example.invalid'));assert.equal(calls[1].body.p_security_context,null);
+    assert.ok(calls.every(c=>c.body.p_email==='owner@example.invalid'));assert.equal(calls[1].body.p_security_context.deviceId,'domain-test-device-0001');
   }finally{globalThis.fetch=old;}
 });

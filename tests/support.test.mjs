@@ -1,15 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import { domainHandler, sessionClaims } from './session-fixture.mjs';
 
 process.env.DEVFIT_JWT_SECRET = 'support-test-secret';
 process.env.SUPABASE_SERVICE_KEY = 'support-test-service';
 delete process.env.RESEND_API_KEY;
-const { default: handler } = await import('../api/data.js?support-tests');
+const { default: rawHandler } = await import('../api/data.js?support-tests');
+const handler=domainHandler(rawHandler);
 
 function token(email = 'customer@gmail.com') {
   const h = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
-  const p = Buffer.from(JSON.stringify({ email })).toString('base64url');
+  const p = Buffer.from(JSON.stringify(sessionClaims({ email }))).toString('base64url');
   const s = crypto.createHmac('sha256', process.env.DEVFIT_JWT_SECRET).update(h + '.' + p).digest('base64url');
   return h + '.' + p + '.' + s;
 }

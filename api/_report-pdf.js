@@ -240,6 +240,7 @@
         {title:'WHAT MOVED FORWARD',items:wins,color:[33,126,70],tint:[241,249,244]},
         {title:'WHAT NEEDS ATTENTION',items:watch,color:R.RED,tint:[253,244,244]}
       ];
+      R.font('normal',7.3); // Measure with the same font used for the body text.
       const prepared=groups.map(g=>{
         const items=(g.items||[]).slice(0,3).map(t=>pdf.splitTextToSize(clean(t),w-13));
         if(!items.length)items.push([g===groups[0]
@@ -387,7 +388,6 @@
       R.footers();
       const fname='DevFit_'+A.meta.fileBase+'_'+safeName(A.meta.name)+'.pdf';
       savePdfNamed(pdf,fname);
-      toast(A.meta.title+' saved');
     }
 
     function cover(){

@@ -8,3 +8,4 @@ _imgtmp/
 
 # Supabase CLI connection metadata (local machine only)
 supabase/.temp/
+node_modules/

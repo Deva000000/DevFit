@@ -2239,8 +2239,12 @@ function renderStatsBanner(){
     progressBar+'</div>';
 }
 
-function logout(){
-  try{ if(window.DevFitDB && DevFitDB.pushAllLocal) DevFitDB.pushAllLocal(); }catch(e){}
+async function logout(){
+  try{ if(window.DevFitDB && DevFitDB.pushAllLocal) await Promise.race([DevFitDB.pushAllLocal(),new Promise(r=>setTimeout(r,6000))]); }catch(e){}
+  if(window.DevFitAuth && DevFitAuth.logout){
+    if(await DevFitAuth.logout()) window.location.href='login.html';
+    return;
+  }
   if(window.DevFitAuth){ DevFitAuth.clearSession(); }
   else { localStorage.removeItem('devfit_user'); }
   localStorage.removeItem('devfit_token');

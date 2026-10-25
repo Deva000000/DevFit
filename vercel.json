@@ -1,6 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["hnd1"],
+  "functions": {
+    "api/pro-access.js": {
+      "maxDuration": 30,
+      "includeFiles": "{api/_pdf-*.js,api/_report-*.js,scoring.js,progress-model.js}"
+    }
+  },
   "headers": [
     {
       "source": "/(.*)",

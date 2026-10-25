@@ -64,6 +64,7 @@ const rpcArgs = {
   save_devfit_data_atomic: ['p_email','p_data_type','p_data','p_base_updated_at','p_device_id','p_ip_hash','p_security_context'],
   check_devfit_security_access: ['p_email','p_device_id','p_ip_hash','p_user_agent','p_route','p_register','p_is_login','p_require_known'],
   consume_devfit_rate_limit: ['p_id','p_limit','p_window_seconds'],
+  authorize_devfit_session: ['p_email','p_device_id','p_session_hash','p_ip_hash','p_user_agent','p_route'],
   record_devfit_error: ['p_type','p_message','p_stack','p_src','p_page','p_ua','p_status']
 };
 const makeDoc = (type, revision = 0) => {
@@ -91,7 +92,7 @@ try {
   // The environment marker and localhost assertion are mandatory. Reset only
   // synthetic fixture tables inside this disposable database for repeatability.
   if(process.env.DEVFIT_SCALE_SKIP_SEED !== '1'){
-  await owner.query('truncate devfit_data,devfit_data_versions,devfit_records,devfit_rate,devfit_logins,devfit_subscribers,devfit_security_blocks,devfit_security_events,devfit_errors');
+  await owner.query('truncate devfit_sessions,devfit_data,devfit_data_versions,devfit_records,devfit_rate,devfit_logins,devfit_subscribers,devfit_security_blocks,devfit_security_events,devfit_errors');
   for (let start=0; start<count; start+=100) {
     const n = Math.min(100,count-start);
     const subscribers = Array.from({length:n},(_,j)=>({email:`scale-${start+j}@example.invalid`,name:'Synthetic user',tier:(start+j)%2?'pro':'free',approved:true}));
@@ -148,8 +149,13 @@ try {
   const handlers = Object.fromEntries(await Promise.all(['data','verify','pro-access'].map(async n => [n,(await import(new URL(`api/${n}.js`,root))).default])));
   const users = Array.from({length:count},(_,i)=>{
     const deviceId=`scale-device-${i}-installation`,email=`scale-${i}@example.invalid`;
-    return { email,deviceId,token:signToken({email,did:sha256Hex(deviceId),tier:'pro'}) };
+    const sid=sha256Hex('synthetic-session-'+i);
+    return { email,deviceId,sid,token:signToken({email,sid,did:sha256Hex(deviceId),tier:'pro'}) };
   });
+  for(let start=0;start<users.length;start+=100){
+    const rows=users.slice(start,start+100).map(u=>({email:u.email,device_id:u.deviceId,session_hash:sha256Hex(u.sid)}));
+    await owner.query('insert into devfit_sessions(email,device_id,session_hash) select email,device_id,session_hash from jsonb_to_recordset($1::jsonb) as x(email text,device_id text,session_hash text) on conflict(session_hash) do nothing',[JSON.stringify(rows)]);
+  }
   apiServer = http.createServer(async (req,res) => {
     try {
       const handler = handlers[req.url?.split('/').at(-1)];
@@ -250,9 +256,13 @@ try {
   report.scenarios.push(gateScenario);console.log(JSON.stringify(gateScenario));
   check('Free/Pro decision checks completed', {accounts:gateUsers,failed:gateFailures});
   await owner.query('update devfit_subscribers set approved=false where email=$1',[u.email]);
-  assert.equal((await load(u,'prefs')).status,403);
-  await owner.query('update devfit_subscribers set approved=true where email=$1',[u.email]);
-  check('revocation takes effect with existing signed token');
+  try { assert.equal((await load(u,'prefs')).status,401); }
+  finally { await owner.query('update devfit_subscribers set approved=true where email=$1',[u.email]); }
+  assert.equal((await load(u,'prefs')).status,401,'Reactivation must not resurrect a revoked bearer token');
+  u.sid=crypto.randomBytes(32).toString('hex');
+  await owner.query('select open_devfit_session($1,$2,$3,null)',[u.email,u.deviceId,sha256Hex(u.sid)]);
+  u.token=signToken({email:u.email,sid:u.sid,did:sha256Hex(u.deviceId),tier:'free'});
+  check('revocation takes effect; reactivation needs a fresh Google-proven session');
   const tampered={...u,token:u.token.slice(0,-8)+'aaaaaaaa'};
   assert.equal((await load(tampered,'prefs')).status,401);
   check('forged signed session denied');

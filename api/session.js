@@ -13,9 +13,9 @@
 import crypto from 'crypto';
 import {
   haveServerConfig, identityFromGoogleIdToken,
-  getSubscriber, computeTier, signToken, rateLimit, clientIp, readJsonBody, sbUpsert,
+  getSubscriber, computeTier, signToken, rateLimit, clientIp, readJsonBody, sbInsertIgnore,
   recordServerEvent, setApiSecurityHeaders, sameOriginIfPresent, checkSecurityAccess,
-  guardInvalidAuth
+  guardInvalidAuth, verifyToken, bearerToken, tokenDeviceMatches, sbRpc, sha256Hex, openSession
 } from './_lib.js';
 
 export default async function handler(req, res) {
@@ -28,6 +28,16 @@ export default async function handler(req, res) {
   if (!haveServerConfig()) { res.status(501).json({ error: 'not_configured' }); return; }
 
   const body = await readJsonBody(req);
+  if (body.op === 'logout') {
+    const session = verifyToken(bearerToken(req));
+    if (!session?.email || !session.sid || !tokenDeviceMatches(session, body.deviceId)) {
+      res.status(401).json({ error: 'invalid_session' }); return;
+    }
+    const result = await sbRpc('revoke_devfit_session', {
+      p_email: session.email, p_device_id: body.deviceId, p_session_hash: sha256Hex(session.sid)
+    });
+    res.status(result?.status === 'ok' ? 200 : 503).json({ ok: result?.status === 'ok' }); return;
+  }
   const provider = String(body.provider || '').toLowerCase();
   const token = String(body.token || '');
   if (!token) { res.status(400).json({ error: 'missing_token' }); return; }
@@ -35,7 +45,7 @@ export default async function handler(req, res) {
   // A shared IP is only an emergency ceiling. Thirty attempts blocked a whole
   // gym/campus/mobile-carrier NAT; verified-account limits below are the primary
   // anti-replay control.
-  const ipRate = await rateLimit('session_ip:' + clientIp(req), 300, 15 * 60, { failClosed: true, timeoutMs: 3000 });
+  const ipRate = await rateLimit('session_ip:' + clientIp(req), 3000, 15 * 60, { failClosed: true, timeoutMs: 3000 });
   if (ipRate.unavailable) { res.status(503).json({ error: 'login_temporarily_unavailable' }); return; }
   if (!ipRate.ok) {
     res.setHeader('Retry-After', String(Math.max(1, ipRate.retryAfter || 1)));
@@ -96,12 +106,14 @@ export default async function handler(req, res) {
     return;
   }
   if (!sub) {
-    const created = await sbUpsert(
+    const created = await sbInsertIgnore(
       'devfit_subscribers',
       { email, name: verifiedName || email.split('@')[0], tier: 'free', approved: true, updated_at: new Date().toISOString() },
       'email'
     );
-    sub = (Array.isArray(created) ? created[0] : created) || null;
+    // A concurrent owner activation/revocation or another login may have won
+    // the insert. Never upsert "free/approved" over that authoritative row.
+    sub = created ? await getSubscriber(email) : null;
     if (!sub) {
       await recordServerEvent('login_failure', 'Account creation failed', { page: '/api/session', status: 503 });
       res.status(503).json({ error: 'account_create_failed' }); return;
@@ -110,7 +122,9 @@ export default async function handler(req, res) {
   if (!sub.approved) { res.status(200).json({ approved: false, status: 'pending' }); return; }
 
   const tier = computeTier(sub);
-  const signed = signToken({ email, did: security.deviceHash, tier, expiry: sub.expiry || '', startDate: sub.start_date || '' });
+  const sid = await openSession(email, body.deviceId);
+  if (!sid) { res.status(503).json({ error: 'session_store_unavailable' }); return; }
+  const signed = signToken({ email, sid, did: security.deviceHash, tier, expiry: sub.expiry || '', startDate: sub.start_date || '' });
 
   res.status(200).json({
     approved: true,

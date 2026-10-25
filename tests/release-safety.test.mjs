@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { cachedFood } from '../api/_food-cache.js';
+import {domainHandler,sessionClaims} from './session-fixture.mjs';
 
 test('production stays within the Vercel Hobby serverless-function limit', () => {
   const apiDir = new URL('../api/', import.meta.url);
@@ -14,13 +15,15 @@ test('production stays within the Vercel Hobby serverless-function limit', () =>
 
 process.env.DEVFIT_JWT_SECRET = 'release-test-only';
 process.env.SUPABASE_SERVICE_KEY = 'test-only';
-const { default: handler } = await import('../api/data.js');
-const { sbSelect, signToken, foodSearchIdentity } = await import('../api/_lib.js');
-const { default: offHandler } = await import('../api/off.js');
-const { default: proAccessHandler } = await import('../api/pro-access.js');
+const handler=domainHandler((await import('../api/data.js')).default);
+const { sbSelect, signToken:baseSignToken, foodSearchIdentity:rawFoodIdentity } = await import('../api/_lib.js');
+const signToken=p=>baseSignToken(sessionClaims(p));
+const foodSearchIdentity=domainHandler(rawFoodIdentity);
+const offHandler=domainHandler((await import('../api/off.js')).default);
+const proAccessHandler=domainHandler((await import('../api/pro-access.js')).default);
 function token(email) {
-  const h = Buffer.from(JSON.stringify({ alg: 'HS256' })).toString('base64url');
-  const p = Buffer.from(JSON.stringify({ email })).toString('base64url');
+  const h = Buffer.from(JSON.stringify({ alg: 'HS256', typ:'JWT' })).toString('base64url');
+  const p = Buffer.from(JSON.stringify(sessionClaims({ email }))).toString('base64url');
   return h + '.' + p + '.' + crypto.createHmac('sha256', process.env.DEVFIT_JWT_SECRET).update(h + '.' + p).digest('base64url');
 }
 async function run(body) {

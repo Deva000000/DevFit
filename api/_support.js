@@ -70,7 +70,7 @@ export async function handleSupportOperation(req, res, email, body) {
   const accountKey = crypto.createHash('sha256').update(email).digest('hex');
   const [perAccount, perIp] = await Promise.all([
     rateLimit('support_submit:' + accountKey, 5, 60 * 60, strict),
-    rateLimit('support_submit_ip:' + clientIp(req), 25, 60 * 60, strict)
+    rateLimit('support_submit_ip:' + clientIp(req), 5000, 60 * 60, strict)
   ]);
   if (perAccount.unavailable || perIp.unavailable) { res.status(503).json({ error: 'security_store_unavailable' }); return; }
   if (!perAccount.ok || !perIp.ok) { res.status(429).json({ error: 'support_limit_reached' }); return; }

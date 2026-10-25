@@ -4,9 +4,10 @@
 // re-reads the current subscriber record, including start/expiry dates.
 
 import {
-  haveServerConfig, verifyToken, getSubscriber, computeTier, signToken,
+  haveServerConfig, verifyToken, computeTier, signToken,
   recordServerEvent, bearerToken, setApiSecurityHeaders, sameOriginIfPresent,
-  readJsonBody, checkSecurityAccess, tokenDeviceMatches, guardInvalidAuth, recordDeviceMismatch
+  readJsonBody, guardInvalidAuth,
+  authorizeSession, denySession
 } from './_lib.js';
 
 export default async function handler(req, res) {
@@ -26,22 +27,11 @@ export default async function handler(req, res) {
     return;
   }
 
-  let deviceHash = payload.did || '';
-  const suppliedDevice = String(body.deviceId || '');
-  if (payload.did || suppliedDevice.length >= 16) {
-    if (!tokenDeviceMatches(payload, suppliedDevice)) {
-      await recordDeviceMismatch(req, email, suppliedDevice, '/api/pro-access');
-      res.status(401).json({ error: 'invalid_device' }); return;
-    }
-    const security = await checkSecurityAccess(req, email, suppliedDevice, {
-      route: '/api/pro-access', register: true, isLogin: false
-    });
-    if (security.status === 'unavailable') { res.status(503).json({ error: 'service_unavailable' }); return; }
-    if (security.status !== 'ok') { res.status(403).json({ error: security.status }); return; }
-    deviceHash = security.deviceHash;
-  }
+  const access = await authorizeSession(req, payload, body.deviceId, '/api/pro-access');
+  if (denySession(res, access)) return;
+  const deviceHash = payload.did;
 
-  const sub = await getSubscriber(email, 5000);
+  const sub = access.subscriber;
   if (typeof sub === 'undefined') {
     await recordServerEvent('pro_access_failure', 'Account store unavailable during Pro authorization', {
       page: '/api/pro-access', status: 503
@@ -52,7 +42,7 @@ export default async function handler(req, res) {
   if (!sub || !sub.approved) { res.status(401).json({ error: 'revoked' }); return; }
 
   const tier = computeTier(sub);
-  const token = signToken({ email, ...(deviceHash ? { did: deviceHash } : {}), tier, expiry: sub.expiry || '', startDate: sub.start_date || '' });
+  const token = signToken({ email, sid: payload.sid, did: deviceHash, tier, expiry: sub.expiry || '', startDate: sub.start_date || '' });
   const account = {
     tier,
     token,
@@ -64,6 +54,15 @@ export default async function handler(req, res) {
   if (tier !== 'pro') {
     res.status(403).json({ authorized: false, error: 'pro_required', ...account });
     return;
+  }
+
+  if (body.action && body.action !== 'authorize') {
+    if (!['progress_pdf','workout_pdf','nutrition_pdf'].includes(body.action)) {
+      res.status(400).json({ error: 'unknown_premium_action' }); return;
+    }
+    // Load the heavier renderer only AFTER current account authorization.
+    const { handlePremiumPdf } = await import('./_premium-pdf.js');
+    await handlePremiumPdf(req,res,email,sub,body); return;
   }
 
   res.status(200).json({ authorized: true, ...account });

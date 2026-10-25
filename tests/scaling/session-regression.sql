@@ -1,0 +1,46 @@
+begin;
+do $$
+declare v_email text:='session-probe@example.invalid';v_device text:='devfit-session-probe-device';v_hash text:=repeat('c',64);v jsonb;v_iat bigint;
+begin
+  assert current_database() like 'devfit_scale%';
+  assert exists(select 1 from public.devfit_scale_environment);
+  insert into public.devfit_subscribers(email,name,approved,tier) values(v_email,'Session QA',true,'pro');
+  insert into public.devfit_logins(email,device_id,first_seen) values(v_email,v_device,now()-interval '1 day');
+  v:=public.open_devfit_session(v_email,v_device,v_hash,null);assert v->>'status'='ok';
+  v:=public.authorize_devfit_session(v_email,v_device,v_hash,repeat('b',64),'QA','/api/verify');assert v->>'status'='ok';
+  assert v->'subscriber'->>'tier'='pro';
+  v:=public.authorize_devfit_session(v_email,'another-device-id',v_hash,repeat('b',64),'QA','/api/verify');assert v->>'status'='revoked';
+  perform public.revoke_devfit_session(v_email,v_device,v_hash);
+  v:=public.authorize_devfit_session(v_email,v_device,v_hash,repeat('b',64),'QA','/api/data');assert v->>'status'='revoked';
+  v_iat:=extract(epoch from now()-interval '1 hour')::bigint;
+  v:=public.open_devfit_session(v_email,v_device,v_hash,v_iat);assert v->>'status'='revoked','Logout must stop legacy replay';
+  update public.devfit_logins set session_revoked_before='epoch' where email=v_email;
+  v:=public.open_devfit_session(v_email,v_device,v_hash,v_iat);assert v->>'status'='ok';
+  v:=public.open_devfit_session(v_email,v_device,v_hash,v_iat);assert v->>'status'='ok','Concurrent legacy retry is idempotent';
+  assert (select count(*)=1 from public.devfit_sessions where email=v_email);
+  perform public.reset_devfit_devices(v_email);
+  assert not exists(select 1 from public.devfit_sessions where email=v_email),'Reset cascades revocation';
+  v:=public.open_devfit_session(v_email,v_device,v_hash,v_iat);assert v->>'status'='revoked','Cannot re-register with an old token';
+  insert into public.devfit_logins(email,device_id) values(v_email,v_device);
+  v:=public.open_devfit_session(v_email,v_device,v_hash,floor(extract(epoch from now()))::bigint);assert v->>'status'='revoked','Same-second reset cannot be replayed';
+  v:=public.open_devfit_session(v_email,v_device,v_hash,v_iat);assert v->>'status'='revoked','Recreated device cannot replay pre-reset legacy token';
+  v:=public.open_devfit_session(v_email,v_device,v_hash,null);assert v->>'status'='ok';
+  insert into public.devfit_security_blocks(scope,key_hash,reason) values('device',encode(extensions.digest(v_device,'sha256'),'hex'),'QA device block');
+  v:=public.authorize_devfit_session(v_email,v_device,v_hash,repeat('b',64),'QA','/api/data');assert v->>'status'='device_blocked';
+  v:=public.authorize_devfit_food_search(v_email,v_device,repeat('b',64),false,'QA');assert v->>'status'='account_unavailable','Legacy unbound request cannot bypass blocks';
+  delete from public.devfit_security_blocks where key_hash=encode(extensions.digest(v_device,'sha256'),'hex');
+  for i in 1..30 loop
+    v:=public.authorize_devfit_session(v_email,v_device,v_hash,repeat('b',64),'QA','/api/pro-access');assert v->>'status'='ok';
+  end loop;
+  v:=public.authorize_devfit_session(v_email,v_device,v_hash,repeat('b',64),'QA','/api/pro-access');assert v->>'status'='rate_limited';
+  update public.devfit_sessions set expires_at=now()-interval '1 second' where email=v_email;
+  v:=public.authorize_devfit_session(v_email,v_device,v_hash,repeat('b',64),'QA','/api/data');assert v->>'status'='revoked';
+  assert not has_table_privilege('anon','public.devfit_sessions','SELECT');
+  assert not has_function_privilege('anon','public.authorize_devfit_session(text,text,text,text,text,text)','EXECUTE');
+  update public.devfit_subscribers set approved=false where email=v_email;
+  assert not exists(select 1 from public.devfit_sessions where email=v_email),'Revocation destroys current sessions';
+  update public.devfit_subscribers set approved=true where email=v_email;
+  v:=public.authorize_devfit_session(v_email,v_device,v_hash,repeat('b',64),'QA','/api/data');assert v->>'status'='revoked','Reactivation must not resurrect old bearer tokens';
+  raise notice 'Session regression checks passed (including 30 authorized quota requests)';
+end;$$;
+rollback;

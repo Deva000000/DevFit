@@ -57,13 +57,10 @@ function b64urlJson(obj) { return b64url(JSON.stringify(obj)); }
 function fromB64url(s) { return Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString(); }
 
 // ── Signed session token (JWT, HS256) ────────────────────────────────────────
-export function signToken(payload, ttlSeconds = null) {
+export function signToken(payload, ttlSeconds = 30 * 24 * 60 * 60) {
   const now = Math.floor(Date.now() / 1000);
-  // DevFit sessions intentionally persist until the user logs out (or the
-  // trainer revokes the account). Google proves the email once at sign-in; this
-  // signed server token is then re-checked against the subscriber row on every
-  // online app load. A finite TTL can still be requested explicitly for tests or
-  // one-off server uses, but normal app sessions do not expire with time.
+  // Finite bearer lifetime. Session IDs are separately checked/revoked in the
+  // database; refreshing the JWT never resurrects a revoked session.
   const body = { ...payload, iat: now };
   if (Number.isFinite(ttlSeconds) && ttlSeconds > 0) body.exp = now + ttlSeconds;
   const head = b64urlJson({ alg: 'HS256', typ: 'JWT' });
@@ -74,18 +71,21 @@ export function signToken(payload, ttlSeconds = null) {
 
 // Returns the payload if valid+unexpired, else null. Signature-checked with a
 // timing-safe compare so a forged token can never be accepted.
-export function verifyToken(token) {
+export function verifyToken(token, { allowLegacy = false } = {}) {
   try {
     const parts = String(token || '').split('.');
     if (parts.length !== 3 || !JWT_SECRET) return null;
     const [h, p, s] = parts;
+    const header = JSON.parse(fromB64url(h));
+    if (header.alg !== 'HS256' || header.typ !== 'JWT') return null;
     const expected = b64url(crypto.createHmac('sha256', JWT_SECRET).update(h + '.' + p).digest());
     const a = Buffer.from(s), b = Buffer.from(expected);
     if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
     const payload = JSON.parse(fromB64url(p));
-    // Legacy DevFit tokens carried a seven-day exp. Accepting their valid
-    // signature lets /api/verify replace them with the new persistent token
-    // without forcing every existing client to sign in once more.
+    const now = Math.floor(Date.now() / 1000);
+    if (!Number.isFinite(payload.iat) || payload.iat > now + 60) return null;
+    if (payload.exp !== undefined && (!Number.isFinite(payload.exp) || payload.exp <= now)) return null;
+    if (!Number.isFinite(payload.exp) && !(allowLegacy && !payload.sid)) return null;
     return payload;
   } catch (e) { return null; }
 }
@@ -242,6 +242,7 @@ export function verifyAdminSession(token) {
   const now = Math.floor(Date.now() / 1000);
   if (!payload || payload.kind !== 'devfit_admin') return null;
   if (!Number.isFinite(payload.exp) || payload.exp <= now) return null;
+  if (payload.exp - payload.iat > 12 * 60 * 60) return null;
   return payload;
 }
 
@@ -430,12 +431,46 @@ export function sha256Hex(value) {
 }
 
 export function tokenDeviceMatches(payload, deviceId) {
-  // Legacy signed tokens did not contain a device binding. /api/verify upgrades
-  // them on the next normal page load so current installed PWAs stay signed in.
-  if (!payload || !payload.did) return true;
+  // Only /api/verify may upgrade legacy unbound sessions, subject to the DB's
+  // rollout deadline and an already-registered installation.
+  if (!payload || !payload.did) return false;
   const actual = Buffer.from(sha256Hex(String(deviceId || '')));
   const expected = Buffer.from(String(payload.did || ''));
   return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+}
+
+export async function openSession(email, deviceId, legacyIat = null, details = false) {
+  // Deterministic only for a verified legacy upgrade: concurrent tabs upgrading
+  // the same old token receive the SAME session instead of revoking each other.
+  const sid = legacyIat === null ? crypto.randomBytes(32).toString('hex')
+    : crypto.createHmac('sha256', JWT_SECRET).update('upgrade|' + email + '|' + deviceId + '|' + legacyIat).digest('hex');
+  const result = await sbRpc('open_devfit_session', {
+    p_email: email, p_device_id: deviceId, p_session_hash: sha256Hex(sid), p_legacy_iat: legacyIat
+  }, 5000);
+  if (details) return result?.status === 'ok' ? {status:'ok',sid} : {status:result?.status||'unavailable'};
+  return result && result.status === 'ok' ? sid : null;
+}
+
+// One DB round trip for session revocation, ownership, blocks, current plan and
+// per-account request limits. No low shared-IP quota for legitimate signed users.
+export async function authorizeSession(req, payload, deviceId, route) {
+  if (!payload?.email || !/^[a-f0-9]{64}$/.test(payload.sid || '')) return { status: 'session_upgrade_required' };
+  if (!tokenDeviceMatches(payload, deviceId)) return { status: 'invalid_device' };
+  return await sbRpc('authorize_devfit_session', {
+    p_email: String(payload.email).trim().toLowerCase(), p_device_id: String(deviceId || ''),
+    p_session_hash: sha256Hex(payload.sid), p_ip_hash: sha256Hex(clientIp(req)),
+    p_user_agent: String(req.headers?.['user-agent'] || '').slice(0, 300), p_route: route
+  }, 5000) || { status: 'unavailable' };
+}
+
+export function denySession(res, access) {
+  if (access.status === 'ok') return false;
+  const retry = Math.max(1, Number(access.retryAfter) || 1);
+  if (access.status === 'rate_limited') res.setHeader('Retry-After', String(retry));
+  const code = access.status === 'unavailable' ? 503 : access.status === 'rate_limited' ? 429
+    : ['revoked','invalid_device','session_upgrade_required'].includes(access.status) ? 401 : 403;
+  res.status(code).json({ error: access.status, ...(code === 429 ? { retryAfter: retry } : {}) });
+  return true;
 }
 
 export async function recordSecurityEvent(event = {}) {
@@ -547,18 +582,12 @@ export async function foodSearchIdentity(req) {
       : { ok: false, status: 401, error: 'sign_in_required' };
   }
   const deviceId = String((req.headers && req.headers['x-devfit-device']) || '');
-  if (payload.did) {
-    if (!tokenDeviceMatches(payload, deviceId)) {
-      await recordDeviceMismatch(req, email, deviceId, '/api/food-search');
-      return { ok: false, status: 401, error: 'invalid_device' };
-    }
-  }
-  const access = await sbRpc('authorize_devfit_food_search', {
-    p_email:email,p_device_id:deviceId,p_ip_hash:sha256Hex(clientIp(req)),
-    p_bound:!!payload.did,p_user_agent:String(req.headers&&req.headers['user-agent']||'').slice(0,300)
-  },4000);
-  if (!access || !['ok','rate_limited','account_unavailable'].includes(access.status)) return { ok:false,status:503,error:'food_search_unavailable' };
-  if (access.status==='account_unavailable') return {ok:false,status:403,error:'account_unavailable'};
+  const access = await authorizeSession(req, payload, deviceId, '/api/food-search');
+  if (access.status !== 'ok' && access.status !== 'rate_limited') return {
+    ok: false, status: access.status === 'unavailable' ? 503 :
+      ['account_unavailable','account_blocked','device_blocked','ip_blocked'].includes(access.status) ? 403 : 401,
+    error: access.status === 'unavailable' ? 'food_search_unavailable' : access.status
+  };
   if (access.status==='rate_limited') return {
     ok: false, status: 429, error: 'search_rate_limited',
     retryAfter: Math.max(access.retryAfter || 1,1)

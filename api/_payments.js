@@ -146,7 +146,7 @@ export async function handlePaymentOperation(req, res, email, op, body) {
   const accountKey = crypto.createHash('sha256').update(email).digest('hex');
   const [perAccount, perIp] = await Promise.all([
     rateLimit('payment_upload:' + accountKey, 8, 24 * 60 * 60, strict),
-    rateLimit('payment_upload_ip:' + clientIp(req), 50, 24 * 60 * 60, strict)
+    rateLimit('payment_upload_ip:' + clientIp(req), 5000, 24 * 60 * 60, strict)
   ]);
   if (perAccount.unavailable || perIp.unavailable) { res.status(503).json({ error: 'security_store_unavailable' }); return; }
   if (!perAccount.ok || !perIp.ok) { res.status(429).json({ error: 'upload_limit_reached' }); return; }

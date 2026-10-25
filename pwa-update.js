@@ -32,14 +32,28 @@
     b.onclick=applyUpdate;
   }
 
-  function applyUpdate(){
+  async function applyUpdate(){
     if(!waitingWorker) return;
     userRequested=true;
     var b=banner();
     b.textContent='Updating DevFit…';
     b.style.pointerEvents='none';
+    try { if(document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (_) {}
+    // Inputs are already saved locally; give the durable queue a bounded chance
+    // to sync. Offline data stays on-device across the restart.
+    try {
+      if(window.DevFitDB && DevFitDB.pushAllLocal) await Promise.race([
+        DevFitDB.pushAllLocal(), new Promise(resolve=>setTimeout(resolve,3000))
+      ]);
+    } catch (_) {}
     waitingWorker.postMessage({type:'SKIP_WAITING'});
   }
+
+  navigator.serviceWorker.addEventListener('message',function(event){
+    if(!event.data || event.data.type!=='DEVFIT_UPDATE_BLOCKED') return;
+    userRequested=false;
+    var b=banner(); b.textContent='Close other DevFit tabs, then tap to update'; b.style.pointerEvents='auto';
+  });
 
   window.DevFitApplyUpdate=applyUpdate;
   window.pwaApplyUpdate=applyUpdate; // compatibility with the existing home banner

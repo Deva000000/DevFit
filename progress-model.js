@@ -22,7 +22,9 @@
   function value(v, fallback) { return v === undefined || v === null ? fallback : v; }
   function positiveInt(v, fallback) {
     const n = parseInt(v, 10);
-    return Number.isFinite(n) && n > 0 ? n : fallback;
+    // A mistyped duration must never allocate millions of empty week rows.
+    // Existing recorded rows are retained independently of this metadata cap.
+    return Number.isFinite(n) && n > 0 && n <= 520 ? n : fallback;
   }
   function mondayYmd(input) {
     const d = input && typeof input.getFullYear==='function' ? new Date(input.getTime())

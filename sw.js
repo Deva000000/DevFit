@@ -1,16 +1,13 @@
-/* DevFit Service Worker — v4.95.0
-   Strategy (atomic updates — no stale code can ever mix with fresh HTML):
-   - HTML pages + app logic (.js/.css): NETWORK-FIRST with cache fallback, so every
-     online load gets a consistent, up-to-date set. This is what prevents the
-     "new page + stale script = broken feature" class of bugs after a deploy.
-   - Big food databases (foods-local/bulk.js): cache-first (versioned via ?v=), to
-     save mobile data. Offline, ignoreSearch resolves ?v= URLs to the precached file.
-   - Icons / manifest / images: cache-first.
+/* DevFit Service Worker — v4.96.0
+   - Shell assets: one content-verified release, served from its own cache.
+   - Installation fails closed if ANY required asset is missing or mismatched.
+   - Switching a release is deliberate and requires other DevFit tabs to close.
+   - Non-shell pages: network-first. Non-shell images: cache-first.
    - CDN assets (Chart.js, jsPDF, fonts): stale-while-revalidate.
    - /api/*: network-only (never cached).
 */
 
-const VERSION = 'devfit-v4.95.0';
+const VERSION = 'devfit-v4.96.0';
 const APP_SHELL = 'devfit-shell-' + VERSION;
 const RUNTIME = 'devfit-runtime-' + VERSION;
 
@@ -21,6 +18,7 @@ const SHELL_FILES = [
   './nutrition.html',
   './workouts.html',
   './settings.html',
+  './admin.html',
   './landing.html',
   './pricing.html',
   './privacy.html',
@@ -39,6 +37,8 @@ const SHELL_FILES = [
   // ── App JS / CSS ─────────────────────────────────────────────────────
   './devfit-db.js',
   './devfit-auth.js',
+  './input-limits.js',
+  './receipt-amount.js',
   './login-install.js',
   './food-search-client.js',
   './devfit-errorlog.js',
@@ -48,12 +48,54 @@ const SHELL_FILES = [
   './scoring.js',
   './progress-model.js',
   './report-engine.js',
-  './report-pdf.js',
   './devfit-pdf.js',
   './pdf-loader.js',
   './theme.css',
   './theme.js'
 ];
+
+// Generated after source edits. An incomplete/mixed deploy cannot install.
+// RELEASE_HASHES_START
+const SHELL_HASHES = {
+  "./login.html": "74e6366e7aaf6da530e5e43be129f99f7454f1df32fc137f0748f182613209a4",
+  "./index.html": "3dc47eb62017123ce0b95c0f923426d4e87836960d96a43086b5d24f67192c66",
+  "./nutrition.html": "ee697ac9fb1813467fded11893cd87c9bef12b8f6f1e4ca1a6e6be362e4be4c1",
+  "./workouts.html": "2c005f4decf7a05ecfbf600bcbde31f3ae13eaae8fdb15e77f4a9a0177f28b22",
+  "./settings.html": "188628f5b22582aefcb72be4ff3cb3bd94f731b29b829124de24d2fbdcbd28da",
+  "./admin.html": "2de32546f6069338daf56e11bdf7b92aa2c3a9e64d41c01fd15fe3cbd309074e",
+  "./landing.html": "dc773d097643a8c435cbe99d0db99dc0ab69aa415e60dff152190f2744ddf7b4",
+  "./pricing.html": "2861c7fc61b1afe6719a818f8d0eaea0f9f6e7830645a9a51d375eb88286f835",
+  "./privacy.html": "bcf0281be12f53d336e081a4a5266954c1afbd0a436ddb86194fada58acc886a",
+  "./terms.html": "eb2409661eafb346a18bed8639103123093d69b0fef4304edba648f85ed46d90",
+  "./manifest.json": "d8c0d8d5ca8e140ac96b5f41c91236be60e484b9832ab940ddb48ec52a1b2b3c",
+  "./icon-touch.png": "119f499d0ff0ddaa02925e63a85aff7847581e6607abcc616b759c1e95a5e074",
+  "./icon-192.png": "f3dee142ca2cf9c573f1a6952f0139bc9d67610289c0e520c495f4928e5d9035",
+  "./icon-512.png": "3a93dd49ddb9b2a6049ff8b41828c51adca7f2d6995bf22e56c477f4e8dfb152",
+  "./icon-1024.png": "bd381f03210d7dfeb8cb0fa88edc16aa4205900b93acb3fcf2df4cc225deb69a",
+  "./logo-header.png": "4d5d5419e6491988dd18926d1984745fa6aee5b12375ce59fcbf05f6071e3c81",
+  "./logo-white.png": "f00ce5f5601efb53416e3595d9f7a982ab8d0b3eca07a2a10e130aee5088c4a8",
+  "./devfit-coaching-poster.png": "f9d6420642f3f962d9cb54ee2130054605efcab1f855d2e6aed04f7ad8d86568",
+  "./favicon.svg": "8a47ecd6bac6f8fb0edd2002698948eaacc7ea002da896e94bf56b6937f3e461",
+  "./favicon.ico": "91fa6dbfe049c74ea62e0dcdf3326b40e05481eb3928541ae946385c2510520b",
+  "./devfit-db.js": "ac5789d23cd2c83c36c5618e7efbbf020aa763345edbe1b67704c3e550bbe37e",
+  "./devfit-auth.js": "eabd6ad0065c2ad0d3f74a5446d1e0707daa9afef7c0e01e48e10893b191c648",
+  "./input-limits.js": "05b91043997e9c813f4390115c6d1db37f30e97a398855faabb8b6cd58b7521b",
+  "./receipt-amount.js": "46facc92dc8e931a8b51c17f6f72a2483f455dbc438a442f5f703fe6a04e40ec",
+  "./login-install.js": "e604908a18f3a92abb5a3b60b036d3b831bd10e73ae954ee158170f6c11bda6e",
+  "./food-search-client.js": "2b4277db5cfbbe5ae557f5bbcb38aa7deeb62f9929cf94ef380b00d1cfb770f8",
+  "./devfit-errorlog.js": "821fbe57a663f8ab2f3b2eb587203da6604cd6b938a4379dffa0c2e491e50f24",
+  "./pwa-update.js": "f33609bc1541a7ebe5678ae8b13f092a0826378a2e21d896a2c635cbb636b076",
+  "./foods-local.js": "5cbc83761e593f291afc0f420fd3d14b7a507c9effe31fa8f49b98c86e55df54",
+  "./foods-bulk.js": "938c82feb73b34349b58b21cdc01e00501aad4a26b68b84222299ac5683c241f",
+  "./scoring.js": "358935ba7ce8d349dea4678e1c500e83c4b34b1f0b9979bd63eabf6382eda89c",
+  "./progress-model.js": "5ea50691b1dbf62cafab657074928b8d086893f919175c2a0d28ec9ca4487eb1",
+  "./report-engine.js": "bf996dac117eba05986907dab6de918e77a8b6e8d541db196a374223ff1f96b5",
+  "./devfit-pdf.js": "893107adfa0730eb3c186c8b5e157bd748d562ef38e7b8553f67ab0d8c938df9",
+  "./pdf-loader.js": "6d7b1164d8a62b72edcc35676a7aa9926befbb72b76d33fa3c69ddc76f7b7518",
+  "./theme.css": "e63bd16a33952266e2479f34c746df45b4fdd25ca0f72b35f1288a951746f0fc",
+  "./theme.js": "e3f8156550f06bc900432207523dc0ef2b0e7cbc75f95b1939e1d739910688ef"
+};
+// RELEASE_HASHES_END
 
 // Keep this list aligned with CSP connect-src: intercepted CDN requests are
 // fetched by the worker, so script-src alone is not enough to let them through.
@@ -62,16 +104,17 @@ const CDN_HOSTS = ['cdnjs.cloudflare.com','fonts.googleapis.com','fonts.gstatic.
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(APP_SHELL)
-      // Cache each file independently — addAll() is atomic, so one 404 would
-      // wipe the WHOLE offline cache. Individual puts keep offline working
-      // even if a single asset is missing/renamed.
-      .then((cache) => Promise.allSettled(
-        SHELL_FILES.map((f) =>
-          fetch(f, { cache: 'no-store' })
-            .then((r) => { if (r && r.ok) return cache.put(f, r); throw new Error(r && r.status); })
-            .catch((e) => console.warn('[SW] precache skip', f, String(e)))
-        )
-      ))
+      .then((cache) => Promise.all(SHELL_FILES.map(async f => {
+        const r = await fetch(f, { cache: 'no-store' });
+        if (!r || !r.ok || r.redirected) throw new Error('Release asset unavailable: ' + f);
+        const bytes = /\.(html|js|css|json|svg)$/.test(f)
+          ? new TextEncoder().encode((await r.clone().text()).replace(/\r\n/g,'\n'))
+          : await r.clone().arrayBuffer();
+        const digest = await crypto.subtle.digest('SHA-256', bytes);
+        const hash = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2,'0')).join('');
+        if (!SHELL_HASHES[f] || hash !== SHELL_HASHES[f]) throw new Error('Release asset mismatch: ' + f);
+        await cache.put(f, r);
+      })))
       // On an update, remain waiting until the client deliberately chooses the
       // update banner. First installs activate normally because no worker exists.
   );
@@ -94,28 +137,37 @@ self.addEventListener('fetch', (event) => {
   if (url.origin === self.location.origin && url.pathname.startsWith('/api/')) return;
 
   // CDN — stale-while-revalidate
-  if (CDN_HOSTS.some((h) => url.hostname.includes(h))) {
+  if (CDN_HOSTS.includes(url.hostname)) {
     event.respondWith(staleWhileRevalidate(req));
     return;
   }
 
   if (url.origin === self.location.origin) {
     const path = url.pathname;
-    // NETWORK-FIRST for HTML + all app logic (.js/.css) so a deploy is ATOMIC:
-    // you can never end up with fresh HTML wired to stale JS (the exact failure
-    // that stuck the diet page after an update). Offline falls back to cache.
-    // The big, rarely-changing food databases stay CACHE-FIRST to save mobile data
-    // (they're versioned via ?v= and busted on change).
+    // Known shell files always come from the verified release cache. Only
+    // unknown documents/code use network-first; they are not core app modules.
     const isDoc = req.mode === 'navigate' || req.destination === 'document' ||
                   path.endsWith('.html') || path.endsWith('/');
     const isBigFoodDb = /foods-(local|bulk)\.js$/.test(path);
     const isAppCode = /\.(js|css)$/.test(path) && !isBigFoodDb;
 
+    const canonical = path === '/' ? './index.html' : '.' + path;
+    if (SHELL_FILES.includes(canonical)) { event.respondWith(releaseAsset(req, canonical)); return; }
     if (isDoc || isAppCode) { event.respondWith(networkFirst(req)); return; }
     // Everything else (food DBs, icons, images, manifest) — cache-first.
     event.respondWith(cacheFirst(req));
   }
 });
+
+async function releaseAsset(req, canonical) {
+  const cache = await caches.open(APP_SHELL);
+  const cached = await cache.match(canonical);
+  // Never substitute an asset from another release, even when online.
+  if (cached) return cached;
+  return new Response(req.mode === 'navigate' ? OFFLINE_PAGE : 'DevFit release is incomplete. Reopen while online.', {
+    status: 503, headers: { 'Content-Type': req.mode === 'navigate' ? 'text/html; charset=utf-8' : 'text/plain' }
+  });
+}
 
 async function networkFirst(req) {
   const cache = await caches.open(APP_SHELL);
@@ -188,5 +240,14 @@ async function staleWhileRevalidate(req) {
 }
 
 self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
+  if (event.data && event.data.type === 'SKIP_WAITING') event.waitUntil((async () => {
+    const tabs = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    // Switching one open tab must not replace dependencies under another tab
+    // that is still editing the old release.
+    if (tabs.length > 1) {
+      if (event.source) event.source.postMessage({ type: 'DEVFIT_UPDATE_BLOCKED' });
+      return;
+    }
+    await self.skipWaiting();
+  })());
 });

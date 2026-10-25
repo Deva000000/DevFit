@@ -71,7 +71,7 @@
   // Core transport. Resolves to the parsed JSON, or { skip:true } when there is no
   // session/token or the backend isn't configured — callers treat skip as "stay
   // local, try again later" and never surface an error or lose data.
-  async function apiCall(op, extra) {
+  async function apiCall(op, extra, retried) {
     const token = getToken();
     if (!token) return { skip: true, reason: 'no_token' };
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -87,6 +87,10 @@
         deviceId: localStorage.getItem('devfit_device_id') || 'unknown'
       }, extra || {}))
     });
+    if (res.status === 401 && !retried && global.DevFitAuth && global.DevFitAuth.reverify) {
+      const refreshed = await global.DevFitAuth.reverify();
+      if (refreshed === 'ok' || refreshed === 'reload') return apiCall(op, extra, true);
+    }
     if (res.status === 501 || res.status === 401) return { skip: true, status: res.status };
     if (res.status === 409) {
       const conflict = await res.json().catch(function () { return {}; });
@@ -867,7 +871,7 @@
         if (syncOutcome[t] !== true) return { ok: false, updated: updated, reason: 'Saved on device; account sync unavailable' };
         if (merged) {
           if (JSON.stringify(merged) !== before) updated++;
-          await cloudSave(t, merged);
+          if (!(await cloudSave(t, merged))) return { ok: false, updated: updated, reason: 'Latest edits are saved on device; account upload is pending' };
         }
       }
       setIndicator('ok');

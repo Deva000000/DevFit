@@ -81,18 +81,22 @@ function el(id){return document.getElementById(id)}function show(id){el(id).styl
 function clearStatus(){['status-checking','status-pending','status-denied'].forEach(hide)}
 function busy(on){el('spinner').style.display=on?'block':'none'}
 function fail(message){busy(false);clearStatus();el('status-denied').textContent=message||'Couldn’t sign you in. Please try again.';show('status-denied')}
+function showLoginResult(r){
+  busy(false);clearStatus();
+  if(r&&r.error==='device_limit'){fail('Your old sign-in could not be replaced. Please retry. Your logs and subscription are unchanged.');return}
+  if(r&&r.error==='device_storage_unavailable'){fail('This browser cannot save your sign-in. Enable website storage, then open DevFit in a normal Safari or Chrome tab and retry.');return}
+  if(r&&r.error==='rate_limited'){fail('Too many sign-in attempts. Wait a few minutes, then retry. Your account has not been blocked by this limit.');return}
+  if(r&&r.error==='account_blocked'){fail('Access is restricted for this account or installation. Contact DevFit for help.');return}
+  if(r&&r.approved===false&&r.status==='pending'){show('status-pending');return}
+  if(r&&r.error==='invalid_identity'){fail('Google could not confirm this sign-in. Tap Continue with Google again and choose your account.');return}
+  fail('Sign-in is temporarily unavailable. Please retry shortly. This does not mean your account is inactive.');
+}
 async function finishLogin(provider,token){
   busy(true);clearStatus();show('status-checking');
   try{
     const r=await DevFitAuth.startSession(provider,token,'');busy(false);clearStatus();
     if(r&&r.approved){document.cookie='devfit_email='+encodeURIComponent(r.email)+';max-age=31536000;path=/;SameSite=Lax;Secure';location.replace('index.html');return}
-    if(r&&r.error==='device_limit'){fail('This account already has 3 active devices. Contact DevFit to reset old devices before signing in here.');return}
-    if(r&&r.error==='device_storage_unavailable'){fail('This browser cannot save your sign-in. Enable website storage, then open DevFit in a normal Safari or Chrome tab and retry.');return}
-    if(r&&r.error==='rate_limited'){fail('Sign-in is busy. Wait a few minutes, then retry. Your account has not been blocked by this limit.');return}
-    if(r&&r.error==='account_blocked'){fail('Access is restricted for this account or installation. Contact DevFit for help.');return}
-    if(r&&r.approved===false&&r.status==='pending'){show('status-pending');return}
-    if(r&&r.error==='invalid_identity'){fail('Google could not confirm this sign-in. Tap Continue with Google again and choose your account.');return}
-    fail('Sign-in is temporarily unavailable. Please retry shortly. This does not mean your account is inactive.');
+    showLoginResult(r);
   }catch(e){fail('Couldn’t connect to sign you in. Check your connection and try again. Your saved logs are unchanged.')}
 }
 function isIOS(){return /iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)}
@@ -134,12 +138,18 @@ function initGoogle(){
   }catch(_){return false;}
 }
 document.addEventListener('DOMContentLoaded',function(){
-  // Never auto-redirect from a cached browser flag. If the dashboard rejected an
-  // expired token, the login form must remain usable instead of forming a loop.
-  const authState=new URLSearchParams(location.search).get('auth');
-  if(authState==='pending')show('status-pending');else if(authState==='denied')show('status-denied');else if(authState==='failed')fail('Google sign-in was not completed. Please try again.');
+  const params=new URLSearchParams(location.search),authState=params.get('auth');
+  if(authState==='pending')show('status-pending');
+  else if(authState==='failed')fail('Google sign-in was not completed. Please try again.');
+  else if(authState&&authState!=='signed_out')showLoginResult({error:authState});
   el('login-retry').onclick=function(){location.reload()};
+  el('google-button').addEventListener('pointerdown',function(){DevFitAuth.cancelRestore()});
   waitForGoogle();
+  // Exactly one server-validated restore, never a cached approved flag. An
+  // explicit account switch or failed sign-in always leaves Google available.
+  if(!authState&&!params.has('switch')&&!isEmbeddedBrowser()){
+    DevFitAuth.restoreSession().then(function(ok){if(ok)location.replace('index.html')});
+  }
 });
 window.addEventListener('pageshow',function(event){
   busy(false);

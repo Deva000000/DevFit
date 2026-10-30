@@ -15,8 +15,9 @@ import {
   haveServerConfig, identityFromGoogleIdToken,
   getSubscriber, computeTier, signToken, rateLimit, clientIp, readJsonBody, sbInsertIgnore,
   recordServerEvent, setApiSecurityHeaders, sameOriginIfPresent, checkSecurityAccess,
-  guardInvalidAuth, verifyToken, bearerToken, tokenDeviceMatches, sbRpc, sha256Hex, openSession
+  guardInvalidAuth, verifyToken, bearerToken, tokenDeviceMatches, sbRpc, sha256Hex, authorizeSession, denySession
 } from './_lib.js';
+import { setBrowserSession, readBrowserSession, clearBrowserSession } from './_browser-session.js';
 
 export default async function handler(req, res) {
   setApiSecurityHeaders(res);
@@ -28,6 +29,22 @@ export default async function handler(req, res) {
   if (!haveServerConfig()) { res.status(501).json({ error: 'not_configured' }); return; }
 
   const body = await readJsonBody(req);
+  if (body.op === 'restore') {
+    // Unlike explicit-bearer routes, this operation uses a cookie: require a
+    // browser-origin header as well as the exact-origin check above (CSRF).
+    if (!req.headers.origin && !req.headers.referer) { res.status(403).json({ error: 'origin' }); return; }
+    const session = readBrowserSession(req);
+    if (!session) { res.status(401).json({ error: 'sign_in_required' }); return; }
+    const access = await authorizeSession(req, session, session.deviceId, '/api/verify');
+    if (denySession(res, access)) return;
+    const sub = access.subscriber, tier = computeTier(sub);
+    const payload = { email: session.email, sid: session.sid, did: session.did, tier,
+      expiry: sub.expiry || '', startDate: sub.start_date || '' };
+    const browserContext = setBrowserSession(res, payload, session.deviceId);
+    res.status(200).json({ approved: true, email: session.email, name: sub.name || session.email.split('@')[0],
+      tier, expiry: sub.expiry || '', startDate: sub.start_date || '', plan: sub.plan || '',
+      deviceId: session.deviceId, token: signToken(payload), browserContext }); return;
+  }
   if (body.op === 'logout') {
     const session = verifyToken(bearerToken(req));
     if (!session?.email || !session.sid || !tokenDeviceMatches(session, body.deviceId)) {
@@ -36,6 +53,7 @@ export default async function handler(req, res) {
     const result = await sbRpc('revoke_devfit_session', {
       p_email: session.email, p_device_id: body.deviceId, p_session_hash: sha256Hex(session.sid)
     });
+    if (result?.status === 'ok') clearBrowserSession(req, res, session);
     res.status(result?.status === 'ok' ? 200 : 503).json({ ok: result?.status === 'ok' }); return;
   }
   const provider = String(body.provider || '').toLowerCase();
@@ -77,11 +95,10 @@ export default async function handler(req, res) {
     res.status(429).json({ error: 'rate_limited', retryAfter: accountRate.retryAfter }); return;
   }
 
-  // Bind the signed session to this installation and stop ordinary account
-  // resale/sharing at a fourth active device. Existing registered devices are
-  // grandfathered so rollout never ejects a current customer.
+  // Check explicit blocks before account provisioning, without counting stale
+  // installations as sessions. Registration/replacement is atomic below.
   const security = await checkSecurityAccess(req, email, body.deviceId, {
-    route: '/api/session', register: true, isLogin: true
+    route: '/api/session', register: false
   });
   if (security.status === 'unavailable') {
     res.status(503).json({ error: 'login_temporarily_unavailable' }); return;
@@ -122,13 +139,20 @@ export default async function handler(req, res) {
   if (!sub.approved) { res.status(200).json({ approved: false, status: 'pending' }); return; }
 
   const tier = computeTier(sub);
-  const sid = await openSession(email, body.deviceId);
-  if (!sid) { res.status(503).json({ error: 'session_store_unavailable' }); return; }
+  const sid = crypto.randomBytes(32).toString('hex');
+  const opened = await sbRpc('start_devfit_account_session', {
+    p_email: email, p_device_id: body.deviceId, p_session_hash: sha256Hex(sid),
+    p_ip_hash: sha256Hex(clientIp(req)), p_user_agent: String(req.headers['user-agent'] || '').slice(0,300)
+  }, 5000);
+  if (!opened) { res.status(503).json({ error: 'session_store_unavailable' }); return; }
+  if (denySession(res, opened)) return;
   const signed = signToken({ email, sid, did: security.deviceHash, tier, expiry: sub.expiry || '', startDate: sub.start_date || '' });
+  const browserContext = setBrowserSession(res, { email, sid, did: security.deviceHash }, body.deviceId);
 
   res.status(200).json({
     approved: true,
     token: signed,
+    browserContext,
     email,
     name: sub.name || verifiedName || email.split('@')[0],
     tier,

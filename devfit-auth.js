@@ -26,6 +26,7 @@
   var STRICT = true; // backend live + verified — forged/absent tokens are now rejected
   var proRequest = null;
   var verifyRequest = null;
+  var loginAttempt = 0;
   // Capture the real browser fetch before page code or a later console command
   // can replace window.fetch and forge a successful authorization response.
   var requestFetch = typeof global.fetch === 'function' ? global.fetch.bind(global) : null;
@@ -48,21 +49,39 @@
   function deviceId() {
     try {
       var d = localStorage.getItem('devfit_device_id');
-      if (!d) {
+      if (!d || d.length < 16 || d.length > 80) {
         d = (self.crypto && crypto.randomUUID) ? crypto.randomUUID()
           : (Date.now().toString(36) + Math.random().toString(16).slice(2));
         localStorage.setItem('devfit_device_id', d);
+        if (localStorage.getItem('devfit_device_id') !== d) return 'unknown';
       }
       return d;
     } catch (e) { return 'unknown'; }
   }
 
   function setSession(u, token) {
+    var previousUser, previousToken;
     try {
-      localStorage.setItem('devfit_user', JSON.stringify(u));
+      previousUser = localStorage.getItem('devfit_user');
+      previousToken = localStorage.getItem('devfit_token');
+      var serialized = JSON.stringify(u);
+      localStorage.setItem('devfit_user', serialized);
       if (token) localStorage.setItem('devfit_token', token);
+      if (localStorage.getItem('devfit_user') !== serialized || (token && getToken() !== token)) throw new Error('storage_unavailable');
       localStorage.setItem('devfit_lastVerified', String(Date.now()));
-    } catch (e) {}
+      return true;
+    } catch (e) {
+      try {
+        if (previousUser == null) localStorage.removeItem('devfit_user'); else localStorage.setItem('devfit_user', previousUser);
+        if (previousToken == null) localStorage.removeItem('devfit_token'); else localStorage.setItem('devfit_token', previousToken);
+      } catch (_) {}
+      return false;
+    }
+  }
+  function rememberBrowserContext(value) {
+    try {
+      if (/^[a-f0-9]{64}$/.test(value || '')) document.cookie = '__Host-devfit_active=' + value + '; Path=/; Max-Age=2592000; Secure; SameSite=Lax';
+    } catch (_) { /* Optional install recovery must not break a valid login. */ }
   }
   function clearSession() {
     try {
@@ -70,6 +89,7 @@
       localStorage.removeItem('devfit_token');
       localStorage.removeItem('devfit_lastVerified');
     } catch (e) {}
+    try { document.cookie = '__Host-devfit_active=; Path=/; Max-Age=0; Secure; SameSite=Lax'; } catch (_) {}
   }
 
   // ── Per-account data separation (physical namespacing) ────────────────────
@@ -102,11 +122,14 @@
       try { return (JSON.parse(origGet('devfit_user') || '{}').email || '').trim().toLowerCase(); }
       catch (e) { return ''; }
     }
+    // A rendered page owns one account. Late callbacks from that page may save
+    // its pending edits, but must never write into a newly selected account.
+    var pageOwner = emailNow() || '__anon__';
     // Per-user keys → "key::email"; everything else untouched. Logged-out access
     // (no email) uses a fixed "__anon__" bucket so it never lands on a real account.
     function ns(key) {
       if (!DATA_KEY_SET[key]) return key;
-      return key + '::' + (emailNow() || '__anon__');
+      return key + '::' + pageOwner;
     }
 
     // ONE-TIME migration: data written before this shim lived under plain keys.
@@ -242,6 +265,7 @@
       var checked = await proRequest;
       var res = checked.response;
       var data = checked.payload;
+      if (currentEmail() !== String(u.email).toLowerCase() || (getToken() !== token && getToken() !== data.token)) return false;
 
       if (res.ok && data && data.authorized === true && data.tier === 'pro') {
         u.tier = 'pro';
@@ -280,21 +304,52 @@
   // Returns { approved, ... } or throws on transport error.
   async function startSession(provider, providerToken, name) {
     if (!requestFetch) throw new Error('fetch_unavailable');
+    var attempt = ++loginAttempt;
     var res = await authFetch(SESSION_API, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store',
       body: JSON.stringify({ provider: provider, token: providerToken, deviceId: deviceId() })
     });
     if (res.status === 501) return { notConfigured: true };
     var data = await res.json();
+    if (attempt !== loginAttempt) return { error: 'sign_in_superseded' };
     if (data && data.approved) {
-      setSession({
+      if (!setSession({
         email: data.email, name: data.name || name || '', approved: true,
         plan: data.plan || '', expiry: data.expiry || '', startDate: data.startDate || '',
         tier: (data.tier || 'free').toLowerCase()
-      }, data.token);
+      }, data.token)) return { error: 'device_storage_unavailable' };
+      rememberBrowserContext(data.browserContext);
     }
     return data;
   }
+
+  // Restores only a server-validated HttpOnly session, never a cached approval
+  // flag. Used once on login entry; failed restore leaves the form usable.
+  async function restoreSession() {
+    var attempt = ++loginAttempt, owner = currentEmail(), token = getToken();
+    try {
+      var res = await authFetch(SESSION_API, { method: 'POST', cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'restore' }) });
+      var data = await res.json();
+      if (!res.ok || !data.approved || attempt !== loginAttempt || currentEmail() !== owner || getToken() !== token) return false;
+      // A stale cookie must not silently switch an existing local account.
+      if (owner && owner !== String(data.email).toLowerCase()) return false;
+      var oldDevice = localStorage.getItem('devfit_device_id');
+      try {
+        localStorage.setItem('devfit_device_id', data.deviceId);
+        if (localStorage.getItem('devfit_device_id') !== data.deviceId || !setSession({
+          email: data.email, name: data.name || '', approved: true, tier: data.tier,
+          expiry: data.expiry || '', startDate: data.startDate || '', plan: data.plan || ''
+        }, data.token)) throw new Error('storage_unavailable');
+      } catch (_) {
+        if (oldDevice == null) localStorage.removeItem('devfit_device_id'); else localStorage.setItem('devfit_device_id', oldDevice);
+        return false;
+      }
+      rememberBrowserContext(data.browserContext);
+      return true;
+    } catch (_) { return false; }
+  }
+  function cancelRestore() { loginAttempt++; }
 
   // Re-verify the persistent session against the server. Updates the cached tier.
   // Returns 'ok' | 'reload' | 'kick' | 'skip' (skip = offline/not-configured).
@@ -304,18 +359,20 @@
   }
   async function verifySession() {
     var u = getUser();
+    var token = getToken();
     if (!u.email) return 'kick';
     try {
       if (!requestFetch) return 'skip';
       var res = await authFetch(VERIFY_API, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store',
-        body: JSON.stringify({ token: getToken(), email: u.email, deviceId: deviceId() })
+        body: JSON.stringify({ token: token, email: u.email, deviceId: deviceId() })
       });
       if (res.status === 501) return 'skip'; // not configured yet → trust cache
       // A temporary backend outage must never look like account revocation and
       // log out a valid installed PWA. Keep the cached session and retry later.
       if (res.status === 429 || res.status >= 500) return 'skip';
       var data = await res.json();
+      if (currentEmail() !== String(u.email).toLowerCase() || getToken() !== token) return 'skip';
       if (data && data.approved) {
         var oldTier = (u.tier || '').toLowerCase();
         var newTier = (data.tier || 'free').toLowerCase();
@@ -325,6 +382,7 @@
         if (data.plan) u.plan = data.plan;
         if (data.name) u.name = data.name;
         setSession(u, data.token);
+        rememberBrowserContext(data.browserContext);
         return (oldTier && oldTier !== newTier) ? 'reload' : 'ok';
       }
       // Server says this session is invalid/revoked.
@@ -338,12 +396,14 @@
     // Keep cached logs AND the signed-in identity if revocation cannot reach the
     // server. Never falsely claim that an offline bearer token was revoked.
     try {
+      var owner = currentEmail(), token = getToken();
       var res = await authFetch(SESSION_API, {
         method: 'POST', cache: 'no-store',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
         body: JSON.stringify({ op: 'logout', deviceId: deviceId() })
       });
       if (!res.ok && res.status !== 401) throw new Error('logout_unavailable');
+      if (currentEmail() !== owner || getToken() !== token) return false;
       clearSession(); return true;
     } catch (_) {
       try { global.alert('Connect to the internet to sign out securely. Your logs are still saved on this device.'); } catch (_) {}
@@ -388,6 +448,7 @@
     if (!u.email) { global.location.href = 'login.html'; return; }
     var initialTier = getUserTier();
     reverify().then(function (r) {
+      if (currentEmail() !== String(u.email).toLowerCase()) { global.location.replace('index.html'); return; }
       if (r === 'kick') { clearSession(); global.location.href = 'login.html'; return; }
       // Reload whenever the effective tier changed vs what the page rendered with,
       // so gates re-apply from a clean state instead of double-binding listeners.
@@ -401,10 +462,16 @@
   var authApi = {
     getUser: getUser, getToken: getToken, setSession: setSession, clearSession: clearSession,
     getUserTier: getUserTier, isPro: isPro, requirePro: requirePro,
-    startSession: startSession, reverify: reverify, gate: gate, logout: logout, exportPdf: exportPdf,
+    startSession: startSession, restoreSession: restoreSession, cancelRestore: cancelRestore, reverify: reverify, gate: gate, logout: logout, exportPdf: exportPdf,
     wipeLocalData: wipeLocalData, enforceDataOwner: enforceDataOwner, DATA_KEYS: DATA_KEYS,
     get strict() { return STRICT; }
   };
+  if (global.addEventListener) global.addEventListener('storage', function (event) {
+    if (event.key !== 'devfit_user') return;
+    var previous, next;
+    try { previous = JSON.parse(event.oldValue || '{}').email || ''; next = JSON.parse(event.newValue || '{}').email || ''; } catch (_) { return; }
+    if (previous !== next) global.location.replace(next ? 'index.html' : 'login.html?auth=signed_out');
+  });
   // Stop ordinary console overrides such as `DevFitAuth.requirePro=()=>true` or
   // replacing the whole object. This is defence in depth; the server remains the
   // authority and still rejects every Free, expired, revoked or unsigned call.

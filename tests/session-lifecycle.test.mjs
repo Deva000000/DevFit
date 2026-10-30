@@ -113,7 +113,7 @@ test('first signup cannot overwrite a concurrent owner activation or revocation'
           assert.match(o.headers.Prefer,/ignore-duplicates/);inserted=true;return{ok:true};
         }
         if(url.includes('/devfit_subscribers?')){reads++;return{ok:true,json:async()=>reads===1?[]:[{email:claims.email,tier:'pro',approved,expiry:'2099-12-31'}]};}
-        if(url.endsWith('/open_devfit_session'))return{ok:true,json:async()=>({status:'ok'})};
+        if(url.endsWith('/start_devfit_account_session'))return{ok:true,json:async()=>({status:'ok'})};
         throw Error('Unexpected signup race request: '+url);
       };
       const r=capture();await session({method:'POST',headers:{},body:{provider:'google_id',token:credential,deviceId:device}},r);

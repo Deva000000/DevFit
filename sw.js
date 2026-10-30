@@ -1,4 +1,4 @@
-/* DevFit Service Worker — v4.96.2
+/* DevFit Service Worker — v4.97.0
    - Shell assets: one content-verified release, served from its own cache.
    - Installation fails closed if ANY required asset is missing or mismatched.
    - Switching a release is deliberate and requires other DevFit tabs to close.
@@ -7,7 +7,7 @@
    - /api/*: network-only (never cached).
 */
 
-const VERSION = 'devfit-v4.96.2';
+const VERSION = 'devfit-v4.97.0';
 
 const SHELL_FILES = [
   // ── Core HTML pages — precached so the whole app works offline ──────
@@ -55,12 +55,12 @@ const SHELL_FILES = [
 // Generated after source edits. An incomplete/mixed deploy cannot install.
 // RELEASE_HASHES_START
 const SHELL_HASHES = {
-  "./login.html": "ac20c415ecc0dd9b77bdc14f0602880afde5c976744bbb44994de44aff70090d",
+  "./login.html": "06e978f5e71b440c7498af34c02e11f23e37728ec2488873a581832f872a977b",
   "./index.html": "3dc47eb62017123ce0b95c0f923426d4e87836960d96a43086b5d24f67192c66",
   "./nutrition.html": "ee697ac9fb1813467fded11893cd87c9bef12b8f6f1e4ca1a6e6be362e4be4c1",
   "./workouts.html": "2c005f4decf7a05ecfbf600bcbde31f3ae13eaae8fdb15e77f4a9a0177f28b22",
-  "./settings.html": "754924ffb9deb9eb1248c1ec536a2354ade75369d17bf7e610aba53800eb28b4",
-  "./admin.html": "60bfb9e291ce60484ae0b2235b1b4118d542bf6673bb1944ff7e11bc47ebd482",
+  "./settings.html": "f9bf62d5d284610f91fa6355e81f315a7c4a754810b4cb5d3f3c16b7cde14e5d",
+  "./admin.html": "b0578f56c1bd9fe09e7cc9f21cc0cc04bb1f69526fa610c29cb9c9d099a0cdea",
   "./landing.html": "dc773d097643a8c435cbe99d0db99dc0ab69aa415e60dff152190f2744ddf7b4",
   "./pricing.html": "2861c7fc61b1afe6719a818f8d0eaea0f9f6e7830645a9a51d375eb88286f835",
   "./privacy.html": "bcf0281be12f53d336e081a4a5266954c1afbd0a436ddb86194fada58acc886a",
@@ -75,8 +75,8 @@ const SHELL_HASHES = {
   "./devfit-coaching-poster.png": "f9d6420642f3f962d9cb54ee2130054605efcab1f855d2e6aed04f7ad8d86568",
   "./favicon.svg": "8a47ecd6bac6f8fb0edd2002698948eaacc7ea002da896e94bf56b6937f3e461",
   "./favicon.ico": "91fa6dbfe049c74ea62e0dcdf3326b40e05481eb3928541ae946385c2510520b",
-  "./devfit-db.js": "b9c3897a85dbec64db8eee5e9956cba9436da2786f4c7012613b94d9a86d7fdc",
-  "./devfit-auth.js": "eabd6ad0065c2ad0d3f74a5446d1e0707daa9afef7c0e01e48e10893b191c648",
+  "./devfit-db.js": "be4d69bcae29356b62da785a3d00759c44bb3bf451c9e6a4ec1b3024cbd7a8bc",
+  "./devfit-auth.js": "24591a74395d20cd0ed5b1cacd8ff5171ad078df55e60619fd2919766560f2a8",
   "./input-limits.js": "05b91043997e9c813f4390115c6d1db37f30e97a398855faabb8b6cd58b7521b",
   "./receipt-amount.js": "46facc92dc8e931a8b51c17f6f72a2483f455dbc438a442f5f703fe6a04e40ec",
   "./login-install.js": "e604908a18f3a92abb5a3b60b036d3b831bd10e73ae954ee158170f6c11bda6e",
@@ -93,7 +93,7 @@ const SHELL_HASHES = {
   "./theme.css": "e63bd16a33952266e2479f34c746df45b4fdd25ca0f72b35f1288a951746f0fc",
   "./theme.js": "e3f8156550f06bc900432207523dc0ef2b0e7cbc75f95b1939e1d739910688ef"
 };
-const RELEASE_ID = "586e0642a94da1165a6bcc2cdaf5baa9bfe388fd0f5d359169faef4fdcc4248d";
+const RELEASE_ID = "f3e434e800b0778e38885e101183ea1cb70f5cdbcf2f43e309bf3bdacd0b2fc4";
 // RELEASE_HASHES_END
 
 // Keep this list aligned with CSP connect-src: intercepted CDN requests are

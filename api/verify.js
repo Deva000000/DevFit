@@ -4,6 +4,7 @@ import {
   bearerToken, setApiSecurityHeaders, sameOriginIfPresent, checkSecurityAccess,
   tokenDeviceMatches, guardInvalidAuth, authorizeSession, denySession, openSession, sha256Hex
 } from './_lib.js';
+import { setBrowserSession } from './_browser-session.js';
 
 export default async function handler(req, res) {
   setApiSecurityHeaders(res);
@@ -37,8 +38,10 @@ export default async function handler(req, res) {
   if (denySession(res, access)) return;
   const sub = access.subscriber;
   const tier = computeTier(sub);
+  const browserContext = setBrowserSession(res, payload, body.deviceId);
   res.status(200).json({
     approved: true, email: payload.email, tier,
+    browserContext,
     token: signToken({ email: payload.email, sid: payload.sid, did: payload.did, tier,
       expiry: sub.expiry || '', startDate: sub.start_date || '' }),
     name: sub.name || payload.email.split('@')[0], expiry: sub.expiry || '',

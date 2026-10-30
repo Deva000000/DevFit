@@ -36,7 +36,7 @@ test('all sensitive browser requests carry the stable device id', () => {
   const settings = fs.readFileSync(new URL('../settings.html', import.meta.url), 'utf8');
   assert.match(auth, /body: JSON\.stringify\(\{ deviceId: deviceId\(\) \}\)/);
   assert.match(auth, /provider: provider, token: providerToken, deviceId: deviceId\(\)/);
-  assert.match(auth, /token: getToken\(\), email: u\.email, deviceId: deviceId\(\)/);
+  assert.match(auth, /token: token, email: u\.email, deviceId: deviceId\(\)/);
   assert.match(db, /deviceId: localStorage\.getItem\('devfit_device_id'\)/);
   assert.match(food, /'X-DevFit-Device': deviceId/);
   assert.match(settings, /op:op,deviceId:localStorage\.getItem\('devfit_device_id'\)/);
@@ -54,7 +54,8 @@ test('admin exposes auditable security events and reversible owner controls', ()
   assert.match(blockSql, /security definer/);
   assert.match(blockSql, /revoke all on function public\.block_devfit_security_identity[\s\S]*from public, anon, authenticated/);
   assert.match(html, /Security & Blocklist/);
-  assert.match(html, /3 active devices per account/);
+  assert.match(html, /3 active installations per account/);
+  assert.match(html, /replaces the least recently used session/);
   assert.match(html, /Block only confirmed abuse/);
   assert.match(html, /Unblocking does not automatically reactivate access/);
 });

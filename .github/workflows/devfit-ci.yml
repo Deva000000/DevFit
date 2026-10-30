@@ -55,7 +55,7 @@ jobs:
           for file in supabase/migrations/*.sql; do
             psql -h 127.0.0.1 -U postgres -d devfit_scale_ci -v ON_ERROR_STOP=1 -f "$file"
           done
-          for file in incremental-regression program-integrity food-cache-regression session-regression notification-regression notification-scheduler-regression; do
+          for file in incremental-regression program-integrity food-cache-regression session-regression login-recovery-regression notification-regression notification-scheduler-regression; do
             psql -h 127.0.0.1 -U postgres -d devfit_scale_ci -v ON_ERROR_STOP=1 -f "tests/scaling/$file.sql"
           done
 

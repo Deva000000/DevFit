@@ -48,8 +48,10 @@
   };
 
   // Missing/expired sessions stay local; a later authenticated load reconciles.
+  const PAGE_OWNER = getEmail();
+  function ownsPage() { return getEmail() === PAGE_OWNER; }
   function getToken() {
-    if (!CLOUD_SYNC_ENABLED) return '';
+    if (!CLOUD_SYNC_ENABLED || !ownsPage()) return '';
     try { return localStorage.getItem('devfit_token') || ''; } catch (e) { return ''; }
   }
   function getEmail() {
@@ -87,6 +89,7 @@
         deviceId: localStorage.getItem('devfit_device_id') || 'unknown'
       }, extra || {}))
     });
+    if (!ownsPage()) return { skip: true, reason: 'account_changed' };
     if (res.status === 401 && !retried && global.DevFitAuth && global.DevFitAuth.reverify) {
       const refreshed = await global.DevFitAuth.reverify();
       if (refreshed === 'ok' || refreshed === 'reload') return apiCall(op, extra, true);
@@ -108,7 +111,8 @@
       err.status = res.status;
       throw err;
     }
-    return await res.json();
+    const data = await res.json();
+    return ownsPage() ? data : { skip: true, reason: 'account_changed' };
     } finally { if (timeout) clearTimeout(timeout); }
   }
 
@@ -772,6 +776,7 @@
   }
 
   function cloudSave(dataType, data) {
+    if (!ownsPage()) return Promise.resolve(false);
     // Page initializers and preference backups call save even when unchanged.
     // An acknowledged no-op must not start a debounce, mark a fresh local edit,
     // or bias later conflict resolution toward a document nobody edited.

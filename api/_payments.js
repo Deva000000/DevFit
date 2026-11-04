@@ -127,6 +127,9 @@ async function activeAccount(email) {
 }
 
 export async function handlePaymentOperation(req, res, email, op, body) {
+  if(op==='submitPayment'&&process.env.DEVFIT_STRIPE_ENABLED==='true'){
+    res.status(410).json({error:'receipt_upload_retired',message:'Update DevFit and use secure online payment in Billing. Do not send a screenshot or pay the old QR.'});return;
+  }
   const account = await activeAccount(email);
   if (!account.email) { res.status(account.status).json({ error: account.error }); return; }
 

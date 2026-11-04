@@ -56,6 +56,18 @@ export default async function handler(req, res) {
   } };
 
   try {
+    if (['billingHistory','createCheckout','checkoutStatus','paymentInvoice'].includes(op)) {
+      try {
+        const {handleStripeOperation}=await import('./_stripe-payments.js');
+        await handleStripeOperation(req,res,email,body);
+      } catch (_) {
+        // Provider errors can include fragments of private keys. Never persist
+        // or send the raw SDK message/stack to the client or monitoring table.
+        await recordServerEvent('billing_failure','Payment operation temporarily unavailable',{page:'/api/data',status:503});
+        res.status(503).json({error:'billing_unavailable'});
+      }
+      return;
+    }
     if (op === 'paymentHistory' || op === 'submitPayment') {
       await handlePaymentOperation(req, res, email, op, body);
       return;

@@ -464,46 +464,21 @@ html.nosplash #devfit-splash{display:none!important}
 
     <a href="pricing.html" id="renew-btn" class="upgrade-btn">Renew Pro — RM19.90/month</a>
 
-    <div class="payment-proof-box" id="payment-proof-box">
-      <div class="section-label" style="margin-bottom:4px">Choose, pay &amp; submit</div>
-      <div class="card-sub" style="margin-top:0">Select app access or a coaching package. DevFit links the receipt to your signed-in Gmail. Every payment is checked before access is activated.</div>
-      <div class="payment-form">
-        <div class="payment-field full"><label for="payment-offer">What are you buying?</label><select id="payment-offer">
-          <option value="app_pro">DevFit Pro app · 30 days</option>
-          <option value="coaching_4w">Coaching · 4 weeks</option>
-          <option value="coaching_8w">Coaching · 8 weeks</option>
-          <option value="coaching_12w">Coaching · 12 weeks</option>
-          <option value="coaching_student_4w">Student coaching · 4 weeks</option>
-        </select></div>
-        <details class="payment-field full coaching-poster-details"><summary>See coaching packages and poster</summary><img src="devfit-coaching-poster.png" loading="lazy" alt="DevFit online coaching: 4 weeks RM200, 8 weeks RM360, 12 weeks RM500, student 4 weeks RM160; includes custom training and diet plan, weekly reviews, WhatsApp check-ins and DevFit app access."><span class="card-sub">Use the DuitNow QR below for payment. The poster QR is for coaching enquiries.</span></details>
-        <div class="payment-field"><label for="payment-payer-name">Your name</label><input id="payment-payer-name" autocomplete="name" maxlength="80" placeholder="Full name"></div>
-        <div class="payment-field"><label for="payment-payer-whatsapp">WhatsApp number</label><input id="payment-payer-whatsapp" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="e.g. 60123456789"></div>
-        <div class="payment-field full"><label for="payment-payer-email">Gmail linked to this payment</label><input id="payment-payer-email" type="email" readonly></div>
+    <div class="payment-proof-box" id="payment-checkout">
+      <div class="section-label">Payment</div>
+      <p class="card-sub">Pay once. No automatic renewal. Pro app access lasts one calendar month; coaching follows the selected number of weeks.</p>
+      <div class="payment-fields">
+        <div class="payment-field full"><label for="payment-offer">Choose your plan</label><select id="payment-offer"><option>Loading plans…</option></select></div>
+        <div class="payment-field"><label for="billing-name">Full name</label><input id="billing-name" autocomplete="name" maxlength="80" style="font-size:16px"></div>
+        <div class="payment-field"><label for="billing-phone">Contact number</label><input id="billing-phone" type="tel" autocomplete="tel" maxlength="24" style="font-size:16px"></div>
+        <div class="payment-field full"><label for="billing-email">DevFit account receiving access</label><input id="billing-email" type="email" readonly style="font-size:16px"></div>
       </div>
-      <div class="payment-offer-summary" id="payment-offer-summary">Loading the current price…</div>
-      <img class="payment-qr" id="payment-qr" src="duitnow-qr.jpg" alt="DevFit DuitNow payment QR">
-      <div class="card-sub">Pay the exact listed amount with the reference below. Student pricing is subject to eligibility review.</div>
-      <div class="payment-ref"><code id="payment-reference">Loading…</code><button id="copy-payment-reference" type="button">Copy</button></div>
-      <div class="receipt-actions">
-        <button id="choose-payment-proof" type="button">Choose screenshot</button>
-        <button id="submit-payment-proof" class="primary" type="button" disabled>Submit receipt</button>
-      </div>
-      <input id="payment-proof-file" type="file" accept="image/jpeg,image/png,image/webp" hidden>
-      <div class="receipt-file" id="payment-proof-file-status">JPG, PNG or WebP. DevFit compresses it securely before upload; maximum saved size 450 KB.</div>
-      <a class="payment-whatsapp" id="payment-whatsapp-followup" href="#" target="_blank" rel="noopener" hidden>Send payment notice on WhatsApp</a>
-      <div class="card-sub" id="payment-whatsapp-note" hidden>WhatsApp opens a prepared message. Tap Send there to notify DevFit; your private receipt stays in DevFit.</div>
-      <div class="payment-history">
-        <div class="section-label" style="margin-bottom:4px">Payment history</div>
-        <div id="payment-history-list" class="card-sub">Loading…</div>
-      </div>
-    </div>
-
-    <!-- How billing works -->
-    <div class="bill-steps" id="bill-steps">
-      <div class="bill-step"><div class="n">1</div><div class="tx"><b id="payment-step-price">Pay the listed amount</b> via DuitNow QR and use the reference shown above.</div></div>
-      <div class="bill-step"><div class="n">2</div><div class="tx"><b>Upload the receipt here.</b> It is linked to your signed-in Gmail and submitted for verification.</div></div>
-      <div class="bill-step"><div class="n">3</div><div class="tx"><b>Activation follows verification.</b> Your plan dates appear above after access is approved.</div></div>
-      <div class="bill-step"><div class="n">4</div><div class="tx"><b>Full access lasts through the displayed end date.</b> When it ends, the app returns to Free and keeps your logged data.</div></div>
+      <div class="payment-offer-summary" id="billing-price" role="status">Checking current price…</div>
+      <button class="upgrade-btn" type="button" id="billing-pay" disabled style="width:100%;border:0;margin-top:12px">Continue to secure payment</button>
+      <p class="card-sub" id="billing-result" role="status" aria-live="polite"></p>
+      <details class="coaching-poster-details" style="margin-top:16px"><summary>What is included in Pro?</summary><p class="card-sub">Full program history, progress and training analytics, workout and nutrition PDFs, progress reports, and premium share cards. Your saved logs remain yours on Free.</p><a href="pricing.html">Compare all benefits</a></details>
+      <details class="coaching-poster-details" style="margin-top:12px"><summary>Coaching packages &amp; poster</summary><img src="devfit-coaching-poster.png" loading="lazy" alt="DevFit coaching packages: 4 weeks RM200, 8 weeks RM360, 12 weeks RM500; student eligibility must be confirmed."><p class="card-sub">Coaching includes Pro for the purchased period. Student eligibility must be confirmed before a discounted checkout is offered. The poster QR is for enquiries, not payment.</p></details>
+      <details class="payment-history" id="billing-history"><summary style="cursor:pointer;font-weight:700">Payments &amp; invoices</summary><div id="billing-history-list" class="card-sub" style="margin-top:12px">Loading…</div><button type="button" class="setting-btn" id="billing-refresh">Refresh payment status</button></details>
     </div>
   </div>
 
@@ -666,7 +641,7 @@ html.nosplash #devfit-splash{display:none!important}
 
   <div class="footer">
     DevFit · Dominance Through Discipline<br>
-    <a href="#support-group-title" id="footer-support-link">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.97.0
+    <a href="#support-group-title" id="footer-support-link">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.98.0
   </div>
 
 
@@ -972,124 +947,8 @@ function fmtDate(d){ try{ const x=new Date(/^\d{4}-\d{2}-\d{2}$/.test(d)?d+'T12:
   }catch(e){}
 })();
 
-// ---------- PAYMENT RECEIPTS ----------
-var pendingPaymentImage='';
-var paymentCatalog=[];
-var paymentBaseReference='';
-var paymentOwnerWhatsapp='60183679177';
-function paymentAmount(cents){return 'RM'+(Number(cents||0)/100).toFixed(2);}
-function selectedPaymentOffer(){return paymentCatalog.find(function(x){return x.code===document.getElementById('payment-offer').value;})||null;}
-function updatePaymentOffer(){
-  var selected=selectedPaymentOffer(),base=paymentBaseReference;
-  var codes={app_pro:'APP',coaching_4w:'C4',coaching_8w:'C8',coaching_12w:'C12',coaching_student_4w:'STU4'};
-  document.getElementById('payment-reference').textContent=base?base.replace(/_APP$/,'_'+(codes[document.getElementById('payment-offer').value]||'APP')):'Loading…';
-  document.getElementById('payment-offer-summary').innerHTML=selected?
-    '<strong>'+paymentEscape(selected.label)+'</strong> · <b>'+paymentEscape(paymentAmount(selected.amountCents))+'</b><br>'+(selected.code==='coaching_student_4w'?'Confirm student eligibility with DevFit before paying. ':'')+'Receipt review and activation are handled by DevFit.':
-    'The current price is unavailable. Please wait and retry before paying.';
-  document.getElementById('payment-step-price').textContent=selected?'Pay '+paymentAmount(selected.amountCents):'Pay the listed amount';
-}
-function paymentToken(){try{return DevFitAuth.getToken()||'';}catch(e){return '';}}
-function paymentDate(value){try{return new Date(value).toLocaleString('en-MY',{dateStyle:'medium',timeStyle:'short'});}catch(e){return '—';}}
-function paymentEscape(value){return String(value==null?'':value).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
-function paintPaymentHistory(rows){
-  var box=document.getElementById('payment-history-list'); if(!box)return;
-  if(!rows||!rows.length){box.innerHTML='<div class="card-sub">No receipts submitted yet.</div>';return;}
-  box.innerHTML=rows.map(function(p){
-    var status=String(p.status||'pending');
-    var label=status==='verified'?'Verified':status==='rejected'?'Needs attention':'Under review';
-    var offer=paymentCatalog.find(function(x){return x.code===p.offer_code;});
-    return '<div class="payment-history-item"><div class="ref">'+paymentEscape((offer&&offer.label)||p.reference||'DevFit payment')+'</div>'+
-      '<div class="status '+status+'">'+label+'</div><div class="when">'+paymentEscape(paymentDate(p.uploaded_at))+' · '+Math.max(1,Math.round((p.byte_size||0)/1024))+' KB</div></div>';
-  }).join('');
-}
-async function paymentRequest(op,payload){
-  var token=paymentToken(); if(!token)throw new Error('Sign in again to continue.');
-  var body=Object.assign({op:op,deviceId:localStorage.getItem('devfit_device_id')||'unknown'},payload||{});
-  var res=await fetch('/api/data',{method:'POST',cache:'no-store',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(body)});
-  var data=await res.json().catch(function(){return {};});
-  if(!res.ok){
-    var messages={invalid_image:'Choose a valid JPG, PNG or WebP screenshot.',image_too_large:'The compressed receipt is still too large.',invalid_offer:'Choose a valid payment option.',invalid_payment_details:'Enter your name and WhatsApp number.',email_mismatch:'Use the Gmail connected to this DevFit account.',receipt_already_used_for_another_offer:'This screenshot is already attached to another package. Upload the receipt for this payment.',upload_limit_reached:'Upload limit reached. Contact DevFit if you need help.',payment_settings_unavailable:'Current payment prices are unavailable. Please do not pay yet; retry shortly.',receipt_storage_unavailable:'Receipt storage is temporarily unavailable.',payment_save_failed:'The receipt could not be saved. Please retry.'};
-    throw new Error(messages[data.error]||'Payment service is temporarily unavailable.');
-  }
-  return data;
-}
-async function loadPaymentHistory(){
-  try{
-    var data=await paymentRequest('paymentHistory');
-    paymentCatalog=data.offers||[];
-    paymentBaseReference=data.reference||'';
-    paymentOwnerWhatsapp=String(data.ownerWhatsapp||'60183679177').replace(/\D/g,'');
-    var user=JSON.parse(localStorage.getItem('devfit_user')||'{}');
-    document.getElementById('payment-payer-email').value=data.email||'';
-    if(!document.getElementById('payment-payer-name').value)document.getElementById('payment-payer-name').value=user.name||'';
-    if(!document.getElementById('payment-payer-whatsapp').value)document.getElementById('payment-payer-whatsapp').value=localStorage.getItem('devfit_payment_whatsapp')||'';
-    var saved=localStorage.getItem('devfit_selected_offer');
-    if(saved&&paymentCatalog.some(function(x){return x.code===saved;}))document.getElementById('payment-offer').value=saved;
-    updatePaymentOffer();
-    paintPaymentHistory(data.payments||[]);
-    fetch('/api/config',{cache:'no-store'}).then(function(r){return r.json();}).then(function(cfg){if(cfg&&cfg.qr)document.getElementById('payment-qr').src=cfg.qr;}).catch(function(){});
-  }catch(e){
-    var box=document.getElementById('payment-history-list');if(box)box.textContent=e.message;
-    var ref=document.getElementById('payment-reference');if(ref)ref.textContent='Unavailable';
-  }
-}
-function canvasBlob(canvas,quality){return new Promise(function(resolve){canvas.toBlob(resolve,'image/jpeg',quality);});}
-function readAsDataUrl(blob){return new Promise(function(resolve,reject){var r=new FileReader();r.onload=function(){resolve(r.result);};r.onerror=reject;r.readAsDataURL(blob);});}
-function loadReceiptImage(file){return new Promise(function(resolve,reject){
-  var url=URL.createObjectURL(file),img=new Image();
-  img.onload=function(){URL.revokeObjectURL(url);resolve(img);};
-  img.onerror=function(){URL.revokeObjectURL(url);reject(new Error('That file is not a readable image.'));};img.src=url;
-});}
-async function compressPaymentProof(file){
-  if(!file||!/^image\/(jpeg|png|webp)$/i.test(file.type)||file.size>15*1024*1024)throw new Error('Choose a JPG, PNG or WebP image under 15 MB.');
-  var img=await loadReceiptImage(file),limits=[1200,1050,900,760],qualities=[.78,.68,.58,.5],blob=null;
-  for(var i=0;i<limits.length;i++){
-    var scale=Math.min(1,limits[i]/Math.max(img.naturalWidth,img.naturalHeight));
-    var c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.naturalWidth*scale));c.height=Math.max(1,Math.round(img.naturalHeight*scale));
-    var ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(img,0,0,c.width,c.height);
-    blob=await canvasBlob(c,qualities[i]);if(blob&&blob.size<=450000)break;
-  }
-  if(!blob||blob.size>450000)throw new Error('This screenshot could not be compressed enough. Crop it to the payment details and try again.');
-  return {data:await readAsDataUrl(blob),bytes:blob.size};
-}
-async function choosePaymentProof(event){
-  var file=event.target.files&&event.target.files[0];event.target.value='';if(!file)return;
-  var status=document.getElementById('payment-proof-file-status'),submit=document.getElementById('submit-payment-proof');
-  pendingPaymentImage='';submit.disabled=true;status.textContent='Preparing a small secure copy…';
-  try{var packed=await compressPaymentProof(file);pendingPaymentImage=packed.data;submit.disabled=false;status.textContent='Ready to submit · '+Math.max(1,Math.round(packed.bytes/1024))+' KB. The full image is not kept on this page.';}
-  catch(e){status.textContent=e.message;toast(e.message,true);}
-}
-async function submitPaymentProof(){
-  if(!pendingPaymentImage)return;
-  var btn=document.getElementById('submit-payment-proof'),status=document.getElementById('payment-proof-file-status');
-  var offer=selectedPaymentOffer(),name=document.getElementById('payment-payer-name').value.trim(),phone=document.getElementById('payment-payer-whatsapp').value.trim();
-  if(!offer){toast('Wait for the current price to load, then retry.',true);return;}
-  if(name.length<2||!/^\+?[0-9\s()-]{7,22}$/.test(phone)||phone.replace(/\D/g,'').length<7){toast('Enter your name and a valid WhatsApp number.',true);return;}
-  btn.disabled=true;btn.textContent='Submitting…';
-  try{
-    var data=await paymentRequest('submitPayment',{image:pendingPaymentImage,offerCode:offer.code,payerName:name,payerWhatsApp:phone,payerEmail:document.getElementById('payment-payer-email').value});
-    pendingPaymentImage='';localStorage.setItem('devfit_payment_whatsapp',phone);
-    status.textContent=data.duplicate?'This receipt was already submitted.':'Receipt saved privately. DevFit will check the payment before activating access.';
-    toast('Payment receipt submitted ✓');
-    if(!data.duplicate&&data.payment){
-      var message=['Hi DevFit, I submitted a payment receipt for review.','Package: '+offer.label,'Listed price: '+paymentAmount(offer.amountCents),'Name: '+name,'Gmail: '+document.getElementById('payment-payer-email').value,'Receipt ID: '+data.payment.id,'I understand activation follows your review.'].join('\n');
-      var link=document.getElementById('payment-whatsapp-followup');
-      link.href='https://wa.me/'+paymentOwnerWhatsapp+'?text='+encodeURIComponent(message);link.hidden=false;
-      document.getElementById('payment-whatsapp-note').hidden=false;
-    }
-    await loadPaymentHistory();
-  }catch(e){btn.disabled=false;status.textContent=e.message;toast(e.message,true);}
-  finally{btn.textContent='Submit receipt';}
-}
-document.getElementById('choose-payment-proof').addEventListener('click',function(){document.getElementById('payment-proof-file').click();});
-document.getElementById('payment-proof-file').addEventListener('change',choosePaymentProof);
-document.getElementById('submit-payment-proof').addEventListener('click',submitPaymentProof);
-document.getElementById('copy-payment-reference').addEventListener('click',async function(){
-  var value=document.getElementById('payment-reference').textContent;
-  try{await navigator.clipboard.writeText(value);toast('Payment reference copied ✓');}catch(e){prompt('Copy your payment reference:',value);}
-});
-document.getElementById('payment-offer').addEventListener('change',function(){localStorage.setItem('devfit_selected_offer',this.value);updatePaymentOffer();});
-loadPaymentHistory();
+// Billing controls are implemented in billing-ui.js.
+function paymentToken(){return DevFitAuth.getToken()||'';}
 
 // ---------- CUSTOMER SUPPORT ----------
 (function customerSupport(){
@@ -1686,6 +1545,7 @@ body{padding-bottom:104px!important}
 </nav>
 <script>(function(){var raw=location.pathname.split('/').pop();var p=raw.replace(/\.html$/,'')||'index';document.querySelectorAll('.devfit-bottomnav a').forEach(function(a){if(a.getAttribute('href').replace(/\.html$/,'')===p)a.classList.add('active');});})();</script>
 <script src="/pwa-update.js"></script>
+<script src="billing-ui.js"></script>
 <script src="devfit-db.js"></script>
 <script>
 // Read ALL report sources on a fresh/reinstalled device, and again before an

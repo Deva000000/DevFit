@@ -138,6 +138,7 @@
 
     <!-- ===== PAYMENTS VIEW ===== -->
     <div id="view-payments" class="hide">
+      <div class="card"><h2>Stripe payments &amp; invoices</h2><div class="hint">Payment amounts and access dates below come from verified server records. No screenshot can mark a Stripe order paid.</div><div id="stripe-orders" class="list"></div></div>
       <div class="card">
         <h2>Payment verification <span class="tap" id="refresh-payments">refresh</span></h2>
         <div class="hint" style="margin-top:0;margin-bottom:10px">Receipts are private. Open a proof only when reviewing it, then mark it verified or rejected. Pro activation remains a separate owner action.</div>
@@ -210,6 +211,7 @@
           <button class="b-red" data-act="revoke">✕ Revoke</button>
         </div>
         <div class="msg" id="act-msg"></div>
+        <div class="actions"><button type="button" onclick="studentPricing(true)">Approve student pricing</button><button type="button" onclick="studentPricing(false)">Remove student pricing</button></div>
         <div class="hint">
           Access is Pro from <b>Start</b> through the whole <b>End</b> day, then auto-reverts to Free —
           exactly on time. <b>To Free</b> keeps their login &amp; data; <b>Revoke</b> blocks login (data kept).
@@ -540,6 +542,12 @@ function renderList(subs){
   });
 }
 
+/* Student discounts are an owner-approved eligibility flag, never a UI claim. */
+function studentPricing(approved){
+  var email=($('email').value||'').trim();if(!email){alert('Choose or enter an account first.');return;}
+  if(!confirm((approved?'Enable':'Remove')+' verified student pricing for '+email+'?'))return;
+  call('studentEligibility',{email:email,approved:approved}).then(function(r){alert(r.status===200?'Student pricing updated.':'Could not update student pricing.');});
+}
 /* ---------- invoices ---------- */
 var invBuilt = null;  // { doc, filename, invNo, name, price }
 
@@ -885,7 +893,29 @@ function paymentStatus(status){
 function paymentWhen(value){
   try{return new Date(value).toLocaleString('en-MY',{dateStyle:'medium',timeStyle:'short'});}catch(e){return '—';}
 }
+async function refreshStripeOrders(){
+  var box=$('stripe-orders');box.textContent='Loading…';
+  var r=await call('stripeOrders');
+  if(r.status!==200){box.textContent='Online payment history is not available yet.';return;}
+  box.textContent='';var rows=r.data.orders||[];
+  if(!rows.length){box.textContent='No online payments yet.';return;}
+  rows.forEach(function(p){
+    var row=document.createElement('div');row.className='sub-row';row.style.cssText='display:block;overflow-wrap:anywhere';
+    row.innerHTML='<b>'+safeText(p.email)+'</b><div>'+safeText(p.offer_label)+' · '+money(p.amount_cents)+' · '+safeText(p.livemode?p.status:'TEST '+p.status)+'</div><div class="hint">'+safeText(paymentWhen(p.paid_at||p.created_at))+(p.access_end?' · Pro through '+safeText(p.access_end):'')+'</div>';
+    if(p.status==='paid'){
+      var button=document.createElement('button');button.textContent='Download verified invoice';
+      button.onclick=async function(){button.disabled=true;try{var result=await call('stripeInvoice',{id:p.id});if(result.status!==200)throw Error('Invoice unavailable');var bytes=Uint8Array.from(atob(result.data.pdf),function(c){return c.charCodeAt(0)});var url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));var a=document.createElement('a');a.href=url;a.download=result.data.filename;a.click();setTimeout(function(){URL.revokeObjectURL(url)},60000);}catch(e){alert(e.message)}finally{button.disabled=false}};
+      row.appendChild(button);
+    }
+    if(['refunded','disputed'].includes(p.status)&&!p.reviewed_at){
+      var review=document.createElement('button');review.textContent='Resolve payment review';
+      review.onclick=async function(){if(!confirm('Confirm you reviewed this refund/dispute and all remaining paid access. This clears the payment hold but does not restore Pro; set the correct access dates separately in Manage.'))return;var result=await call('resolveStripeReview',{id:p.id});if(result.status!==200)alert('Could not resolve review.');refreshStripeOrders();};row.appendChild(review);
+    }
+    box.appendChild(row);
+  });
+}
 async function refreshPayments(){
+  refreshStripeOrders();
   var box=$('payments'); box.innerHTML='<div class="hint">Loading payment history…</div>';
   var r=await call('payments');
   if(r.status!==200){box.innerHTML='<div class="hint">Payment history could not load. Retry shortly.</div>';return;}

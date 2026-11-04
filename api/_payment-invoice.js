@@ -1,0 +1,34 @@
+import { jsPDF } from 'jspdf';
+export function paymentInvoice(order) {
+  if(order.status!=='paid'||!order.paid_at||!order.stripe_payment_intent)throw new Error('verified_payment_required');
+  const doc=new jsPDF({unit:'mm',format:'a4'}),red=[204,0,0],ink=[28,28,34];
+  const ascii=s=>String(s||'').replace(/[^\x20-\x7e]/g,' ').replace(/\s+/g,' ').trim();
+  doc.setFillColor(...red);doc.rect(0,0,210,6,'F');doc.setTextColor(...ink);
+  doc.setFont('helvetica','bold');doc.setFontSize(25);doc.text('DEVFIT',20,27);
+  doc.setFontSize(10);doc.setTextColor(100);doc.text('DOMINANCE THROUGH DISCIPLINE',20,34);
+  doc.setFontSize(24);doc.setTextColor(...ink);doc.text(order.livemode?'PAID INVOICE':'TEST INVOICE',20,59);
+  const number='DF-'+order.id.toUpperCase();
+  doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(90);doc.text(number,20,69);
+  doc.text('Payment confirmed: '+new Date(order.paid_at).toISOString().replace('T',' ').slice(0,19)+' UTC',20,76);
+  doc.setDrawColor(225);doc.line(20,85,190,85);
+  doc.setFontSize(10);doc.setTextColor(...ink);doc.setFont('helvetica','bold');doc.text('BILLED TO',20,97);doc.text('ISSUED BY',119,97);
+  doc.setFont('helvetica','normal');doc.text(doc.splitTextToSize(ascii(order.payer_name)||'DevFit customer',88),20,106);
+  doc.text(doc.splitTextToSize(ascii(order.email),88),20,119);
+  doc.text(doc.splitTextToSize(ascii(process.env.DEVFIT_INVOICE_BUSINESS_NAME||'DEVFIT'),71),119,106);
+  doc.text(doc.splitTextToSize(ascii(process.env.DEVFIT_INVOICE_BUSINESS_ADDRESS||''),71),119,119);
+  doc.text('devaa1024@gmail.com',119,139);
+  doc.setFillColor(245,245,247);doc.roundedRect(20,153,170,39,3,3,'F');
+  doc.setFont('helvetica','bold');doc.text(doc.splitTextToSize(ascii(order.offer_label),115),26,165);
+  doc.text('MYR '+(order.amount_cents/100).toFixed(2),184,165,{align:'right'});
+  doc.setFont('helvetica','normal');doc.setFontSize(9);
+  doc.text('Quantity: 1 | One-time payment | No automatic renewal',26,182);
+  doc.setFontSize(17);doc.setFont('helvetica','bold');doc.text('TOTAL PAID',20,210);doc.text('MYR '+(order.amount_cents/100).toFixed(2),190,210,{align:'right'});
+  doc.setFontSize(10);doc.setFont('helvetica','normal');
+  if(order.access_end)doc.text('Pro access through '+order.access_end,20,224);
+  doc.setFontSize(8);doc.setTextColor(100);doc.text(doc.splitTextToSize('Payment reference: '+ascii(order.stripe_payment_intent),170),20,240);
+  doc.text('Verified payment record. Contact DevFit for any applicable tax documentation.',20,255);
+  doc.text('This document is not a validated government e-Invoice.',20,261);
+  if(!order.livemode)doc.text('TEST ONLY - No real payment or Pro activation.',20,267);
+  doc.setDrawColor(225);doc.line(20,275,190,275);doc.text('devfitportal.vercel.app',20,283);doc.text('1 / 1',190,283,{align:'right'});
+  return {filename:'DevFit_Invoice_'+order.id+'.pdf',pdf:Buffer.from(doc.output('arraybuffer')).toString('base64')};
+}

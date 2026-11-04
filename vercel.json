@@ -1,6 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["hnd1"],
+  "rewrites": [
+    { "source": "/api/stripe-webhook", "destination": "/api/admin?webhook=stripe" }
+  ],
   "functions": {
     "api/admin.js": { "maxDuration": 60 },
     "api/pro-access.js": {

@@ -2,6 +2,11 @@
   "name": "devfit",
   "private": true,
   "type": "module",
-  "engines": { "node": "24.x" },
-  "dependencies": { "jspdf": "4.2.1" }
+  "engines": {
+    "node": "24.x"
+  },
+  "dependencies": {
+    "jspdf": "4.2.1",
+    "stripe": "23.1.0"
+  }
 }

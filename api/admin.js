@@ -25,12 +25,15 @@ import { notifySavedPayment } from './_payments.js';
 import { runNotificationWorker } from './_notification-worker.js';
 
 const ADMIN_PW = process.env.DEVFIT_ADMIN_PASSWORD || '';
+export const config={api:{bodyParser:false}};
 const BACKUP_TABLES = {
   devfit_subscribers: 'email.asc',
   devfit_data: 'email.asc,data_type.asc',
   devfit_data_versions: 'id.asc',
   devfit_logins: 'email.asc,device_id.asc',
   devfit_payments: 'email.asc,uploaded_at.asc',
+  devfit_checkout_orders: 'email.asc,created_at.asc,id.asc',
+  devfit_checkout_eligibility: 'email.asc',
   devfit_support_requests: 'email.asc,created_at.asc',
   devfit_security_events: 'id.asc',
   devfit_security_blocks: 'created_at.asc',
@@ -81,6 +84,13 @@ async function deletionCounts(email) {
 }
 
 export default async function handler(req, res) {
+  // Dedicated public webhook URL is rewritten here to share a function slot.
+  // Only Stripe's raw-body signature authenticates this isolated branch; no
+  // browser-controlled action or cookie can select a privileged admin action.
+  if (req.query?.webhook === 'stripe') {
+    const { default: webhook } = await import('./_stripe-webhook.js');
+    return webhook(req,res);
+  }
   setApiSecurityHeaders(res);
   if (req.method !== 'POST') { res.status(405).json({ error: 'method' }); return; }
   if (!haveServerConfig()) { res.status(501).json({ error: 'not_configured' }); return; }
@@ -135,6 +145,34 @@ export default async function handler(req, res) {
   const email = String(body.email || '').trim().toLowerCase();
 
   try {
+    if(action==='studentEligibility'){
+      if(!email||typeof body.approved!=='boolean'){res.status(400).json({error:'invalid_eligibility'});return;}
+      const sub=await getSubscriber(email);
+      if(!sub?.approved){res.status(404).json({error:'account_unavailable'});return;}
+      const saved=await sbUpsert('devfit_checkout_eligibility',{email,student_approved:body.approved,updated_at:new Date().toISOString()},'email');
+      res.status(saved?200:503).json({ok:!!saved});return;
+    }
+    if (action === 'stripeOrders') {
+      const rows=await sbSelect('devfit_checkout_orders','select=id,email,offer_label,amount_cents,currency,status,livemode,payer_name,payer_phone,created_at,paid_at,access_start,access_end,reviewed_at&order=created_at.desc&limit=250');
+      if(!rows){res.status(503).json({error:'billing_unavailable'});return;}
+      res.status(200).json({orders:rows});return;
+    }
+    if (action === 'stripeInvoice') {
+      const {validOrderId}=await import('./_stripe-payments.js');
+      if(!validOrderId(body.id)){res.status(400).json({error:'invalid_order'});return;}
+      const rows=await sbSelect('devfit_checkout_orders','id=eq.'+body.id+'&limit=1');
+      if(!rows?.[0]||rows[0].status!=='paid'){res.status(404).json({error:'invoice_unavailable'});return;}
+      const {paymentInvoice}=await import('./_payment-invoice.js');
+      res.status(200).json(paymentInvoice(rows[0]));return;
+    }
+    if(action==='resolveStripeReview'){
+      const {validOrderId}=await import('./_stripe-payments.js');
+      if(!validOrderId(body.id)){res.status(400).json({error:'invalid_order'});return;}
+      const saved=await sbPatch('devfit_checkout_orders','id=eq.'+body.id+'&status=in.(refunded,disputed)',{reviewed_at:new Date().toISOString()});
+      if(!saved?.[0]){res.status(409).json({error:'review_unavailable'});return;}
+      await recordSecurityEvent({email:saved[0].email,type:'payment_review_resolved',severity:'info',route:'/api/admin',reason:'Owner reviewed refund/dispute; entitlement restoration remains a separate owner action'});
+      res.status(200).json({ok:true});return;
+    }
     if (action === 'list') {
       const rows = await sbSelect('devfit_subscribers', 'select=email,name,tier,approved,expiry,start_date,plan,updated_at&order=updated_at.desc');
       res.status(200).json({ subscribers: rows || [] });

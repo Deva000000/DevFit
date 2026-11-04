@@ -33,13 +33,13 @@ test('all sensitive browser requests carry the stable device id', () => {
   const auth = fs.readFileSync(new URL('../devfit-auth.js', import.meta.url), 'utf8');
   const db = fs.readFileSync(new URL('../devfit-db.js', import.meta.url), 'utf8');
   const food = fs.readFileSync(new URL('../food-search-client.js', import.meta.url), 'utf8');
-  const settings = fs.readFileSync(new URL('../settings.html', import.meta.url), 'utf8');
+  const settings = fs.readFileSync(new URL('../billing-ui.js', import.meta.url), 'utf8');
   assert.match(auth, /body: JSON\.stringify\(\{ deviceId: deviceId\(\) \}\)/);
   assert.match(auth, /provider: provider, token: providerToken, deviceId: deviceId\(\)/);
   assert.match(auth, /token: token, email: u\.email, deviceId: deviceId\(\)/);
   assert.match(db, /deviceId: localStorage\.getItem\('devfit_device_id'\)/);
   assert.match(food, /'X-DevFit-Device': deviceId/);
-  assert.match(settings, /op:op,deviceId:localStorage\.getItem\('devfit_device_id'\)/);
+  assert.match(settings, /deviceId:localStorage\.getItem\('devfit_device_id'\)/);
 });
 
 test('admin exposes auditable security events and reversible owner controls', () => {

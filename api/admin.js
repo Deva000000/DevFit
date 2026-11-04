@@ -87,7 +87,12 @@ export default async function handler(req, res) {
   // Dedicated public webhook URL is rewritten here to share a function slot.
   // Only Stripe's raw-body signature authenticates this isolated branch; no
   // browser-controlled action or cookie can select a privileged admin action.
-  if (req.query?.webhook === 'stripe') {
+  // Vercel's lazy req.query getter uses deprecated url.parse(). Match both the
+  // public alias and rewritten URL using WHATWG URL, without touching that getter.
+  let route;
+  try{route=new URL(req.url||'/api/admin','https://devfit.internal');}
+  catch(_){res.status(400).json({error:'invalid_url'});return;}
+  if (route.pathname==='/api/stripe-webhook'||route.searchParams.get('webhook')==='stripe') {
     const { default: webhook } = await import('./_stripe-webhook.js');
     return webhook(req,res);
   }

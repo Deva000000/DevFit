@@ -158,3 +158,13 @@ test('only authenticated owner can reconcile Stripe; edited paid flags and amoun
     try{assert.equal((await run()).code,503);}finally{process.env.STRIPE_SECRET_KEY=saved;}
   }finally{globalThis.fetch=original;delete process.env.DEVFIT_ADMIN_PASSWORD;}
 });
+
+test('public and rewritten webhook URLs avoid Vercel legacy query getter and require a valid signature',async()=>{
+  const {default:admin}=await import('../api/admin.js');
+  for(const url of ['/api/stripe-webhook','/api/admin?webhook=stripe']){
+    const req={method:'POST',url,headers:{'stripe-signature':'invalid'},body:'{}'};
+    Object.defineProperty(req,'query',{get(){throw Error('Legacy query getter must not run');}});
+    const res={setHeader(){},status(n){this.code=n;return this;},json(v){this.body=v;}};
+    await admin(req,res);assert.equal(res.code,400);assert.equal(res.body.error,'invalid_signature');
+  }
+});

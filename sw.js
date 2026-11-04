@@ -61,7 +61,7 @@ const SHELL_HASHES = {
   "./nutrition.html": "ee697ac9fb1813467fded11893cd87c9bef12b8f6f1e4ca1a6e6be362e4be4c1",
   "./workouts.html": "2c005f4decf7a05ecfbf600bcbde31f3ae13eaae8fdb15e77f4a9a0177f28b22",
   "./settings.html": "233f7cf42a35c0c01a37a72ea3d06641632d718f3337c4b33b579030845e328e",
-  "./admin.html": "726af23d147bb601ec5e04bb573f7e1bcf04f23c4f8c3005ff4be850c9505e14",
+  "./admin.html": "01f90309d5b74e7f20d30bac53d3224e1cfc14ebfd7adde6cb1d1ac844f6e07b",
   "./landing.html": "5bd79fc0d33a1ff8055e6b43f9606a772eec8347cf26dfad1117c9207c6e62fc",
   "./pricing.html": "20d1bcc03d25f14cb2167146fd741dc5f00331054d715d53c2ce6f28090789e2",
   "./privacy.html": "e14fe65f4a8d92a1bdd3b4d937f4e1b4f25cd5e25b97251a5340f3993afa72b8",
@@ -95,7 +95,7 @@ const SHELL_HASHES = {
   "./theme.css": "e63bd16a33952266e2479f34c746df45b4fdd25ca0f72b35f1288a951746f0fc",
   "./theme.js": "e3f8156550f06bc900432207523dc0ef2b0e7cbc75f95b1939e1d739910688ef"
 };
-const RELEASE_ID = "a5098229ea94e95bf584a04a5cb7bd03a646e7d72df4097c68b685065337507f";
+const RELEASE_ID = "b6e5f257ea30abb955bbbdc08bf19cbf987fa617823f8248b1ec6db0ffbee3c0";
 // RELEASE_HASHES_END
 
 // Keep this list aligned with CSP connect-src: intercepted CDN requests are

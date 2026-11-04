@@ -69,6 +69,8 @@
   .payment-actions button:hover{border-color:#cc0000;color:#fff}
   .payment-actions .verify{background:#14532d;border-color:#166534;color:#dcfce7}
   .payment-actions .reject{background:#3f1616;border-color:#7f1d1d;color:#fecaca}
+  #stripe-orders button,#refresh-stripe-orders{padding:9px 12px;margin:8px 8px 0 0;background:#242424;border:1px solid #383838;color:#ddd;font-size:12px}
+  #stripe-orders button:disabled{opacity:.6;cursor:wait}
   .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:none;align-items:center;justify-content:center;padding:16px}
   .modal-bg.show{display:flex}
   .modal{background:#111;border:1px solid #333;border-top:3px solid #cc0000;border-radius:14px;padding:20px;max-width:420px;width:100%}
@@ -138,7 +140,7 @@
 
     <!-- ===== PAYMENTS VIEW ===== -->
     <div id="view-payments" class="hide">
-      <div class="card"><h2>Stripe payments &amp; invoices</h2><div class="hint">Payment amounts and access dates below come from verified server records. No screenshot can mark a Stripe order paid.</div><div id="stripe-orders" class="list"></div></div>
+      <div class="card"><h2>Stripe payments &amp; invoices</h2><div class="hint">Check payment status directly with Stripe, manage the matching account, or download a verified invoice. Amounts cannot be changed here and screenshots cannot mark an order paid.</div><button type="button" id="refresh-stripe-orders">Refresh online payments</button><div id="stripe-orders-msg" class="hint" role="status" aria-live="polite"></div><div id="stripe-orders" class="list"></div></div>
       <div class="card">
         <h2>Payment verification <span class="tap" id="refresh-payments">refresh</span></h2>
         <div class="hint" style="margin-top:0;margin-bottom:10px">Receipts are private. Open a proof only when reviewing it, then mark it verified or rejected. Pro activation remains a separate owner action.</div>
@@ -337,13 +339,15 @@ function addDays(d,n){ var x=new Date(d); x.setDate(x.getDate()+n); return x; }
 
 async function call(action, extra){
   var body = Object.assign({ action: action }, extra || {});
-  var res = await fetch(API, { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
-  var data = await res.json().catch(function(){ return {}; });
-  return { status: res.status, data: data };
+  try{
+    var res = await fetch(API, { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    var data = await res.json().catch(function(){ return {}; });
+    return { status: res.status, data: data };
+  }catch(_){return {status:0,data:{error:'network_unavailable'}};}
 }
 
 /* ---------- encrypted owner backup ---------- */
-var BACKUP_TABLES=['devfit_subscribers','devfit_data','devfit_data_versions','devfit_logins','devfit_payments','devfit_support_requests','devfit_security_events','devfit_security_blocks','devfit_config'];
+var BACKUP_TABLES=['devfit_subscribers','devfit_data','devfit_data_versions','devfit_logins','devfit_payments','devfit_checkout_orders','devfit_checkout_eligibility','devfit_support_requests','devfit_security_events','devfit_security_blocks','devfit_config'];
 var BACKUP_AAD='DevFit Owner Backup v1';
 function bytesToB64(bytes){
   var out='', chunk=0x8000;
@@ -902,6 +906,26 @@ async function refreshStripeOrders(){
   rows.forEach(function(p){
     var row=document.createElement('div');row.className='sub-row';row.style.cssText='display:block;overflow-wrap:anywhere';
     row.innerHTML='<b>'+safeText(p.email)+'</b><div>'+safeText(p.offer_label)+' · '+money(p.amount_cents)+' · '+safeText(p.livemode?p.status:'TEST '+p.status)+'</div><div class="hint">'+safeText(paymentWhen(p.paid_at||p.created_at))+(p.access_end?' · Pro through '+safeText(p.access_end):'')+'</div>';
+    var manage=document.createElement('button');manage.type='button';manage.textContent='Manage account';
+    manage.onclick=async function(){
+      manage.disabled=true;
+      try{var result=await call('get',{email:p.email});if(result.status!==200||!result.data.subscriber)throw Error('Account details unavailable. Please refresh.');
+        var sub=result.data.subscriber;$('email').value=sub.email;$('name').value=sub.name||'';
+        $('start').value=sub.start_date||ymd(new Date());$('end').value=sub.expiry||ymd(new Date());updateDuration();
+        showTab('manage');$('email').scrollIntoView({behavior:'smooth'});
+      }catch(e){$('stripe-orders-msg').textContent=e.message;}finally{manage.disabled=false;}
+    };row.appendChild(manage);
+    if(p.status==='pending'){
+      var check=document.createElement('button');check.type='button';check.textContent='Check with Stripe';
+      check.onclick=async function(){
+        check.disabled=true;$('stripe-orders-msg').textContent='Checking Stripe…';
+        try{var result=await call('stripeReconcile',{id:p.id});
+          if(result.status!==200){var messages={stripe_not_configured:'Stripe credentials are not configured yet.',payment_mode_mismatch:'This order belongs to a different Stripe test/live environment.',payment_not_verified:'Stripe has not verified this payment. Access was not changed.',payment_review_required:'This payment requires owner review.',retry_later:'Please wait a minute before checking again.'};throw Error(messages[result.data.error]||'Payment check unavailable. Please retry; do not manually mark it paid.');}
+          $('stripe-orders-msg').textContent=result.data.order.status==='paid'?(result.data.order.test?'Test payment confirmed. Customer Pro access was not changed.':'Stripe payment confirmed. Account access and invoice are updated.'):'Stripe still reports this payment as pending. No access was changed.';
+          await refreshStripeOrders();
+        }catch(e){$('stripe-orders-msg').textContent=e.message;}finally{check.disabled=false;}
+      };row.appendChild(check);
+    }
     if(p.status==='paid'){
       var button=document.createElement('button');button.textContent='Download verified invoice';
       button.onclick=async function(){button.disabled=true;try{var result=await call('stripeInvoice',{id:p.id});if(result.status!==200)throw Error('Invoice unavailable');var bytes=Uint8Array.from(atob(result.data.pdf),function(c){return c.charCodeAt(0)});var url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));var a=document.createElement('a');a.href=url;a.download=result.data.filename;a.click();setTimeout(function(){URL.revokeObjectURL(url)},60000);}catch(e){alert(e.message)}finally{button.disabled=false}};
@@ -1160,6 +1184,7 @@ $('security-reset-devices').addEventListener('click',function(){securityResetDev
 $('refresh-errors').addEventListener('click', refreshErrors);
 $('error-days').addEventListener('change',refreshErrors);
 $('refresh-payments').addEventListener('click', refreshPayments);
+$('refresh-stripe-orders').addEventListener('click', refreshStripeOrders);
 $('refresh-support').addEventListener('click', refreshSupport);
 $('payment-proof-close').addEventListener('click',function(){$('payment-proof-image').removeAttribute('src');$('payment-proof-panel').classList.add('hide');});
 $('payment-detect-amount').addEventListener('click',async function(){

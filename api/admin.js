@@ -157,6 +157,29 @@ export default async function handler(req, res) {
       if(!rows){res.status(503).json({error:'billing_unavailable'});return;}
       res.status(200).json({orders:rows});return;
     }
+    if(action==='stripeReconcile'){
+      // Owner recovery path for a delayed webhook; never a manual paid toggle.
+      // Keep provider exceptions out of the outer logger (SDK errors may contain keys).
+      try{
+        const {validOrderId,stripeConfig,reconcileCheckout,publicOrder}=await import('./_stripe-payments.js');
+        if(!validOrderId(body.id)){res.status(400).json({error:'invalid_order'});return;}
+        const cfg=stripeConfig();
+        if(!cfg.configured){res.status(503).json({error:'stripe_not_configured'});return;}
+        const limited=await rateLimit('admin_stripe_reconcile',20,60,{failClosed:true});
+        if(!limited.ok){res.status(limited.unavailable?503:429).json({error:'retry_later'});return;}
+        const rows=await sbSelect('devfit_checkout_orders','id=eq.'+body.id+'&limit=1'),order=rows?.[0];
+        if(!rows){res.status(503).json({error:'billing_unavailable'});return;}
+        if(!order){res.status(404).json({error:'order_unavailable'});return;}
+        if(order.livemode!==cfg.live){res.status(409).json({error:'payment_mode_mismatch'});return;}
+        if(!['pending','paid'].includes(order.status)){res.status(409).json({error:'payment_review_required'});return;}
+        const result=await reconcileCheckout(order);
+        if(!['ok','pending'].includes(result.status)){res.status(409).json({error:'payment_not_verified'});return;}
+        const current=await sbSelect('devfit_checkout_orders','id=eq.'+body.id+'&limit=1');
+        if(!current?.[0]){res.status(503).json({error:'billing_unavailable'});return;}
+        await recordSecurityEvent({email:order.email,type:'payment_reconciled',severity:'info',route:'/api/admin',reason:'Owner requested canonical Stripe payment verification; no manual payment override'});
+        res.status(200).json({order:publicOrder(current[0])});return;
+      }catch(_){res.status(503).json({error:'payment_check_unavailable'});return;}
+    }
     if (action === 'stripeInvoice') {
       const {validOrderId}=await import('./_stripe-payments.js');
       if(!validOrderId(body.id)){res.status(400).json({error:'invalid_order'});return;}

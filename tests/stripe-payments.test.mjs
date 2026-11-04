@@ -122,3 +122,39 @@ test('signed webhook re-reads provider payment; refund mode mismatch never reach
     assert.equal(await deliver('charge.refunded',{id:'ch_qa'}),400);assert.equal(review,-1,'Test event cannot suspend a live order');
   }finally{globalThis.fetch=original;}
 });
+
+test('only authenticated owner can reconcile Stripe; edited paid flags and amounts grant nothing',async()=>{
+  process.env.DEVFIT_ADMIN_PASSWORD='synthetic-owner-password';
+  const {default:admin}=await import('../api/admin.js');
+  const {signAdminSession}=await import('../api/_lib.js');
+  const original=fetch;let fulfilled=0,providerPaid=false,wrongAmount=false;
+  const row={...order,status:'pending',offer_code:'app_pro',offer_label:'Pro',created_at:new Date().toISOString()};
+  globalThis.fetch=async(u,o={})=>{
+    const url=new URL(String(u)),name=url.pathname.split('/').at(-1);
+    const response=v=>new Response(JSON.stringify(v),{headers:{'Content-Type':'application/json'}});
+    if(url.hostname==='api.stripe.com'){
+      const s=paid();if(!providerPaid)s.payment_status='unpaid';if(wrongAmount)s.amount_total=1;
+      return response(s);
+    }
+    if(name==='consume_devfit_rate_limit')return response({allowed:true});
+    if(name==='devfit_checkout_orders')return response([row]);
+    if(name==='fulfill_devfit_checkout'){fulfilled++;row.status='paid';return response({status:'ok'});}
+    if(name==='devfit_security_events')return response([]);
+    throw Error('Unexpected route '+name);
+  };
+  const run=async(auth=true,extra={})=>{
+    const res={setHeader(){},status(n){this.code=n;return this;},json(v){this.body=v;}};
+    await admin({method:'POST',headers:{host:'devfit.test',origin:'https://devfit.test',...(auth?{cookie:'devfit_admin_session='+signAdminSession()}: {})},body:{action:'stripeReconcile',id:row.id,status:'paid',amountCents:1,...extra}},res);
+    return res;
+  };
+  try{
+    assert.equal((await run(false)).code,401);assert.equal(fulfilled,0);
+    assert.equal((await run(true,{id:'invalid'})).code,400);
+    const unpaid=await run();assert.equal(unpaid.code,200);assert.equal(unpaid.body.order.status,'pending');assert.equal(fulfilled,0);
+    providerPaid=true;wrongAmount=true;assert.equal((await run()).code,409);assert.equal(fulfilled,0);
+    wrongAmount=false;row.livemode=true;assert.equal((await run()).code,409);assert.equal(fulfilled,0);
+    row.livemode=false;const verified=await run();assert.equal(verified.code,200);assert.equal(verified.body.order.status,'paid');assert.equal(fulfilled,1);
+    const saved=process.env.STRIPE_SECRET_KEY;delete process.env.STRIPE_SECRET_KEY;
+    try{assert.equal((await run()).code,503);}finally{process.env.STRIPE_SECRET_KEY=saved;}
+  }finally{globalThis.fetch=original;delete process.env.DEVFIT_ADMIN_PASSWORD;}
+});

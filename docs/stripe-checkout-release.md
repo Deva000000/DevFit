@@ -17,6 +17,10 @@ No customer payments or production migrations are part of the local QA.
   Success URLs, payment email edits, uploaded receipts and client Pro flags cannot.
 - Test orders never change any account entitlement. Duplicate delivery does not
   extend Pro twice. A Stripe payment intent cannot fund multiple orders.
+- Admin Payments can refresh history, check a pending order directly with Stripe,
+  open its account and download the same verified invoice. Reconciliation requires
+  an authenticated owner session and configured matching test/live credentials;
+  it never trusts a manually entered amount or offers a manual paid toggle.
 - Refund/dispute notifications suspend Pro (not login or history) until owner
   review of all remaining manual/paid periods. Resolving the review does not
   restore Pro automatically: the owner sets the correct remaining access dates.

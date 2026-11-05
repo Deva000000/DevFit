@@ -1,5 +1,24 @@
 # Stripe checkout release checklist
 
+## Release state — 5 November 2026
+
+- Production report-only hotfix: `bd06363`, v4.97.1. No billing rollout or
+  customer database writes. Previous programs are visible without metric cells,
+  historical period selection is directly available, renewal does not limit dates.
+- This branch simplifies the training contact/poster into nested collapsed details.
+- Student-card submission, owner notification and approval-before-checkout still
+  require implementation and testing; the current eligibility flag alone is not
+  that workflow. Do not present it as completed or enable the payment release.
+- User approved a temporary pause of Student-evaluation solely for an RM0 staging
+  test window. It is STILL ACTIVE; pause only after local preparation is complete.
+  Pause staging before restoring Student-evaluation, verify restoration, and never
+  pause production DevFit. Supabase restore may update service/database versions;
+  review compatibility and recovery readiness before starting the window.
+- Free project creation was rejected at the existing two-active-project quota.
+  Stripe sandbox connection exists; private Preview key was updated by the user.
+  Isolated staging database, Preview backend secrets and webhook acceptance remain
+  pending. Do not use production database credentials in Preview.
+
 This integration is disabled by default. Do not enable it with a key pasted into
 chat, and do not switch live payments on before the hosted sandbox checks pass.
 No customer payments or production migrations are part of the local QA.

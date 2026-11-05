@@ -151,7 +151,7 @@ test('progress UI provisions weeks automatically and uses quick sleep and step s
 });
 
 test('training plan reorders workout days and exercises without rebuilding their records', () => {
-  const html=fs.readFileSync(new URL('../workouts.html',import.meta.url),'utf8');
+  const html=fs.readFileSync(new URL('../workouts.html',import.meta.url),'utf8').replace(/\r\n/g,'\n');
   const helper=html.match(/function orderItemsByIds\(items,ids\)\{[\s\S]*?\n\}(?=\n\nlet activePlanReorder)/);
   assert.ok(helper,'reorder helper should remain independently testable');
   const context={Map,String,Array};

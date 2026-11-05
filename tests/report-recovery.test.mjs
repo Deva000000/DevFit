@@ -134,3 +134,21 @@ test('report training includes archived cycles once and prefers the live version
     cycleArchive:[{sessions:[{id:'old',date:'2026-08-01',workoutId:'upper',notes:'old'},{id:'archived',date:'2026-07-20',workoutId:'lower'}]}]}));
   const train=c.loadTraining();assert.equal(train.sessions.length,2);assert.equal(train.sessions[0].notes,'latest');
 });
+
+test('renewal does not hide archived training-only programs or reset Week 1 selection',async()=>{
+  const {c,storage,nodes}=settingsContext();
+  const old=fixture();old.bw=old.bw.map(()=>Array(7).fill(''));
+  const canonical=c.DevFitProgress.ensureDocument(old),archivedId=canonical.activeProgramId;
+  const fresh=c.DevFitProgress.startProgram(canonical,{start:'2026-09-28',duration:8});
+  storage.set('progressLog2',JSON.stringify(fresh));
+  storage.set('devfit_user',JSON.stringify({email:'renewed@example.invalid',tier:'pro',startDate:'2026-09-28',expiry:'2026-10-28'}));
+  storage.set('devfitTrainingV1',JSON.stringify({sessions:[{date:'2026-07-13',workoutId:'upper'}]}));
+  c.loadReportData();c.buildRangeOptions();
+  const program=nodes.get('report-program');assert.equal(program.children.length,2,'Metric-free archive remains selectable');
+  program.value=archivedId;program.onchange();assert.equal(c.appData.programStart,'2026-07-13');
+  const period=nodes.get('program-report-range');period.value=String(c.REPORT_RANGES.findIndex(r=>r.kind==='week'&&r.startW===0));period.onchange();
+  c.DevFitDB={restoreAccount:async()=>({ok:true})};let generated;
+  c.generateReport=async range=>{generated=range;};await c.exportProgramPDF();
+  assert.equal(generated.startW,0);assert.equal(generated.endW,0);assert.equal(program.value,archivedId);
+  assert.equal(JSON.parse(storage.get('progressLog2')).activeProgramId,fresh.activeProgramId);
+});

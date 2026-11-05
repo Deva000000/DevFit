@@ -60,10 +60,10 @@ const SHELL_HASHES = {
   "./index.html": "3dc47eb62017123ce0b95c0f923426d4e87836960d96a43086b5d24f67192c66",
   "./nutrition.html": "ee697ac9fb1813467fded11893cd87c9bef12b8f6f1e4ca1a6e6be362e4be4c1",
   "./workouts.html": "2c005f4decf7a05ecfbf600bcbde31f3ae13eaae8fdb15e77f4a9a0177f28b22",
-  "./settings.html": "233f7cf42a35c0c01a37a72ea3d06641632d718f3337c4b33b579030845e328e",
+  "./settings.html": "74785ee4efcc30419dbf5a1383460ad709a9f9a54cc0634aa31e3574f7aa425d",
   "./admin.html": "01f90309d5b74e7f20d30bac53d3224e1cfc14ebfd7adde6cb1d1ac844f6e07b",
   "./landing.html": "5bd79fc0d33a1ff8055e6b43f9606a772eec8347cf26dfad1117c9207c6e62fc",
-  "./pricing.html": "20d1bcc03d25f14cb2167146fd741dc5f00331054d715d53c2ce6f28090789e2",
+  "./pricing.html": "570d0678c90cd4e07371f4afc757c3d248bcd2fb076b987ce74a984659383f91",
   "./privacy.html": "e14fe65f4a8d92a1bdd3b4d937f4e1b4f25cd5e25b97251a5340f3993afa72b8",
   "./terms.html": "26887975647009b1b1e82c4ccd8ad2732b4c1d94f36530d79c721f88298c55b0",
   "./manifest.json": "d8c0d8d5ca8e140ac96b5f41c91236be60e484b9832ab940ddb48ec52a1b2b3c",
@@ -95,7 +95,7 @@ const SHELL_HASHES = {
   "./theme.css": "e63bd16a33952266e2479f34c746df45b4fdd25ca0f72b35f1288a951746f0fc",
   "./theme.js": "e3f8156550f06bc900432207523dc0ef2b0e7cbc75f95b1939e1d739910688ef"
 };
-const RELEASE_ID = "b6e5f257ea30abb955bbbdc08bf19cbf987fa617823f8248b1ec6db0ffbee3c0";
+const RELEASE_ID = "fe528480619fd6d6d0e11f26775bf7ce5dec1454d1239fe8c96a211d82718862";
 // RELEASE_HASHES_END
 
 // Keep this list aligned with CSP connect-src: intercepted CDN requests are

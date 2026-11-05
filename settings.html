@@ -90,7 +90,7 @@
   /* RANGE PICKER ROW */
   .range-row{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:10px;align-items:end}
   .range-picker-label{display:block;font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#aaa;margin:0 0 6px 4px}
-  .range-row select{width:100%;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;padding:11px 14px;border:1px solid #3a3a3a;border-radius:11px;background:#1a1a1a;color:#fff;outline:none;cursor:pointer}
+  .range-row select{width:100%;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;padding:11px 14px;border:1px solid #3a3a3a;border-radius:11px;background:#1a1a1a;color:#fff;outline:none;cursor:pointer}
   .range-row select:focus{border-color:#cc0000;box-shadow:0 0 0 3px rgba(204,0,0,.12)}
   .range-summary{margin-top:8px;padding:10px 12px;border-radius:9px;background:#17171a;border:1px solid #303036;color:#999;font-size:11px;line-height:1.45}
   .range-summary strong{display:block;color:#fff;font-size:12px;margin-bottom:2px}
@@ -477,7 +477,7 @@ html.nosplash #devfit-splash{display:none!important}
       <button class="upgrade-btn" type="button" id="billing-pay" disabled style="width:100%;border:0;margin-top:12px">Continue to secure payment</button>
       <p class="card-sub" id="billing-result" role="status" aria-live="polite"></p>
       <details class="coaching-poster-details" style="margin-top:16px"><summary>What is included in Pro?</summary><p class="card-sub">Full program history, progress and training analytics, workout and nutrition PDFs, progress reports, and premium share cards. Your saved logs remain yours on Free.</p><a href="pricing.html">Compare all benefits</a></details>
-      <details class="coaching-poster-details" style="margin-top:12px"><summary>Coaching packages &amp; poster</summary><img src="devfit-coaching-poster.png" loading="lazy" alt="DevFit coaching packages: 4 weeks RM200, 8 weeks RM360, 12 weeks RM500; student eligibility must be confirmed."><p class="card-sub">Coaching includes Pro for the purchased period. Student eligibility must be confirmed before a discounted checkout is offered. The poster QR is for enquiries, not payment.</p></details>
+      <details class="coaching-poster-details" style="margin-top:12px"><summary>Looking for personal training?</summary><p class="card-sub"><a href="https://wa.me/60183679177" target="_blank" rel="noopener noreferrer">Contact DevFit directly</a> for a personalised training and nutrition plan.</p><details><summary>View coaching packages &amp; poster</summary><img src="devfit-coaching-poster.png" loading="lazy" alt="DevFit coaching packages: 4 weeks RM200, 8 weeks RM360, 12 weeks RM500; student eligibility must be confirmed."><p class="card-sub">Coaching includes Pro for the purchased period. Student pricing requires approval before payment. The poster QR is for enquiries, not payment.</p></details></details>
       <details class="payment-history" id="billing-history"><summary style="cursor:pointer;font-weight:700">Payments &amp; invoices</summary><div id="billing-history-list" class="card-sub" style="margin-top:12px">Loading…</div><button type="button" class="setting-btn" id="billing-refresh">Refresh payment status</button></details>
     </div>
   </div>
@@ -510,7 +510,7 @@ html.nosplash #devfit-splash{display:none!important}
       <div class="chev">›</div>
     </button>
 
-    <button class="setting-btn" id="program-report-toggle-btn" type="button">
+    <button class="setting-btn" id="program-report-toggle-btn" type="button" style="display:none">
       <div class="icon">P</div>
       <div class="body">
         <div class="title">Progress Report (PDF)</div>
@@ -519,9 +519,10 @@ html.nosplash #devfit-splash{display:none!important}
       <div class="chev">›</div>
     </button>
 
-    <div id="range-row" class="range-row" style="display:none">
+    <p class="card-sub">Active Pro unlocks every retained program and past week, including history from before a renewal. Choose a program above, then the period below.</p>
+    <div id="range-row" class="range-row">
       <div>
-        <label class="range-picker-label" for="program-report-range">Report period</label>
+        <label class="range-picker-label" for="program-report-range">Choose a past week or period</label>
         <select id="program-report-range"><option value="0">This week</option></select>
         <div class="range-summary" id="report-range-summary" aria-live="polite"></div>
       </div>
@@ -1077,9 +1078,11 @@ function buildReportProgramOptions(){
   const sel=document.getElementById('report-program');if(!sel) return;
   const canonical=DevFitProgress.ensureDocument(JSON.parse(localStorage.getItem('progressLog2')||'{}'));
   sel.innerHTML='';
-  (canonical.programs||[]).filter(p=>p.id===canonical.activeProgramId||DevFitProgress.programHasData(p)).forEach(p=>{
+  // Workouts/nutrition live in separate dated documents. A program with no
+  // metric cells may still contain a complete training/diet report.
+  (canonical.programs||[]).forEach((p,index)=>{
     const opt=document.createElement('option');opt.value=p.id;
-    opt.textContent=(p.id===canonical.activeProgramId?'Current':'Archived')+' · '+p.start+' · '+Math.max(p.duration,(p.bw||[]).length)+' weeks';
+    opt.textContent=(p.id===canonical.activeProgramId?'Current program':'Previous program')+' '+(index+1)+' · '+p.start+' · '+Math.max(p.duration,(p.bw||[]).length)+' weeks';
     sel.appendChild(opt);
   });
   sel.value=reportProgramId||canonical.activeProgramId;

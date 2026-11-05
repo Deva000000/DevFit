@@ -47,6 +47,9 @@ test('billing defaults disabled, live/test keys cannot be mixed, and public hist
   assert.equal(stripeConfig().ready,false);
   process.env.DEVFIT_STRIPE_ENABLED='true';process.env.STRIPE_MODE='live';assert.equal(stripeConfig().ready,false);
   process.env.STRIPE_MODE='test';assert.equal(stripeConfig().ready,true);delete process.env.DEVFIT_STRIPE_ENABLED;
+  const previousEnvironment=process.env.VERCEL_ENV;process.env.VERCEL_ENV='production';
+  try{assert.equal(stripeConfig().configured,false,'Production must refuse a test-mode key even when configured');}
+  finally{if(previousEnvironment===undefined)delete process.env.VERCEL_ENV;else process.env.VERCEL_ENV=previousEnvironment;}
   const p=publicOrder({...order,stripe_payment_intent:'private_ref',checkout_url:'private_url',request_id:'private_request'});
   assert(!JSON.stringify(p).includes('private_'));assert.equal(p.id,order.id);
 });

@@ -5,7 +5,9 @@ import { paymentOffers } from './_payments.js';
 
 export function stripeConfig() {
   const key=process.env.STRIPE_SECRET_KEY||'',mode=process.env.STRIPE_MODE||'test';
-  const valid=['test','live'].includes(mode)&&new RegExp('^(sk|rk)_'+mode+'_').test(key);
+  const environment=process.env.VERCEL_ENV;
+  const modeAllowed=environment==='production'?mode==='live':environment==='preview'?mode==='test':true;
+  const valid=modeAllowed&&['test','live'].includes(mode)&&new RegExp('^(sk|rk)_'+mode+'_').test(key);
   return {key,mode,live:mode==='live',configured:valid&&!!process.env.STRIPE_WEBHOOK_SECRET,ready:valid&&!!process.env.STRIPE_WEBHOOK_SECRET
     &&process.env.DEVFIT_STRIPE_ENABLED==='true'};
 }

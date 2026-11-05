@@ -29,7 +29,7 @@ export async function paymentOffers() {
   if (!Array.isArray(rows) || !rows[0]) return null;
   const config = rows[0];
   return {
-    offers: [{ code: 'app_pro', label: 'DevFit Pro app · 30 days', amountCents: appPriceCents(config.price) },
+    offers: [{ code: 'app_pro', label: 'DevFit Pro app · 1 calendar month', amountCents: appPriceCents(config.price) },
       ...Object.entries(COACHING_OFFERS).map(([code, offer]) => ({ code, label: offer.label, amountCents: offer.amountCents }))],
     ownerWhatsapp: String(config.whatsapp || '60183679177').replace(/\D/g, '').slice(0, 15)
   };
@@ -50,7 +50,7 @@ export async function sendPaymentNotification(payment) {
   const apiKey = process.env.RESEND_API_KEY || '';
   if (!apiKey) return { ok: false, configured: false, error: 'email_not_configured' };
   const offer = COACHING_OFFERS[payment.offer_code];
-  const label = offer ? offer.label : 'DevFit Pro app · 30 days';
+  const label = offer ? offer.label : 'DevFit Pro app · 1 calendar month';
   const amount = payment.expected_amount_cents ? 'RM' + (payment.expected_amount_cents / 100).toFixed(2) : 'Not recorded';
   const body = [
     'New DevFit receipt awaiting your review', '',
@@ -127,9 +127,6 @@ async function activeAccount(email) {
 }
 
 export async function handlePaymentOperation(req, res, email, op, body) {
-  if(op==='submitPayment'&&process.env.DEVFIT_STRIPE_ENABLED==='true'){
-    res.status(410).json({error:'receipt_upload_retired',message:'Update DevFit and use secure online payment in Billing. Do not send a screenshot or pay the old QR.'});return;
-  }
   const account = await activeAccount(email);
   if (!account.email) { res.status(account.status).json({ error: account.error }); return; }
 
@@ -139,7 +136,10 @@ export async function handlePaymentOperation(req, res, email, op, body) {
     if (!Array.isArray(rows)) { res.status(503).json({ error: 'payment_history_unavailable' }); return; }
     const catalog = await paymentOffers();
     if (!catalog) { res.status(503).json({ error: 'payment_settings_unavailable' }); return; }
-    res.status(200).json({ email, reference: paymentReference(email), payments: rows, ...catalog });
+    const eligibility=await sbSelect('devfit_checkout_eligibility','email=eq.'+encodeURIComponent(email)+'&select=student_approved&limit=1');
+    const studentApproved=eligibility?.[0]?.student_approved===true;
+    res.status(200).json({ email, reference: paymentReference(email), payments: rows, ...catalog,
+      studentApproved,offers:catalog.offers.filter(o=>o.code!=='coaching_student_4w'||studentApproved) });
     return;
   }
 
@@ -155,6 +155,11 @@ export async function handlePaymentOperation(req, res, email, op, body) {
   if (!perAccount.ok || !perIp.ok) { res.status(429).json({ error: 'upload_limit_reached' }); return; }
 
   const offerCode = String(body.offerCode || 'app_pro');
+  if(offerCode==='coaching_student_4w'){
+    const eligible=await sbSelect('devfit_checkout_eligibility','email=eq.'+encodeURIComponent(email)+'&select=student_approved&limit=1');
+    if(!eligible){res.status(503).json({error:'student_verification_unavailable'});return;}
+    if(eligible[0]?.student_approved!==true){res.status(403).json({error:'student_approval_required'});return;}
+  }
   const catalog = await paymentOffers();
   if (!catalog) { res.status(503).json({ error: 'payment_settings_unavailable' }); return; }
   const selectedOffer = catalog.offers.find((offer) => offer.code === offerCode);

@@ -36,6 +36,7 @@ const SHELL_FILES = [
   './devfit-db.js',
   './devfit-auth.js',
   './billing-ui.js',
+  './qr-billing-ui.js',
   './input-limits.js',
   './receipt-amount.js',
   './login-install.js',
@@ -60,10 +61,10 @@ const SHELL_HASHES = {
   "./index.html": "3dc47eb62017123ce0b95c0f923426d4e87836960d96a43086b5d24f67192c66",
   "./nutrition.html": "ee697ac9fb1813467fded11893cd87c9bef12b8f6f1e4ca1a6e6be362e4be4c1",
   "./workouts.html": "2c005f4decf7a05ecfbf600bcbde31f3ae13eaae8fdb15e77f4a9a0177f28b22",
-  "./settings.html": "74785ee4efcc30419dbf5a1383460ad709a9f9a54cc0634aa31e3574f7aa425d",
+  "./settings.html": "0ef2f5c1d95ce1f4f14d6663d16c482802422e58dca117c54a3e395c060dba81",
   "./admin.html": "01f90309d5b74e7f20d30bac53d3224e1cfc14ebfd7adde6cb1d1ac844f6e07b",
   "./landing.html": "5bd79fc0d33a1ff8055e6b43f9606a772eec8347cf26dfad1117c9207c6e62fc",
-  "./pricing.html": "570d0678c90cd4e07371f4afc757c3d248bcd2fb076b987ce74a984659383f91",
+  "./pricing.html": "a043c7efb3a4fe0100ab4168d7fba8557b503fd135cd7c761f26bcded9647b55",
   "./privacy.html": "e14fe65f4a8d92a1bdd3b4d937f4e1b4f25cd5e25b97251a5340f3993afa72b8",
   "./terms.html": "26887975647009b1b1e82c4ccd8ad2732b4c1d94f36530d79c721f88298c55b0",
   "./manifest.json": "d8c0d8d5ca8e140ac96b5f41c91236be60e484b9832ab940ddb48ec52a1b2b3c",
@@ -78,7 +79,8 @@ const SHELL_HASHES = {
   "./favicon.ico": "91fa6dbfe049c74ea62e0dcdf3326b40e05481eb3928541ae946385c2510520b",
   "./devfit-db.js": "be4d69bcae29356b62da785a3d00759c44bb3bf451c9e6a4ec1b3024cbd7a8bc",
   "./devfit-auth.js": "24591a74395d20cd0ed5b1cacd8ff5171ad078df55e60619fd2919766560f2a8",
-  "./billing-ui.js": "592678f09b12ed85a2a2bff275dd01fd1cfa9498f5a2c611b0b2d67378e1af5a",
+  "./billing-ui.js": "07304d31eb128e6c3fd9c94640eda5f2371e9469fc38445f9eb6ff883762ed2a",
+  "./qr-billing-ui.js": "91fa645a4d752fb80659069f2fed61f60585e638155f2fe057204c3d0bd2928b",
   "./input-limits.js": "05b91043997e9c813f4390115c6d1db37f30e97a398855faabb8b6cd58b7521b",
   "./receipt-amount.js": "46facc92dc8e931a8b51c17f6f72a2483f455dbc438a442f5f703fe6a04e40ec",
   "./login-install.js": "e604908a18f3a92abb5a3b60b036d3b831bd10e73ae954ee158170f6c11bda6e",
@@ -95,7 +97,7 @@ const SHELL_HASHES = {
   "./theme.css": "e63bd16a33952266e2479f34c746df45b4fdd25ca0f72b35f1288a951746f0fc",
   "./theme.js": "e3f8156550f06bc900432207523dc0ef2b0e7cbc75f95b1939e1d739910688ef"
 };
-const RELEASE_ID = "fe528480619fd6d6d0e11f26775bf7ce5dec1454d1239fe8c96a211d82718862";
+const RELEASE_ID = "3038b4c28ab8fee615eb6862e12cc9c32652b43933ade9571a6871bdffb424fb";
 // RELEASE_HASHES_END
 
 // Keep this list aligned with CSP connect-src: intercepted CDN requests are

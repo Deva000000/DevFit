@@ -74,6 +74,9 @@
     }catch(e){$('billing-result').textContent=e.message;}
   }
   $('billing-pay').onclick=pay;$('payment-offer').onchange=selection;
+  $('billing-method').onchange=function(){
+    const qr=this.value==='qr';$('stripe-method-panel').hidden=qr;$('qr-method-panel').hidden=!qr;
+  };
   $('billing-refresh').onclick=async()=>{await load();await confirm();};
   load().then(confirm);
 })();

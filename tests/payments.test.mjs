@@ -36,11 +36,12 @@ test('customer payment history exposes metadata but never receipt paths',async(t
     if(u.includes('/devfit_payments?'))return {ok:true,json:async()=>[{id:'1',reference:'DEVFIT_SEP26_PAYER',status:'pending',byte_size:120000,uploaded_at:'2026-09-22T01:00:00Z'}]};
     throw new Error('unexpected '+u);
   };
-  try{const r=await run({op:'paymentHistory',email:'victim@gmail.com'});assert.equal(r.status,200);assert.equal(r.body.reference,'DEVFIT_SEP26_PAYER_APP');assert.equal(r.body.payments[0].storage_path,undefined);assert.equal(r.body.offers.length,5);}finally{globalThis.fetch=original;}
+  try{const r=await run({op:'paymentHistory',email:'victim@gmail.com'});assert.equal(r.status,200);assert.equal(r.body.reference,'DEVFIT_SEP26_PAYER_APP');assert.equal(r.body.payments[0].storage_path,undefined);assert.equal(r.body.offers.length,4);assert.equal(r.body.studentApproved,false);}finally{globalThis.fetch=original;}
 });
 
 test('valid receipt is rate-limited, stored privately and linked to signed Gmail',async()=>{
   const original=globalThis.fetch,requests=[];
+  const previousStripeFlag=process.env.DEVFIT_STRIPE_ENABLED;process.env.DEVFIT_STRIPE_ENABLED='true';
   globalThis.fetch=async(url,options={})=>{
     const u=String(url),method=options.method||'GET';requests.push({u,method,body:options.body});
     if(u.includes('/devfit_subscribers?'))return {ok:true,json:async()=>[{approved:true}]};
@@ -59,7 +60,20 @@ test('valid receipt is rate-limited, stored privately and linked to signed Gmail
     const r=await run({op:'submitPayment',email:'victim@gmail.com',image:'data:image/jpeg;base64,'+jpeg.toString('base64')});
     assert.equal(r.status,201);assert.equal(r.body.ok,true);assert.equal(r.body.payment.storage_path,undefined);
     assert.equal(requests.some(x=>x.u.includes('victim')),false);
-  }finally{globalThis.fetch=original;}
+  }finally{globalThis.fetch=original;if(previousStripeFlag===undefined)delete process.env.DEVFIT_STRIPE_ENABLED;else process.env.DEVFIT_STRIPE_ENABLED=previousStripeFlag;}
+});
+
+test('secondary QR cannot bypass owner approval of student eligibility',async()=>{
+  const original=fetch;let writes=0;
+  globalThis.fetch=async(url,options={})=>{
+    if(options.method==='POST'&&!String(url).includes('/rpc/consume_devfit_rate_limit'))writes++;
+    if(String(url).includes('/devfit_subscribers?'))return new Response(JSON.stringify([{approved:true}]));
+    if(String(url).includes('/rpc/consume_devfit_rate_limit'))return new Response(JSON.stringify({allowed:true}));
+    if(String(url).includes('/devfit_checkout_eligibility?'))return new Response(JSON.stringify([{student_approved:false}]));
+    throw Error('Unexpected storage call');
+  };
+  try{const result=await run({op:'submitPayment',offerCode:'coaching_student_4w',studentApproved:true});assert.equal(result.status,403);assert.equal(result.body.error,'student_approval_required');assert.equal(writes,0);}
+  finally{globalThis.fetch=original;}
 });
 
 test('non-image payloads are rejected before private storage',async()=>{

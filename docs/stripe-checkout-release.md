@@ -104,9 +104,12 @@ Listen for:
 8. After those checks, deploy the migration, application and private live
    configuration as a coordinated release. Do not publish a half-working Pay UI.
 
-Older cached clients receive `receipt_upload_retired` once Stripe is enabled.
-Historical receipt records and owner review remain available; no receipt is
-promoted into a trusted Stripe payment or used for automatic activation.
+Payment-method requirement updated: Stripe is the primary/default choice and
+DuitNow QR is a secondary, explicitly selected manual-verification choice.
+Receipt submissions remain available even when Stripe is enabled. QR and Stripe
+have separate histories; no receipt is promoted into a trusted Stripe payment or
+used for automatic activation. Student QR submissions also require owner-approved
+eligibility. Existing paid account access must not be changed by this UI rollout.
 
 The browser UI QA uses mocked payment responses. Unit tests use synthetic keys
 and provider responses. PostgreSQL tests use disposable local data. None is a

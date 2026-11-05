@@ -467,6 +467,9 @@ html.nosplash #devfit-splash{display:none!important}
     <div class="payment-proof-box" id="payment-checkout">
       <div class="section-label">Payment</div>
       <p class="card-sub">Pay once. No automatic renewal. Pro app access lasts one calendar month; coaching follows the selected number of weeks.</p>
+      <label for="billing-method">Payment method</label>
+      <select id="billing-method" style="width:100%;font-size:16px;padding:12px;border-radius:10px;background:#1a1a1a;color:#fff;border:1px solid #3a3a3a"><option value="stripe">Stripe — recommended</option><option value="qr">DuitNow QR — manual verification</option></select>
+      <div id="stripe-method-panel">
       <div class="payment-fields">
         <div class="payment-field full"><label for="payment-offer">Choose your plan</label><select id="payment-offer"><option>Loading plans…</option></select></div>
         <div class="payment-field"><label for="billing-name">Full name</label><input id="billing-name" autocomplete="name" maxlength="80" style="font-size:16px"></div>
@@ -476,6 +479,42 @@ html.nosplash #devfit-splash{display:none!important}
       <div class="payment-offer-summary" id="billing-price" role="status">Checking current price…</div>
       <button class="upgrade-btn" type="button" id="billing-pay" disabled style="width:100%;border:0;margin-top:12px">Continue to secure payment</button>
       <p class="card-sub" id="billing-result" role="status" aria-live="polite"></p>
+      </div>
+      <div id="qr-method-panel" hidden>
+    <div class="payment-proof-box" id="qr-payment-proof-box">
+      <div class="section-label" style="margin-bottom:4px">DuitNow QR · manual verification</div>
+      <div class="card-sub" style="margin-top:0">Select app access or a coaching package. DevFit links the receipt to your signed-in Gmail. Every payment is checked before access is activated.</div>
+      <div class="payment-form">
+        <div class="payment-field full"><label for="qr-payment-offer">What are you buying?</label><select id="qr-payment-offer">
+          <option value="app_pro">DevFit Pro app · 1 calendar month</option>
+          <option value="coaching_4w">Coaching · 4 weeks</option>
+          <option value="coaching_8w">Coaching · 8 weeks</option>
+          <option value="coaching_12w">Coaching · 12 weeks</option>
+          <option value="coaching_student_4w">Student coaching · 4 weeks</option>
+        </select></div>
+        <details class="payment-field full coaching-poster-details"><summary>See coaching packages and poster</summary><img src="devfit-coaching-poster.png" loading="lazy" alt="DevFit online coaching: 4 weeks RM200, 8 weeks RM360, 12 weeks RM500, student 4 weeks RM160; includes custom training and diet plan, weekly reviews, WhatsApp check-ins and DevFit app access."><span class="card-sub">Use the DuitNow QR below for payment. The poster QR is for coaching enquiries.</span></details>
+        <div class="payment-field"><label for="qr-payment-payer-name">Your name</label><input id="qr-payment-payer-name" autocomplete="name" maxlength="80" placeholder="Full name"></div>
+        <div class="payment-field"><label for="qr-payment-payer-whatsapp">WhatsApp number</label><input id="qr-payment-payer-whatsapp" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="e.g. 60123456789"></div>
+        <div class="payment-field full"><label for="qr-payment-payer-email">Gmail linked to this payment</label><input id="qr-payment-payer-email" type="email" readonly></div>
+      </div>
+      <div class="payment-offer-summary" id="qr-payment-offer-summary">Loading the current price…</div>
+      <img class="payment-qr" id="qr-payment-qr" src="duitnow-qr.jpg" alt="DevFit DuitNow payment QR">
+      <div class="card-sub">Pay the exact listed amount with the reference below. Student pricing is subject to eligibility review.</div>
+      <div class="payment-ref"><code id="qr-payment-reference">Loading…</code><button id="copy-qr-payment-reference" type="button">Copy</button></div>
+      <div class="receipt-actions">
+        <button id="choose-qr-payment-proof" type="button">Choose screenshot</button>
+        <button id="submit-qr-payment-proof" class="primary" type="button" disabled>Submit receipt</button>
+      </div>
+      <input id="qr-payment-proof-file" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+      <div class="receipt-file" id="qr-payment-proof-file-status">JPG, PNG or WebP. DevFit compresses it securely before upload; maximum saved size 450 KB.</div>
+      <a class="payment-whatsapp" id="qr-payment-whatsapp-followup" href="#" target="_blank" rel="noopener" hidden>Send payment notice on WhatsApp</a>
+      <div class="card-sub" id="qr-payment-whatsapp-note" hidden>WhatsApp opens a prepared message. Tap Send there to notify DevFit; your private receipt stays in DevFit.</div>
+      <div class="payment-history">
+        <div class="section-label" style="margin-bottom:4px">Payment history</div>
+        <div id="qr-payment-history-list" class="card-sub">Loading…</div>
+      </div>
+    </div>
+      </div>
       <details class="coaching-poster-details" style="margin-top:16px"><summary>What is included in Pro?</summary><p class="card-sub">Full program history, progress and training analytics, workout and nutrition PDFs, progress reports, and premium share cards. Your saved logs remain yours on Free.</p><a href="pricing.html">Compare all benefits</a></details>
       <details class="coaching-poster-details" style="margin-top:12px"><summary>Looking for personal training?</summary><p class="card-sub"><a href="https://wa.me/60183679177" target="_blank" rel="noopener noreferrer">Contact DevFit directly</a> for a personalised training and nutrition plan.</p><details><summary>View coaching packages &amp; poster</summary><img src="devfit-coaching-poster.png" loading="lazy" alt="DevFit coaching packages: 4 weeks RM200, 8 weeks RM360, 12 weeks RM500; student eligibility must be confirmed."><p class="card-sub">Coaching includes Pro for the purchased period. Student pricing requires approval before payment. The poster QR is for enquiries, not payment.</p></details></details>
       <details class="payment-history" id="billing-history"><summary style="cursor:pointer;font-weight:700">Payments &amp; invoices</summary><div id="billing-history-list" class="card-sub" style="margin-top:12px">Loading…</div><button type="button" class="setting-btn" id="billing-refresh">Refresh payment status</button></details>
@@ -1549,6 +1588,7 @@ body{padding-bottom:104px!important}
 <script>(function(){var raw=location.pathname.split('/').pop();var p=raw.replace(/\.html$/,'')||'index';document.querySelectorAll('.devfit-bottomnav a').forEach(function(a){if(a.getAttribute('href').replace(/\.html$/,'')===p)a.classList.add('active');});})();</script>
 <script src="/pwa-update.js"></script>
 <script src="billing-ui.js"></script>
+<script src="qr-billing-ui.js"></script>
 <script src="devfit-db.js"></script>
 <script>
 // Read ALL report sources on a fresh/reinstalled device, and again before an

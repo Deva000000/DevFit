@@ -1,4 +1,4 @@
-/* DevFit Service Worker — v4.97.0
+/* DevFit Service Worker — v4.97.1
    - Shell assets: one content-verified release, served from its own cache.
    - Installation fails closed if ANY required asset is missing or mismatched.
    - Switching a release is deliberate and requires other DevFit tabs to close.
@@ -7,7 +7,7 @@
    - /api/*: network-only (never cached).
 */
 
-const VERSION = 'devfit-v4.97.0';
+const VERSION = 'devfit-v4.97.1';
 
 const SHELL_FILES = [
   // ── Core HTML pages — precached so the whole app works offline ──────
@@ -59,7 +59,7 @@ const SHELL_HASHES = {
   "./index.html": "3dc47eb62017123ce0b95c0f923426d4e87836960d96a43086b5d24f67192c66",
   "./nutrition.html": "ee697ac9fb1813467fded11893cd87c9bef12b8f6f1e4ca1a6e6be362e4be4c1",
   "./workouts.html": "2c005f4decf7a05ecfbf600bcbde31f3ae13eaae8fdb15e77f4a9a0177f28b22",
-  "./settings.html": "f9bf62d5d284610f91fa6355e81f315a7c4a754810b4cb5d3f3c16b7cde14e5d",
+  "./settings.html": "0f13fc9982d3249c63b1421d762f6e64cd4639a70b80ef7a94d5b806e20aa05a",
   "./admin.html": "b0578f56c1bd9fe09e7cc9f21cc0cc04bb1f69526fa610c29cb9c9d099a0cdea",
   "./landing.html": "dc773d097643a8c435cbe99d0db99dc0ab69aa415e60dff152190f2744ddf7b4",
   "./pricing.html": "2861c7fc61b1afe6719a818f8d0eaea0f9f6e7830645a9a51d375eb88286f835",
@@ -93,7 +93,7 @@ const SHELL_HASHES = {
   "./theme.css": "e63bd16a33952266e2479f34c746df45b4fdd25ca0f72b35f1288a951746f0fc",
   "./theme.js": "e3f8156550f06bc900432207523dc0ef2b0e7cbc75f95b1939e1d739910688ef"
 };
-const RELEASE_ID = "f3e434e800b0778e38885e101183ea1cb70f5cdbcf2f43e309bf3bdacd0b2fc4";
+const RELEASE_ID = "3996bd14edf4c8862caf0e69cb1ea49c6b995e098c181d3703b611134f92466a";
 // RELEASE_HASHES_END
 
 // Keep this list aligned with CSP connect-src: intercepted CDN requests are

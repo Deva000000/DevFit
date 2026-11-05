@@ -22,3 +22,10 @@ test('rendering is isolated per request and never mutates source account data',(
   const second=renderPremiumPdf(structuredClone(docs),{...sub,name:'Another user'},'workout_pdf',{});
   assert(second.bytes.length>1000);assert.equal(JSON.stringify(docs),original);
 });
+
+test('renewed membership dates never restrict retained Week 1 or an archived program PDF',()=>{
+  const renewed={...sub,start_date:'2026-11-05',expiry:'2026-12-05',tier:'pro'};
+  const old=renderPremiumPdf(docs,renewed,'progress_pdf',{startW:0,endW:0});
+  assert(old.bytes.length>1000);assert.match(old.filename,/Week/);
+  assert.equal(JSON.stringify(docs.progress).includes('2026-11-05'),false,'Renewal must not re-date saved program records');
+});

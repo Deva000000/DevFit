@@ -90,7 +90,7 @@
   /* RANGE PICKER ROW */
   .range-row{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:10px;align-items:end}
   .range-picker-label{display:block;font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#aaa;margin:0 0 6px 4px}
-  .range-row select{width:100%;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;padding:11px 14px;border:1px solid #3a3a3a;border-radius:11px;background:#1a1a1a;color:#fff;outline:none;cursor:pointer}
+  .range-row select{width:100%;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;padding:11px 14px;border:1px solid #3a3a3a;border-radius:11px;background:#1a1a1a;color:#fff;outline:none;cursor:pointer}
   .range-row select:focus{border-color:#cc0000;box-shadow:0 0 0 3px rgba(204,0,0,.12)}
   .range-summary{margin-top:8px;padding:10px 12px;border-radius:9px;background:#17171a;border:1px solid #303036;color:#999;font-size:11px;line-height:1.45}
   .range-summary strong{display:block;color:#fff;font-size:12px;margin-bottom:2px}
@@ -535,7 +535,7 @@ html.nosplash #devfit-splash{display:none!important}
       <div class="chev">›</div>
     </button>
 
-    <button class="setting-btn" id="program-report-toggle-btn" type="button">
+    <button class="setting-btn" id="program-report-toggle-btn" type="button" style="display:none">
       <div class="icon">P</div>
       <div class="body">
         <div class="title">Progress Report (PDF)</div>
@@ -544,9 +544,10 @@ html.nosplash #devfit-splash{display:none!important}
       <div class="chev">›</div>
     </button>
 
-    <div id="range-row" class="range-row" style="display:none">
+    <p class="card-sub">Active Pro unlocks every retained program and past week, including history from before a renewal. Choose a program above, then the period below.</p>
+    <div id="range-row" class="range-row">
       <div>
-        <label class="range-picker-label" for="program-report-range">Report period</label>
+        <label class="range-picker-label" for="program-report-range">Choose a past week or period</label>
         <select id="program-report-range"><option value="0">This week</option></select>
         <div class="range-summary" id="report-range-summary" aria-live="polite"></div>
       </div>
@@ -666,7 +667,7 @@ html.nosplash #devfit-splash{display:none!important}
 
   <div class="footer">
     DevFit · Dominance Through Discipline<br>
-    <a href="#support-group-title" id="footer-support-link">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.97.0
+    <a href="#support-group-title" id="footer-support-link">Contact DevFit</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> · v4.97.1
   </div>
 
 
@@ -1218,9 +1219,10 @@ function buildReportProgramOptions(){
   const sel=document.getElementById('report-program');if(!sel) return;
   const canonical=DevFitProgress.ensureDocument(JSON.parse(localStorage.getItem('progressLog2')||'{}'));
   sel.innerHTML='';
-  (canonical.programs||[]).filter(p=>p.id===canonical.activeProgramId||DevFitProgress.programHasData(p)).forEach(p=>{
+  // Dated workouts/nutrition can exist without metric cells in this program.
+  (canonical.programs||[]).forEach((p,index)=>{
     const opt=document.createElement('option');opt.value=p.id;
-    opt.textContent=(p.id===canonical.activeProgramId?'Current':'Archived')+' · '+p.start+' · '+Math.max(p.duration,(p.bw||[]).length)+' weeks';
+    opt.textContent=(p.id===canonical.activeProgramId?'Current program':'Previous program')+' '+(index+1)+' · '+p.start+' · '+Math.max(p.duration,(p.bw||[]).length)+' weeks';
     sel.appendChild(opt);
   });
   sel.value=reportProgramId||canonical.activeProgramId;

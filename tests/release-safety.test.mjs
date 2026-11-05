@@ -238,6 +238,31 @@ test('Pro authorization ignores claimed token tier and uses the current subscrib
   } finally { globalThis.fetch = original; }
 });
 
+test('a renewed Pro account can export retained Week 1 from before renewal, while expired access stays denied',async()=>{
+  const original=fetch;let tier='free',loads=0;
+  const progress={programStart:'2026-07-13',programDuration:'12',bw:[[70,70.1]],steps:[[4000]],sleep:[[7]],weeklyCheckin:[]};
+  globalThis.fetch=async(url,options={})=>{
+    if(String(url).includes('devfit_subscribers?'))return new Response(JSON.stringify([{approved:true,tier,start_date:new Date().toISOString().slice(0,10),expiry:'2099-12-31'}]));
+    if(String(url).endsWith('/rpc/load_devfit_account')){
+      loads++;assert.equal(JSON.parse(options.body).p_email,'renewed@example.invalid');
+      return new Response(JSON.stringify({status:'ok',rows:[{data_type:'progress',data:progress}]}));
+    }
+    throw Error('Unexpected write or request');
+  };
+  const exportOld=async()=>{
+    const res=responseCapture();
+    await proAccessHandler({method:'POST',headers:{authorization:'Bearer '+signToken({email:'renewed@example.invalid',tier:'free'})},
+      body:{action:'progress_pdf',email:'other@example.invalid',selection:{startW:0,endW:0}}},res);return res.out;
+  };
+  try{
+    assert.equal((await exportOld()).status,403);assert.equal(loads,0);
+    tier='pro';const r=await exportOld();assert.equal(r.status,200);
+    assert.equal(Buffer.from(r.body.pdf,'base64').subarray(0,5).toString(),'%PDF-');assert.equal(loads,1);
+    assert.equal(progress.programStart,'2026-07-13');
+    tier='free';assert.equal((await exportOld()).status,403);assert.equal(loads,1);
+  }finally{globalThis.fetch=original;}
+});
+
 test('client premium actions fail closed and coalesce double taps', async () => {
   const authCode = fs.readFileSync(new URL('../devfit-auth.js', import.meta.url), 'utf8');
   function clientContext(serverResult) {

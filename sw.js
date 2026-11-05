@@ -65,8 +65,8 @@ const SHELL_HASHES = {
   "./admin.html": "01f90309d5b74e7f20d30bac53d3224e1cfc14ebfd7adde6cb1d1ac844f6e07b",
   "./landing.html": "5bd79fc0d33a1ff8055e6b43f9606a772eec8347cf26dfad1117c9207c6e62fc",
   "./pricing.html": "a043c7efb3a4fe0100ab4168d7fba8557b503fd135cd7c761f26bcded9647b55",
-  "./privacy.html": "e14fe65f4a8d92a1bdd3b4d937f4e1b4f25cd5e25b97251a5340f3993afa72b8",
-  "./terms.html": "26887975647009b1b1e82c4ccd8ad2732b4c1d94f36530d79c721f88298c55b0",
+  "./privacy.html": "012447920cae265ceaebde6c6b41c474dd164f12f7896445b9ae65ac756e1c24",
+  "./terms.html": "9fea48bb87c67e1647c6183aea7565f9fb233188e6b8ee156b0a7be5fcf75028",
   "./manifest.json": "d8c0d8d5ca8e140ac96b5f41c91236be60e484b9832ab940ddb48ec52a1b2b3c",
   "./icon-touch.png": "119f499d0ff0ddaa02925e63a85aff7847581e6607abcc616b759c1e95a5e074",
   "./icon-192.png": "f3dee142ca2cf9c573f1a6952f0139bc9d67610289c0e520c495f4928e5d9035",
@@ -97,7 +97,7 @@ const SHELL_HASHES = {
   "./theme.css": "e63bd16a33952266e2479f34c746df45b4fdd25ca0f72b35f1288a951746f0fc",
   "./theme.js": "e3f8156550f06bc900432207523dc0ef2b0e7cbc75f95b1939e1d739910688ef"
 };
-const RELEASE_ID = "3038b4c28ab8fee615eb6862e12cc9c32652b43933ade9571a6871bdffb424fb";
+const RELEASE_ID = "736019c34b729689d82f65f7c8bd102df3193b654a427e406e5038a428670c45";
 // RELEASE_HASHES_END
 
 // Keep this list aligned with CSP connect-src: intercepted CDN requests are
